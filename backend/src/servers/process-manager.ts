@@ -1,8 +1,18 @@
 import { execFile } from "node:child_process";
+import { promises as fs } from "node:fs";
 import { promisify } from "node:util";
 import type { ServerEntry } from "../types";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Path of the plain, line-based console log that `screen -L` writes for a
+ * server. The console viewer tails this file rather than attaching to screen
+ * directly (see console-stream.ts).
+ */
+export function consoleLogPath(entry: ServerEntry): string {
+  return `${entry.folder}/dashboard-console.log`;
+}
 
 // Matches the "<pid>.<name>" prefix of each session line in `screen -ls`
 // output. Deliberately ignores everything after the name (state, and on
@@ -65,7 +75,11 @@ export async function startServer(entry: ServerEntry): Promise<void> {
   if (await isServerRunning(entry)) {
     return;
   }
-  const logFile = `${entry.folder}/dashboard-console.log`;
+  const logFile = consoleLogPath(entry);
+  // Start each run from an empty logfile: `screen -L` *appends*, so without
+  // this the log would grow without bound across restarts and the live console
+  // would replay stale lines from previous runs on the next attach.
+  await fs.writeFile(logFile, "").catch(() => undefined);
   const command = `cd "${entry.folder}" && exec bash "${entry.startScript}"`;
   await execFileAsync(
     "screen",
@@ -76,6 +90,18 @@ export async function startServer(entry: ServerEntry): Promise<void> {
     // attaches (see console-stream.ts for the full explanation).
     { env: { ...process.env, TERM: "xterm-256color" } }
   );
+  // screen buffers logfile writes and flushes only every 10s by default, which
+  // makes the tailed live console lag badly. Flush every second so the web
+  // console stays near-real-time. Ignore failure - the console still works,
+  // just less promptly.
+  await execFileAsync("screen", [
+    "-S",
+    entry.screenName,
+    "-X",
+    "logfile",
+    "flush",
+    "1",
+  ]).catch(() => undefined);
 }
 
 /**

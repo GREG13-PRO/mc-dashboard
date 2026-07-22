@@ -1,71 +1,81 @@
-import * as pty from "node-pty";
-import type { IPty } from "node-pty";
+import { spawn } from "node:child_process";
+import type { ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
 import type { ServerEntry } from "../types";
+import { consoleLogPath } from "./process-manager";
 
 type OutputListener = (chunk: Buffer) => void;
 
-interface AttachHandle {
-  pty: IPty;
+interface TailHandle {
+  proc: ChildProcessByStdio<null, Readable, Readable>;
   listeners: Set<OutputListener>;
 }
 
-const attachments = new Map<string, AttachHandle>();
+const tails = new Map<string, TailHandle>();
 
 /**
- * Subscribes to live console output for a server, lazily spawning a
- * `screen -x` attach pty on first subscriber and tearing it down when the
- * last subscriber leaves. Returns an unsubscribe function.
+ * Subscribes to live console output for a server by tailing screen's own
+ * logfile (servers are started with `screen -L -Logfile ...`, see
+ * process-manager). Lazily spawns one `tail -F` per server on the first
+ * subscriber and tears it down when the last subscriber leaves. Returns an
+ * unsubscribe function.
+ *
+ * This deliberately does NOT attach with `screen -x`. An interactive attach
+ * streams screen's full-window *redraws* - absolute cursor addressing sized to
+ * an exact terminal geometry - and feeding that into a read-only xterm of a
+ * different size produced a runaway redraw loop that spat out endless blank
+ * lines (which is exactly the "console keeps inserting empty lines" bug). The
+ * logfile instead holds the inner program's plain, line-based stdout/stderr, so
+ * tailing it is stable no matter the viewer's terminal size.
  */
 export function subscribeConsole(entry: ServerEntry, onData: OutputListener): () => void {
-  let handle = attachments.get(entry.id);
+  let handle = tails.get(entry.id);
 
   if (!handle) {
-    // Under systemd there is no controlling terminal, so `TERM` is typically
-    // unset or "dumb" in process.env - spreading that in silently overrides
-    // node-pty's `name` option (which only sets TERM when the env doesn't
-    // already define one). Screen then can't reliably determine terminal
-    // capabilities and falls into a runaway resize/redraw loop, growing its
-    // scroll region on every redraw - which is what caused the console to
-    // look like it was endlessly, erratically scrolling. Force a real TERM
-    // explicitly instead of trusting the ambient environment.
-    const attachPty = pty.spawn("screen", ["-x", entry.screenName], {
-      name: "xterm-256color",
-      cols: 120,
-      rows: 30,
-      env: { ...process.env, TERM: "xterm-256color" } as Record<string, string>,
+    // -n 200: seed the view with recent history on attach.
+    // -F (not -f): follow by name and keep retrying if the file doesn't exist
+    // yet (server not started) or gets recreated/truncated on the next start.
+    const proc = spawn("tail", ["-n", "200", "-F", consoleLogPath(entry)], {
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    handle = { pty: attachPty, listeners: new Set() };
-    attachments.set(entry.id, handle);
+    handle = { proc, listeners: new Set() };
+    tails.set(entry.id, handle);
 
-    attachPty.onData((data) => {
-      const buf = Buffer.from(data, "utf-8");
+    proc.stdout.on("data", (data: Buffer) => {
       for (const listener of handle!.listeners) {
-        listener(buf);
+        listener(data);
       }
     });
-    attachPty.onExit(() => {
-      attachments.delete(entry.id);
+    // While the logfile is missing, `tail -F` prints "cannot open ... No such
+    // file" retry chatter to stderr - swallow it so it never reaches the view.
+    proc.stderr.on("data", () => undefined);
+    proc.on("exit", () => {
+      tails.delete(entry.id);
     });
   }
 
   handle.listeners.add(onData);
 
   return () => {
-    const current = attachments.get(entry.id);
+    const current = tails.get(entry.id);
     if (!current) return;
     current.listeners.delete(onData);
     if (current.listeners.size === 0) {
-      current.pty.kill();
-      attachments.delete(entry.id);
+      current.proc.kill();
+      tails.delete(entry.id);
     }
   };
 }
 
-export function resizeConsole(entry: ServerEntry, cols: number, rows: number): void {
-  const handle = attachments.get(entry.id);
-  handle?.pty.resize(cols, rows);
+/**
+ * Kept for API compatibility with the console WebSocket, which forwards xterm
+ * resize events. A tailed logfile has no terminal geometry to resize, and
+ * xterm reflows its own view client-side, so this is intentionally a no-op.
+ */
+export function resizeConsole(_entry: ServerEntry, _cols: number, _rows: number): void {
+  // no-op
 }
 
 export function isConsoleAttached(serverId: string): boolean {
-  return attachments.has(serverId);
+  return tails.has(serverId);
 }

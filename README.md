@@ -3,20 +3,21 @@
 Webes felügyeleti panel BungeeCord + alszerverekhez: indítás/leállítás, élő konzol,
 fájlkezelő és RCON játékoslista, `screen` session-ökön keresztül.
 
-Ez a projekt **csak Linuxon futtatható és tesztelhető** — a `screen` parancs és a
-`node-pty` natív modul Windows alatt nem működik. A kódot itt Windows-on írtuk,
-de telepíteni/futtatni a Linux szerveren kell.
+Ez a projekt **csak Linuxon futtatható és tesztelhető** — a dashboard a `screen`
+parancson keresztül indítja/kezeli a szervereket, ami Windows alatt nincs meg. A
+kódot írni bárhol lehet, de telepíteni/futtatni a Linux szerveren kell.
 
 ## Előfeltételek a Linux szerveren
 
 ```bash
 sudo apt update
-sudo apt install -y screen build-essential python3 nodejs npm
+sudo apt install -y screen nodejs npm
 node --version   # legyen >= 18
 ```
 
-`node-pty` natív modul, ezért build eszközök (`build-essential`, `python3`) kellenek
-a `npm install` során történő fordításhoz.
+A projektnek nincs natív (fordítást igénylő) függősége, így `build-essential`/
+`python3` nem szükséges — a konzol a `screen` logfájljának olvasásával működik,
+nem natív pty-vel.
 
 **Fontos:** a dashboard-ot mindig ugyanazzal a Linux felhasználóval indítsd, mint
 amelyik a Minecraft mappákat birtokolja és a `screen` session-öket létrehozza —
