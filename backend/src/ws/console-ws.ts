@@ -5,7 +5,7 @@ import type { Request, Response } from "express";
 import { sessionMiddleware } from "../auth/session-middleware";
 import { userStore } from "../auth/user-store";
 import { serverRegistry } from "../servers/registry";
-import { subscribeConsole, resizeConsole } from "../servers/console-stream";
+import { subscribeConsole } from "../servers/console-stream";
 import { isServerRunning, sendCommand } from "../servers/process-manager";
 import type { ServerEntry } from "../types";
 
@@ -60,7 +60,7 @@ function handleConnection(ws: WebSocket, entry: ServerEntry): void {
 
   ws.on("message", (raw) => {
     void (async () => {
-      let msg: { type: string; data?: string; cols?: number; rows?: number };
+      let msg: { type: string; data?: string };
       try {
         msg = JSON.parse(raw.toString());
       } catch {
@@ -74,12 +74,6 @@ function handleConnection(ws: WebSocket, entry: ServerEntry): void {
             await sendCommand(entry, line).catch((err) =>
               send(ws, { type: "error", message: (err as Error).message })
             );
-          }
-          break;
-        }
-        case "resize": {
-          if (typeof msg.cols === "number" && typeof msg.rows === "number") {
-            resizeConsole(entry, msg.cols, msg.rows);
           }
           break;
         }

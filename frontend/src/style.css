@@ -248,10 +248,47 @@ label {
 .terminal-wrap {
   flex: 1;
   min-height: 300px;
+  margin: 0 1.5rem;
+}
+.console-log-outer {
+  position: relative;
+  height: 100%;
   background: #0a0b0d;
   border-radius: 8px;
-  padding: 8px;
-  margin: 0 1.5rem;
+}
+.console-log {
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #d7dae0;
+}
+.console-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.console-scroll-btn {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(30, 32, 36, 0.92);
+  color: #d7dae0;
+  font-size: 0.8rem;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.console-scroll-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
 }
 .console-input-row {
   display: flex;

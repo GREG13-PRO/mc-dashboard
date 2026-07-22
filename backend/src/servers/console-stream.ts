@@ -67,15 +67,6 @@ export function subscribeConsole(entry: ServerEntry, onData: OutputListener): ()
   };
 }
 
-/**
- * Kept for API compatibility with the console WebSocket, which forwards xterm
- * resize events. A tailed logfile has no terminal geometry to resize, and
- * xterm reflows its own view client-side, so this is intentionally a no-op.
- */
-export function resizeConsole(_entry: ServerEntry, _cols: number, _rows: number): void {
-  // no-op
-}
-
 export function isConsoleAttached(serverId: string): boolean {
   return tails.has(serverId);
 }

@@ -1,6 +1,6 @@
 import { api, ApiError } from "../api";
 import { ConsoleSocket } from "../ws-client";
-import { ConsoleTerminal } from "../components/Terminal";
+import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
 import { confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
@@ -22,7 +22,7 @@ export function renderServerView(
   let server: ServerWithStatus | null = null;
   let disposed = false;
 
-  let terminal: ConsoleTerminal | null = null;
+  let terminal: ConsoleLogView | null = null;
   let socket: ConsoleSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -126,7 +126,7 @@ export function renderServerView(
   function setupConsole() {
     const wrap = root.querySelector<HTMLDivElement>("#terminal-wrap");
     if (!wrap) return;
-    terminal = new ConsoleTerminal(wrap, (cols, rows) => socket?.resize(cols, rows));
+    terminal = new ConsoleLogView(wrap);
     connectSocket();
 
     const input = root.querySelector<HTMLInputElement>("#console-input")!;

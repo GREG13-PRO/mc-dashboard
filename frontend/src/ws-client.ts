@@ -57,10 +57,6 @@ export class ConsoleSocket {
     this.send({ type: "input", data: line.endsWith("\n") ? line : `${line}\n` });
   }
 
-  resize(cols: number, rows: number) {
-    this.send({ type: "resize", cols, rows });
-  }
-
   close() {
     this.ws.close();
   }
