@@ -7,6 +7,7 @@ import { sessionMiddleware } from "./auth/session-middleware";
 import { apiRouter } from "./routes";
 import { setupConsoleWebSocket } from "./ws/console-ws";
 import { startRconPoller } from "./servers/rcon-poller";
+import { startRestartScheduler } from "./servers/restart-scheduler";
 import { assertScreenInstalled } from "./servers/process-manager";
 
 async function main() {
@@ -32,6 +33,7 @@ async function main() {
   const httpServer = http.createServer(app);
   setupConsoleWebSocket(httpServer);
   startRconPoller();
+  startRestartScheduler();
 
   httpServer.listen(env.port, () => {
     console.log(`mc-dashboard listening on http://localhost:${env.port}`);

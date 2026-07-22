@@ -1,7 +1,16 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { serverRegistry } from "./registry";
-import { startServer, stopServer, restartServer, isServerRunning, sendCommand } from "./process-manager";
+import {
+  startServer,
+  stopServer,
+  restartServer,
+  killServer,
+  isServerRunning,
+  sendCommand,
+  getResourceUsageMap,
+} from "./process-manager";
 import { getCachedPlayers } from "./rcon-poller";
+import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
 import { filesRouter } from "../files/fs.routes";
 import { requireAdmin, requirePermission } from "../auth/auth.middleware";
 import type { ServerEntryInput } from "../types";
@@ -51,11 +60,13 @@ function toPublicEntry(entry: ReturnType<typeof serverRegistry.get>) {
 
 serversRouter.get("/", async (req, res) => {
   const entries = serverRegistry.list().filter((entry) => hasAnyPermission(req, entry.id));
+  const usage = await getResourceUsageMap(entries);
   const withStatus = await Promise.all(
     entries.map(async (entry) => ({
       ...toPublicEntry(entry),
       running: await isServerRunning(entry),
       players: getCachedPlayers(entry.id) ?? null,
+      resources: usage.get(entry.id) ?? null,
     }))
   );
   res.json({ servers: withStatus });
@@ -81,10 +92,12 @@ serversRouter.get("/:id", requireAnyPermission, async (req, res) => {
     res.status(404).json({ error: "Server not found" });
     return;
   }
+  const usage = await getResourceUsageMap([entry]);
   res.json({
     server: toPublicEntry(entry),
     running: await isServerRunning(entry),
     players: getCachedPlayers(entry.id) ?? null,
+    resources: usage.get(entry.id) ?? null,
   });
 });
 
@@ -154,6 +167,90 @@ serversRouter.post("/:id/restart", requirePermission("console"), async (req, res
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/kill", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await killServer(entry);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/backups", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ backups: await listBackups(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/backups", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const backup = await createBackup(entry);
+    res.status(201).json({ backup });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/backups/:filename/download", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const filePath = resolveBackupPath(entry, req.params.filename);
+    res.download(filePath);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/backups/:filename/restore", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await restoreBackup(entry, req.params.filename);
+    res.json({ ok: true });
+  } catch (err) {
+    const message = (err as Error).message;
+    res.status(message.includes("Stop the server") ? 409 : 400).json({ error: message });
+  }
+});
+
+serversRouter.delete("/:id/backups/:filename", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deleteBackup(entry, req.params.filename);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

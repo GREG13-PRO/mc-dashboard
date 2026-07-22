@@ -309,6 +309,16 @@ label {
   display: flex;
   align-items: center;
 }
+.resource-usage {
+  margin-left: 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
 .server-actions {
   display: flex;
   gap: 0.5rem;

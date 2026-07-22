@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { promisify } from "node:util";
-import type { ServerEntry } from "../types";
+import type { ResourceUsage, ServerEntry } from "../types";
 
 const execFileAsync = promisify(execFile);
 
@@ -19,7 +19,19 @@ export function consoleLogPath(entry: ServerEntry): string {
 // output. Deliberately ignores everything after the name (state, and on
 // some screen versions an extra "(date time)" field before the state) since
 // only the name is needed to check whether a given session exists.
-const SCREEN_LIST_RE = /^\s*\d+\.(\S+)/gm;
+const SCREEN_LIST_RE = /^\s*(\d+)\.(\S+)/gm;
+
+// `screen -ls` exits non-zero when there are zero sessions, but still
+// prints (or omits) useful stdout on both success and that "failure" - this
+// pulls the raw listing out of whichever path it came from.
+async function rawScreenList(): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("screen", ["-ls"]);
+    return stdout;
+  } catch (err) {
+    return (err as { stdout?: string }).stdout ?? "";
+  }
+}
 
 export class ScreenNotInstalledError extends Error {
   constructor() {
@@ -47,23 +59,22 @@ export async function assertScreenInstalled(): Promise<void> {
  * returns just the name part after the dot.
  */
 export async function listScreenSessionNames(): Promise<Set<string>> {
-  try {
-    const { stdout } = await execFileAsync("screen", ["-ls"]);
-    const names = new Set<string>();
-    for (const match of stdout.matchAll(SCREEN_LIST_RE)) {
-      names.add(match[1]);
-    }
-    return names;
-  } catch (err) {
-    // `screen -ls` exits with a non-zero status when there are zero
-    // sessions, but still prints (or omits) useful stdout - treat as empty.
-    const stdout = (err as { stdout?: string }).stdout ?? "";
-    const names = new Set<string>();
-    for (const match of stdout.matchAll(SCREEN_LIST_RE)) {
-      names.add(match[1]);
-    }
-    return names;
+  const stdout = await rawScreenList();
+  const names = new Set<string>();
+  for (const match of stdout.matchAll(SCREEN_LIST_RE)) {
+    names.add(match[2]);
   }
+  return names;
+}
+
+/** Same as listScreenSessionNames, but keyed by name to the screen manager's own PID. */
+export async function listScreenPids(): Promise<Map<string, number>> {
+  const stdout = await rawScreenList();
+  const pids = new Map<string, number>();
+  for (const match of stdout.matchAll(SCREEN_LIST_RE)) {
+    pids.set(match[2], Number(match[1]));
+  }
+  return pids;
 }
 
 export async function isServerRunning(entry: ServerEntry): Promise<boolean> {
@@ -130,4 +141,82 @@ export async function stopServer(entry: ServerEntry, timeoutMs = 30_000): Promis
 export async function restartServer(entry: ServerEntry): Promise<void> {
   await stopServer(entry);
   await startServer(entry);
+}
+
+/**
+ * Immediately tears down the screen session (and whatever process tree it
+ * holds) without sending the stop command or waiting - for a server that's
+ * hung or unresponsive to normal `stop`, not a substitute for it in the
+ * common case.
+ */
+export async function killServer(entry: ServerEntry): Promise<void> {
+  if (!(await isServerRunning(entry))) {
+    return;
+  }
+  await execFileAsync("screen", ["-S", entry.screenName, "-X", "quit"]).catch(() => undefined);
+}
+
+interface PsRow {
+  pid: number;
+  ppid: number;
+  cpu: number;
+  rssKb: number;
+  comm: string;
+}
+
+async function readProcessTable(): Promise<PsRow[]> {
+  const { stdout } = await execFileAsync("ps", ["-eo", "pid,ppid,pcpu,rss,comm", "--no-headers"]);
+  return stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [pid, ppid, cpu, rssKb, ...commParts] = line.trim().split(/\s+/);
+      return { pid: Number(pid), ppid: Number(ppid), cpu: Number(cpu), rssKb: Number(rssKb), comm: commParts.join(" ") };
+    });
+}
+
+/**
+ * Resource usage (CPU%, RAM) for every currently running server, keyed by
+ * server id. A single `ps` + `screen -ls` call is shared across all servers
+ * rather than spawning one of each per server, since this is polled on
+ * every dashboard list refresh.
+ *
+ * Each server's screen session wraps `bash -c "... | tee ..."`, so the
+ * actual java process is a few generations below the screen manager's own
+ * PID - this walks the process tree from there to find it.
+ */
+export async function getResourceUsageMap(entries: ServerEntry[]): Promise<Map<string, ResourceUsage>> {
+  const result = new Map<string, ResourceUsage>();
+  const screenPids = await listScreenPids();
+  const relevant = entries.filter((e) => screenPids.has(e.screenName));
+  if (relevant.length === 0) return result;
+
+  const rows = await readProcessTable();
+  const byPpid = new Map<number, PsRow[]>();
+  for (const row of rows) {
+    const siblings = byPpid.get(row.ppid) ?? [];
+    siblings.push(row);
+    byPpid.set(row.ppid, siblings);
+  }
+
+  for (const entry of relevant) {
+    const rootPid = screenPids.get(entry.screenName)!;
+    const queue = [rootPid];
+    const seen = new Set<number>();
+    while (queue.length > 0) {
+      const pid = queue.shift()!;
+      if (seen.has(pid)) continue;
+      seen.add(pid);
+      const children = byPpid.get(pid) ?? [];
+      const javaProc = children.find((c) => c.comm.includes("java"));
+      if (javaProc) {
+        result.set(entry.id, { cpuPercent: javaProc.cpu, memoryMb: Math.round(javaProc.rssKb / 1024) });
+        break;
+      }
+      for (const child of children) queue.push(child.pid);
+    }
+  }
+
+  return result;
 }

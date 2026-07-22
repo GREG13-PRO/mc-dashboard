@@ -3,7 +3,23 @@ import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import { paths } from "../config/env";
 import { assertFileInsideRoot } from "../files/safe-path";
-import type { ServerEntry, ServerEntryInput } from "../types";
+import type { ScheduledRestartConfig, ServerEntry, ServerEntryInput } from "../types";
+
+const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function normalizeScheduledRestart(
+  input: Partial<ScheduledRestartConfig> | undefined,
+  existing: ScheduledRestartConfig
+): ScheduledRestartConfig {
+  const time = input?.time ?? existing.time;
+  if (input?.enabled && !TIME_RE.test(time)) {
+    throw new Error(`Invalid scheduled restart time: ${time} (expected HH:MM)`);
+  }
+  return {
+    enabled: input?.enabled ?? existing.enabled,
+    time,
+  };
+}
 
 function slugify(name: string): string {
   return name
@@ -28,6 +44,12 @@ class ServerRegistry {
     const raw = fs.readFileSync(paths.serversFile, "utf-8");
     const parsed = raw.trim() ? (JSON.parse(raw) as ServerEntry[]) : [];
     for (const entry of parsed) {
+      // Servers registered before the scheduled-restart feature existed
+      // won't have this field in the persisted JSON - backfill a disabled
+      // default so downstream code never has to null-check it.
+      if (!entry.scheduledRestart) {
+        entry.scheduledRestart = { enabled: false, time: "04:00" };
+      }
       this.entries.set(entry.id, entry);
     }
   }
@@ -72,6 +94,7 @@ class ServerRegistry {
         port: input.rcon?.port ?? 25575,
         password: input.rcon?.password ?? "",
       },
+      scheduledRestart: normalizeScheduledRestart(input.scheduledRestart, { enabled: false, time: "04:00" }),
       createdAt: now,
       updatedAt: now,
       order: this.entries.size,
@@ -112,6 +135,7 @@ class ServerRegistry {
         // pre-fills the password field), not "clear the password".
         password: input.rcon?.password || existing.rcon.password,
       },
+      scheduledRestart: normalizeScheduledRestart(input.scheduledRestart, existing.scheduledRestart),
       updatedAt: new Date().toISOString(),
     };
 

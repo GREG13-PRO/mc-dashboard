@@ -4,6 +4,11 @@ export interface RconPublicConfig {
   port: number;
 }
 
+export interface ScheduledRestartConfig {
+  enabled: boolean;
+  time: string;
+}
+
 export interface ServerEntry {
   id: string;
   name: string;
@@ -12,6 +17,7 @@ export interface ServerEntry {
   screenName: string;
   stopCommand: string;
   rcon: RconPublicConfig;
+  scheduledRestart: ScheduledRestartConfig;
   createdAt: string;
   updatedAt: string;
   order: number;
@@ -24,9 +30,15 @@ export interface PlayersSnapshot {
   fetchedAt: string;
 }
 
+export interface ResourceUsage {
+  cpuPercent: number;
+  memoryMb: number;
+}
+
 export interface ServerWithStatus extends ServerEntry {
   running: boolean;
   players: PlayersSnapshot | null;
+  resources: ResourceUsage | null;
 }
 
 export interface ServerEntryInput {
@@ -40,6 +52,16 @@ export interface ServerEntryInput {
     port: number;
     password: string;
   };
+  scheduledRestart?: {
+    enabled: boolean;
+    time: string;
+  };
+}
+
+export interface BackupInfo {
+  filename: string;
+  size: number;
+  createdAt: string;
 }
 
 export type PlayerAction = "kill" | "heal" | "feed" | "starve" | "kick";

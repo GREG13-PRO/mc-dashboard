@@ -39,6 +39,14 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       <label for="f-rcon-password">RCON jelszó ${existing ? "(üresen hagyva nem változik)" : ""}</label>
       <input id="f-rcon-password" type="password" />
     </div>
+    <div class="field checkbox-row">
+      <input id="f-restart-enabled" type="checkbox" ${existing?.scheduledRestart.enabled ? "checked" : ""} />
+      <label for="f-restart-enabled" style="margin:0">Ütemezett napi újraindítás</label>
+    </div>
+    <div class="field">
+      <label for="f-restart-time">Időpont (ha fut a szerver akkor)</label>
+      <input id="f-restart-time" type="time" value="${existing?.scheduledRestart.time ?? "04:00"}" />
+    </div>
     <div id="form-error" class="error-text"></div>
     <div class="modal-actions">
       <button id="cancel-btn" class="btn">Mégse</button>
@@ -61,9 +69,15 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     const rconHost = form.querySelector<HTMLInputElement>("#f-rcon-host")!.value.trim();
     const rconPort = Number(form.querySelector<HTMLInputElement>("#f-rcon-port")!.value);
     const rconPassword = form.querySelector<HTMLInputElement>("#f-rcon-password")!.value;
+    const restartEnabled = form.querySelector<HTMLInputElement>("#f-restart-enabled")!.checked;
+    const restartTime = form.querySelector<HTMLInputElement>("#f-restart-time")!.value;
 
     if (!name || !folder || !startScript) {
       errorEl.textContent = "Név, mappa és start script megadása kötelező.";
+      return;
+    }
+    if (restartEnabled && !restartTime) {
+      errorEl.textContent = "Add meg az ütemezett újraindítás időpontját.";
       return;
     }
 
@@ -78,6 +92,10 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
         port: rconPort,
         // Left blank on edit -> backend keeps the previously stored password.
         password: rconPassword,
+      },
+      scheduledRestart: {
+        enabled: restartEnabled,
+        time: restartTime || "04:00",
       },
     };
 

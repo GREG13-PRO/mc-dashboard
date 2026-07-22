@@ -1,4 +1,12 @@
-import type { FileEntryInfo, PlayerAction, ServerEntryInput, ServerWithStatus, UserInput, UserPublic } from "./types";
+import type {
+  BackupInfo,
+  FileEntryInfo,
+  PlayerAction,
+  ServerEntryInput,
+  ServerWithStatus,
+  UserInput,
+  UserPublic,
+} from "./types";
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -58,12 +66,13 @@ export const api = {
     return servers;
   },
   async getServer(id: string): Promise<ServerWithStatus> {
-    const { server, running, players } = await request<{
+    const { server, running, players, resources } = await request<{
       server: ServerWithStatus;
       running: boolean;
       players: ServerWithStatus["players"];
+      resources: ServerWithStatus["resources"];
     }>(`/servers/${id}`);
-    return { ...server, running, players };
+    return { ...server, running, players, resources };
   },
   async createServer(input: ServerEntryInput): Promise<ServerWithStatus> {
     const { server } = await request<{ server: ServerWithStatus }>("/servers", {
@@ -90,6 +99,27 @@ export const api = {
   },
   async restartServer(id: string): Promise<void> {
     await request(`/servers/${id}/restart`, { method: "POST" });
+  },
+  async killServer(id: string): Promise<void> {
+    await request(`/servers/${id}/kill`, { method: "POST" });
+  },
+
+  async listBackups(serverId: string): Promise<BackupInfo[]> {
+    const { backups } = await request<{ backups: BackupInfo[] }>(`/servers/${serverId}/backups`);
+    return backups;
+  },
+  async createBackup(serverId: string): Promise<BackupInfo> {
+    const { backup } = await request<{ backup: BackupInfo }>(`/servers/${serverId}/backups`, { method: "POST" });
+    return backup;
+  },
+  async restoreBackup(serverId: string, filename: string): Promise<void> {
+    await request(`/servers/${serverId}/backups/${encodeURIComponent(filename)}/restore`, { method: "POST" });
+  },
+  async deleteBackup(serverId: string, filename: string): Promise<void> {
+    await request(`/servers/${serverId}/backups/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+  backupDownloadUrl(serverId: string, filename: string): string {
+    return `/api/servers/${serverId}/backups/${encodeURIComponent(filename)}/download`;
   },
   async playerAction(serverId: string, playerName: string, action: PlayerAction): Promise<void> {
     await request(`/servers/${serverId}/players/${encodeURIComponent(playerName)}/action`, {

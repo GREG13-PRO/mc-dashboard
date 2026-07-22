@@ -72,7 +72,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         </div>
         <div class="server-meta">${
           s.rcon.enabled && s.players ? `${s.players.online}/${s.players.max} játékos` : s.running ? "fut" : "leállítva"
-        }</div>
+        }${s.running && s.resources ? ` · ${s.resources.cpuPercent.toFixed(0)}% CPU · ${s.resources.memoryMb} MB` : ""}</div>
       </div>`
       )
       .join("");

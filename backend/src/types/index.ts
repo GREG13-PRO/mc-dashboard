@@ -5,6 +5,12 @@ export interface RconConfig {
   password: string;
 }
 
+export interface ScheduledRestartConfig {
+  enabled: boolean;
+  // 24h "HH:MM", local time of the machine running the dashboard.
+  time: string;
+}
+
 export interface ServerEntry {
   id: string;
   name: string;
@@ -13,6 +19,7 @@ export interface ServerEntry {
   screenName: string;
   stopCommand: string;
   rcon: RconConfig;
+  scheduledRestart: ScheduledRestartConfig;
   createdAt: string;
   updatedAt: string;
   order: number;
@@ -24,6 +31,18 @@ export interface ServerEntryInput {
   startScript: string;
   stopCommand?: string;
   rcon?: Partial<RconConfig>;
+  scheduledRestart?: Partial<ScheduledRestartConfig>;
+}
+
+export interface ResourceUsage {
+  cpuPercent: number;
+  memoryMb: number;
+}
+
+export interface BackupInfo {
+  filename: string;
+  size: number;
+  createdAt: string;
 }
 
 export interface ServerStatus {

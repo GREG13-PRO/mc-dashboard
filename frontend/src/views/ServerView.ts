@@ -25,6 +25,7 @@ export function renderServerView(
   let terminal: ConsoleLogView | null = null;
   let socket: ConsoleSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  const consoleHistory: string[] = [];
 
   root.innerHTML = `<div class="empty-state">Betöltés…</div>`;
 
@@ -41,15 +42,20 @@ export function renderServerView(
 
   function renderShell() {
     if (!server) return;
+    const resourceText =
+      server.running && server.resources
+        ? `<span class="resource-usage">${server.resources.cpuPercent.toFixed(0)}% CPU · ${server.resources.memoryMb} MB RAM</span>`
+        : "";
     root.innerHTML = `
       <div class="server-view-header">
-        <h2><span class="status-dot ${server.running ? "running" : "stopped"}" id="status-dot"></span>${server.name}</h2>
+        <h2><span class="status-dot ${server.running ? "running" : "stopped"}" id="status-dot"></span>${server.name}${resourceText}</h2>
         ${
           perms.console
             ? `<div class="server-actions">
           <button class="btn btn-primary" id="start-btn" ${server.running ? "disabled" : ""}>Start</button>
           <button class="btn" id="restart-btn" ${!server.running ? "disabled" : ""}>Restart</button>
           <button class="btn btn-danger" id="stop-btn" ${!server.running ? "disabled" : ""}>Stop</button>
+          <button class="btn btn-danger" id="kill-btn" ${!server.running ? "disabled" : ""} title="Azonnali leállítás mentés/várakozás nélkül">Kill</button>
         </div>`
             : ""
         }
@@ -83,6 +89,15 @@ export function renderServerView(
     root.querySelector<HTMLButtonElement>("#stop-btn")?.addEventListener("click", () =>
       runAction(() => api.stopServer(serverId))
     );
+    root.querySelector<HTMLButtonElement>("#kill-btn")?.addEventListener("click", async () => {
+      if (
+        await confirmModal(
+          `Biztosan <strong>kill</strong>-eled a(z) <strong>${server!.name}</strong> szervert? Ez azonnal leállítja mentés és várakozás nélkül - csak akkor használd, ha a normál Stop nem reagál.`
+        )
+      ) {
+        void runAction(() => api.killServer(serverId));
+      }
+    });
 
     renderTabContent();
   }
@@ -130,15 +145,39 @@ export function renderServerView(
     connectSocket();
 
     const input = root.querySelector<HTMLInputElement>("#console-input")!;
+    // Shell-like history: Up/Down cycle through previously sent commands for
+    // this tab session (not persisted - resets on reload, that's fine).
+    let draft = "";
+    let historyIndex = consoleHistory.length;
+
     const send = () => {
       const value = input.value;
       if (!value) return;
       socket?.sendInput(value);
+      if (consoleHistory[consoleHistory.length - 1] !== value) {
+        consoleHistory.push(value);
+      }
+      historyIndex = consoleHistory.length;
       input.value = "";
     };
     root.querySelector<HTMLButtonElement>("#console-send")!.onclick = send;
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") send();
+      if (e.key === "Enter") {
+        send();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (historyIndex === consoleHistory.length) draft = input.value;
+        if (historyIndex > 0) {
+          historyIndex--;
+          input.value = consoleHistory[historyIndex];
+        }
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (historyIndex < consoleHistory.length) {
+          historyIndex++;
+          input.value = historyIndex === consoleHistory.length ? draft : consoleHistory[historyIndex];
+        }
+      }
     });
   }
 
@@ -153,9 +192,11 @@ export function renderServerView(
         const startBtn = root.querySelector<HTMLButtonElement>("#start-btn");
         const stopBtn = root.querySelector<HTMLButtonElement>("#stop-btn");
         const restartBtn = root.querySelector<HTMLButtonElement>("#restart-btn");
+        const killBtn = root.querySelector<HTMLButtonElement>("#kill-btn");
         if (startBtn) startBtn.disabled = running;
         if (stopBtn) stopBtn.disabled = !running;
         if (restartBtn) restartBtn.disabled = !running;
+        if (killBtn) killBtn.disabled = !running;
       },
       onError: (message) => showToast(message, "error"),
       onClose: () => {
@@ -253,6 +294,9 @@ export function renderServerView(
       <div class="field"><label>Stop parancs</label><div>${server.stopCommand}</div></div>
       <div class="field"><label>Screen session</label><div>${server.screenName}</div></div>
       <div class="field"><label>RCON</label><div>${server.rcon.enabled ? `${server.rcon.host}:${server.rcon.port}` : "kikapcsolva"}</div></div>
+      <div class="field"><label>Ütemezett újraindítás</label><div>${
+        server.scheduledRestart.enabled ? `minden nap ${server.scheduledRestart.time}-kor` : "kikapcsolva"
+      }</div></div>
       <div style="display:flex;gap:0.5rem;margin-top:1rem;">
         <button class="btn" id="edit-btn">Szerkesztés</button>
         ${
@@ -260,6 +304,13 @@ export function renderServerView(
             ? `<button class="btn btn-danger" id="delete-btn" ${server.running ? "disabled title='Állítsd le előbb'" : ""}>Törlés</button>`
             : ""
         }
+      </div>
+      <div style="margin-top:2rem;padding-top:1.2rem;border-top:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+          <h3 style="margin:0;font-size:1rem;">Mentések</h3>
+          <button class="btn btn-primary" id="create-backup-btn">+ Mentés készítése</button>
+        </div>
+        <div id="backups-list"><div class="empty-state" style="padding:0.5rem 0;">Betöltés…</div></div>
       </div>
     `;
     content.querySelector<HTMLButtonElement>("#edit-btn")!.onclick = () => {
@@ -278,6 +329,83 @@ export function renderServerView(
         }
       }
     });
+    content.querySelector<HTMLButtonElement>("#create-backup-btn")!.onclick = async () => {
+      const btn = content.querySelector<HTMLButtonElement>("#create-backup-btn")!;
+      btn.disabled = true;
+      try {
+        await api.createBackup(serverId);
+        showToast("Mentés elkészült");
+        await renderBackupsList(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Mentés sikertelen", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    };
+    void renderBackupsList(content);
+  }
+
+  async function renderBackupsList(content: HTMLElement) {
+    const listEl = content.querySelector<HTMLDivElement>("#backups-list");
+    if (!listEl) return;
+    try {
+      const backups = await api.listBackups(serverId);
+      if (backups.length === 0) {
+        listEl.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">Még nincs mentés.</div>`;
+        return;
+      }
+      listEl.innerHTML = backups
+        .map(
+          (b) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div>${new Date(b.createdAt).toLocaleString()}</div>
+            <div style="color:var(--text-dim);font-size:0.8rem;">${(b.size / 1024 / 1024).toFixed(1)} MB</div>
+          </div>
+          <div style="display:flex;gap:0.4rem;">
+            <a class="btn" href="${api.backupDownloadUrl(serverId, b.filename)}">Letöltés</a>
+            <button class="btn" data-restore="${b.filename}" ${server?.running ? "disabled title='Állítsd le előbb'" : ""}>Visszaállítás</button>
+            <button class="btn btn-danger" data-delete-backup="${b.filename}">Törlés</button>
+          </div>
+        </div>`
+        )
+        .join("");
+
+      listEl.querySelectorAll<HTMLButtonElement>("[data-restore]").forEach((btn) => {
+        btn.onclick = async () => {
+          const filename = btn.dataset.restore!;
+          if (
+            await confirmModal(
+              `Biztosan visszaállítod ezt a mentést? Ez <strong>felülírja</strong> a jelenlegi szerver-mappa tartalmát.`
+            )
+          ) {
+            try {
+              await api.restoreBackup(serverId, filename);
+              showToast("Visszaállítva");
+            } catch (err) {
+              showToast(err instanceof ApiError ? err.message : "Visszaállítás sikertelen", "error");
+            }
+          }
+        };
+      });
+      listEl.querySelectorAll<HTMLButtonElement>("[data-delete-backup]").forEach((btn) => {
+        btn.onclick = async () => {
+          const filename = btn.dataset.deleteBackup!;
+          if (await confirmModal("Biztosan törlöd ezt a mentést?")) {
+            try {
+              await api.deleteBackup(serverId, filename);
+              await renderBackupsList(content);
+            } catch (err) {
+              showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+            }
+          }
+        };
+      });
+    } catch (err) {
+      listEl.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">${
+        err instanceof ApiError ? err.message : "Mentések betöltése sikertelen"
+      }</div>`;
+    }
   }
 
   void load();
