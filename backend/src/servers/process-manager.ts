@@ -6,9 +6,10 @@ import type { ServerEntry } from "../types";
 const execFileAsync = promisify(execFile);
 
 /**
- * Path of the plain, line-based console log that `screen -L` writes for a
- * server. The console viewer tails this file rather than attaching to screen
- * directly (see console-stream.ts).
+ * Path of the plain, line-based console log for a server, written by piping
+ * the server's stdout through `tee` (see startServer). The console viewer
+ * tails this file rather than attaching to screen directly (see
+ * console-stream.ts).
  */
 export function consoleLogPath(entry: ServerEntry): string {
   return `${entry.folder}/dashboard-console.log`;
@@ -76,32 +77,27 @@ export async function startServer(entry: ServerEntry): Promise<void> {
     return;
   }
   const logFile = consoleLogPath(entry);
-  // Start each run from an empty logfile: `screen -L` *appends*, so without
-  // this the log would grow without bound across restarts and the live console
-  // would replay stale lines from previous runs on the next attach.
+  // Start each run from an empty logfile so the live console never replays
+  // stale lines from a previous run on the next attach.
   await fs.writeFile(logFile, "").catch(() => undefined);
-  const command = `cd "${entry.folder}" && exec bash "${entry.startScript}"`;
+  // Pipe stdout/stderr through `tee` instead of using `screen -L -Logfile`:
+  // screen's own logfile writer only flushes its buffer to disk every 10
+  // seconds (hardcoded default, confirmed not adjustable at runtime via
+  // `-X logfile flush <secs>` on a session already logging), which made the
+  // tailed web console lag by up to 10s. `tee` writes each chunk as it
+  // arrives, so the logfile - and the tailed console - stays near-real-time.
+  // Stdin is unaffected: it still goes straight to the script/JVM on the left
+  // of the pipe, so `sendCommand`'s `screen -X stuff` keeps working the same.
+  const command = `cd "${entry.folder}" && bash "${entry.startScript}" 2>&1 | tee "${logFile}"`;
   await execFileAsync(
     "screen",
-    ["-L", "-Logfile", logFile, "-dmS", entry.screenName, "bash", "-c", command],
+    ["-dmS", entry.screenName, "bash", "-c", command],
     // Under systemd there's no controlling terminal, so TERM is typically
     // missing/"dumb" - give the session a real one from the start so screen
     // never has to guess at terminal capabilities later when a display
     // attaches (see console-stream.ts for the full explanation).
     { env: { ...process.env, TERM: "xterm-256color" } }
   );
-  // screen buffers logfile writes and flushes only every 10s by default, which
-  // makes the tailed live console lag badly. Flush every second so the web
-  // console stays near-real-time. Ignore failure - the console still works,
-  // just less promptly.
-  await execFileAsync("screen", [
-    "-S",
-    entry.screenName,
-    "-X",
-    "logfile",
-    "flush",
-    "1",
-  ]).catch(() => undefined);
 }
 
 /**

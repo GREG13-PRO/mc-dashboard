@@ -14,8 +14,8 @@ interface TailHandle {
 const tails = new Map<string, TailHandle>();
 
 /**
- * Subscribes to live console output for a server by tailing screen's own
- * logfile (servers are started with `screen -L -Logfile ...`, see
+ * Subscribes to live console output for a server by tailing its logfile
+ * (servers are started with stdout piped through `tee` into this file, see
  * process-manager). Lazily spawns one `tail -F` per server on the first
  * subscriber and tears it down when the last subscriber leaves. Returns an
  * unsubscribe function.
