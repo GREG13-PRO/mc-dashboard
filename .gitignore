@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.env
+backend/data/servers.json
+backend/data/auth.json
+*.log
+.DS_Store
+
+# Local Claude Code settings may contain secrets (SSH hosts, passwords) — never commit
+.claude/

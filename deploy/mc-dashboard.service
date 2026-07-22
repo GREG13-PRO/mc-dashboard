@@ -1,0 +1,30 @@
+[Unit]
+Description=Minecraft Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=minecraft
+# Must be backend/, not the repo root: dotenv and the DATA_DIR default both
+# resolve relative to the process's current working directory.
+WorkingDirectory=/home/minecraft/mc-dashboard/backend
+# Invoke node directly rather than `npm start` - npm wraps the real process
+# in several layers of shell/npm children, so systemd's tracked "main PID"
+# ends up being a wrapper rather than the process actually holding port 3000.
+# Combined with KillMode=process below, that meant a restart never actually
+# killed the real dashboard process, causing port-already-in-use crash loops.
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+# Critical: the whole point of using `screen` sessions is that Minecraft
+# servers survive a dashboard restart/crash. Without this, systemd's default
+# KillMode=control-group sends SIGTERM/SIGKILL to every process in this
+# service's cgroup on stop/restart - including the screen-wrapped java
+# processes, which are technically still cgroup members even though screen
+# detaches them from the terminal. KillMode=process signals only the
+# tracked main PID (now the real node process), leaving screen and its
+# children alone.
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
