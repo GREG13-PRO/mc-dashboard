@@ -3,6 +3,7 @@ import type { Socket } from "node:net";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Request, Response } from "express";
 import { sessionMiddleware } from "../auth/session-middleware";
+import { userStore } from "../auth/user-store";
 import { serverRegistry } from "../servers/registry";
 import { subscribeConsole, resizeConsole } from "../servers/console-stream";
 import { isServerRunning, sendCommand } from "../servers/process-manager";
@@ -112,8 +113,9 @@ export function setupConsoleWebSocket(httpServer: HttpServer): void {
         return;
       }
 
-      const authenticated = Boolean((req as unknown as Request).session?.authenticated);
-      if (!authenticated) {
+      const userId = (req as unknown as Request).session?.userId;
+      const user = userId ? userStore.get(userId) : undefined;
+      if (!user) {
         socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
         socket.destroy();
         return;
@@ -122,6 +124,12 @@ export function setupConsoleWebSocket(httpServer: HttpServer): void {
       const entry = serverRegistry.get(serverId);
       if (!entry) {
         socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+
+      if (!user.isAdmin && !user.permissions[serverId]?.console) {
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
         socket.destroy();
         return;
       }

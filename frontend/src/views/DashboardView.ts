@@ -2,6 +2,8 @@ import { api, ApiError } from "../api";
 import { showToast } from "../components/Toast";
 import { openAddServerModal } from "./AddServerModal";
 import { renderServerView } from "./ServerView";
+import { renderUsersView } from "./UsersView";
+import { isAdmin, setCurrentUser } from "../auth-state";
 import type { ServerWithStatus } from "../types";
 
 function parseServerIdFromHash(): string | null {
@@ -21,7 +23,8 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
           <h1>Minecraft Dashboard</h1>
           <button class="btn" id="logout-btn">Kijelentkezés</button>
         </div>
-        <button class="btn btn-primary add-server-btn" id="add-server-btn">+ Új szerver</button>
+        ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn">+ Új szerver</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;margin-bottom:0.6rem;">Felhasználók</button>` : ""}
         <div class="server-list" id="server-list"></div>
       </div>
       <div class="main-content" id="main-content">
@@ -32,11 +35,15 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
 
   root.querySelector<HTMLButtonElement>("#logout-btn")!.onclick = async () => {
     await api.logout().catch(() => undefined);
+    setCurrentUser(null);
     onLogout();
   };
-  root.querySelector<HTMLButtonElement>("#add-server-btn")!.onclick = () => {
+  root.querySelector<HTMLButtonElement>("#add-server-btn")?.addEventListener("click", () => {
     openAddServerModal(() => void refreshList());
-  };
+  });
+  root.querySelector<HTMLButtonElement>("#users-nav-btn")?.addEventListener("click", () => {
+    location.hash = "#/users";
+  });
 
   async function refreshList() {
     try {
@@ -82,6 +89,17 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     disposeServerView = null;
 
     const mainContent = root.querySelector<HTMLDivElement>("#main-content")!;
+
+    if (location.hash === "#/users") {
+      if (!isAdmin()) {
+        location.hash = "";
+        return;
+      }
+      disposeServerView = renderUsersView(mainContent);
+      renderList();
+      return;
+    }
+
     const serverId = parseServerIdFromHash();
 
     if (!serverId) {

@@ -1,4 +1,4 @@
-import type { FileEntryInfo, PlayerAction, ServerEntryInput, ServerWithStatus } from "./types";
+import type { FileEntryInfo, PlayerAction, ServerEntryInput, ServerWithStatus, UserInput, UserPublic } from "./types";
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -21,14 +21,36 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  async login(password: string): Promise<void> {
-    await request("/auth/login", { method: "POST", body: JSON.stringify({ password }) });
+  async login(username: string, password: string): Promise<{ user: UserPublic }> {
+    return request("/auth/login", { method: "POST", body: JSON.stringify({ username, password }) });
   },
   async logout(): Promise<void> {
     await request("/auth/logout", { method: "POST" });
   },
-  async authStatus(): Promise<{ authenticated: boolean }> {
+  async authStatus(): Promise<{ authenticated: boolean; user?: UserPublic }> {
     return request("/auth/status");
+  },
+
+  async listUsers(): Promise<UserPublic[]> {
+    const { users } = await request<{ users: UserPublic[] }>("/users");
+    return users;
+  },
+  async createUser(input: UserInput): Promise<UserPublic> {
+    const { user } = await request<{ user: UserPublic }>("/users", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return user;
+  },
+  async updateUser(id: string, input: Partial<UserInput>): Promise<UserPublic> {
+    const { user } = await request<{ user: UserPublic }>(`/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    });
+    return user;
+  },
+  async deleteUser(id: string): Promise<void> {
+    await request(`/users/${id}`, { method: "DELETE" });
   },
 
   async listServers(): Promise<ServerWithStatus[]> {

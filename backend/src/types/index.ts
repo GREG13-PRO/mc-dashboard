@@ -42,3 +42,29 @@ export interface FileEntryInfo {
   size: number;
   mtime: string;
 }
+
+export interface ServerPermissions {
+  console: boolean;
+  files: boolean;
+  players: boolean;
+  settings: boolean;
+}
+
+export interface UserRecord {
+  id: string;
+  username: string;
+  passwordHash: string;
+  isAdmin: boolean;
+  permissions: Record<string, ServerPermissions>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type UserPublic = Omit<UserRecord, "passwordHash">;
+
+export interface UserInput {
+  username: string;
+  password?: string;
+  isAdmin?: boolean;
+  permissions?: Record<string, Partial<ServerPermissions>>;
+}

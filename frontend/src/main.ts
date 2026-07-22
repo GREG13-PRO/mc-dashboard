@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { setCurrentUser } from "./auth-state";
 import { renderLoginView } from "./views/LoginView";
 import { renderDashboard } from "./views/DashboardView";
 
@@ -19,8 +20,9 @@ function showDashboard() {
 
 async function boot() {
   try {
-    const { authenticated } = await api.authStatus();
-    if (authenticated) {
+    const { authenticated, user } = await api.authStatus();
+    if (authenticated && user) {
+      setCurrentUser(user);
       showDashboard();
     } else {
       showLogin();

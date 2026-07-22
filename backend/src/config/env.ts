@@ -20,4 +20,5 @@ export const env = {
 
 export const paths = {
   serversFile: path.join(env.dataDir, "servers.json"),
+  usersFile: path.join(env.dataDir, "auth.json"),
 };

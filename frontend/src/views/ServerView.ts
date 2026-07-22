@@ -5,16 +5,20 @@ import { FileBrowser } from "../components/FileBrowser";
 import { confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { openAddServerModal } from "./AddServerModal";
+import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
 
 type Tab = "console" | "files" | "players" | "settings";
+const ALL_TABS: Tab[] = ["console", "files", "players", "settings"];
 
 export function renderServerView(
   root: HTMLElement,
   serverId: string,
   callbacks: { onDeleted: () => void; onChanged: () => void }
 ): () => void {
-  let activeTab: Tab = "console";
+  const perms = permissionsFor(serverId);
+  const availableTabs = ALL_TABS.filter((tab) => perms[tab]);
+  let activeTab: Tab = availableTabs[0] ?? "console";
   let server: ServerWithStatus | null = null;
   let disposed = false;
 
@@ -40,14 +44,18 @@ export function renderServerView(
     root.innerHTML = `
       <div class="server-view-header">
         <h2><span class="status-dot ${server.running ? "running" : "stopped"}" id="status-dot"></span>${server.name}</h2>
-        <div class="server-actions">
+        ${
+          perms.console
+            ? `<div class="server-actions">
           <button class="btn btn-primary" id="start-btn" ${server.running ? "disabled" : ""}>Start</button>
           <button class="btn" id="restart-btn" ${!server.running ? "disabled" : ""}>Restart</button>
           <button class="btn btn-danger" id="stop-btn" ${!server.running ? "disabled" : ""}>Stop</button>
-        </div>
+        </div>`
+            : ""
+        }
       </div>
       <div class="tabs">
-        ${(["console", "files", "players", "settings"] as Tab[])
+        ${availableTabs
           .map(
             (tab) =>
               `<div class="tab ${tab === activeTab ? "active" : ""}" data-tab="${tab}">${labelFor(tab)}</div>`
@@ -66,10 +74,15 @@ export function renderServerView(
       };
     });
 
-    root.querySelector<HTMLButtonElement>("#start-btn")!.onclick = () => runAction(() => api.startServer(serverId));
-    root.querySelector<HTMLButtonElement>("#restart-btn")!.onclick = () =>
-      runAction(() => api.restartServer(serverId));
-    root.querySelector<HTMLButtonElement>("#stop-btn")!.onclick = () => runAction(() => api.stopServer(serverId));
+    root.querySelector<HTMLButtonElement>("#start-btn")?.addEventListener("click", () =>
+      runAction(() => api.startServer(serverId))
+    );
+    root.querySelector<HTMLButtonElement>("#restart-btn")?.addEventListener("click", () =>
+      runAction(() => api.restartServer(serverId))
+    );
+    root.querySelector<HTMLButtonElement>("#stop-btn")?.addEventListener("click", () =>
+      runAction(() => api.stopServer(serverId))
+    );
 
     renderTabContent();
   }
@@ -242,7 +255,11 @@ export function renderServerView(
       <div class="field"><label>RCON</label><div>${server.rcon.enabled ? `${server.rcon.host}:${server.rcon.port}` : "kikapcsolva"}</div></div>
       <div style="display:flex;gap:0.5rem;margin-top:1rem;">
         <button class="btn" id="edit-btn">Szerkesztés</button>
-        <button class="btn btn-danger" id="delete-btn" ${server.running ? "disabled title='Állítsd le előbb'" : ""}>Törlés</button>
+        ${
+          isAdmin()
+            ? `<button class="btn btn-danger" id="delete-btn" ${server.running ? "disabled title='Állítsd le előbb'" : ""}>Törlés</button>`
+            : ""
+        }
       </div>
     `;
     content.querySelector<HTMLButtonElement>("#edit-btn")!.onclick = () => {
@@ -251,7 +268,7 @@ export function renderServerView(
         callbacks.onChanged();
       }, server!);
     };
-    content.querySelector<HTMLButtonElement>("#delete-btn")!.onclick = async () => {
+    content.querySelector<HTMLButtonElement>("#delete-btn")?.addEventListener("click", async () => {
       if (await confirmModal(`Biztosan törlöd a(z) <strong>${server!.name}</strong> szervert a listából?`)) {
         try {
           await api.deleteServer(serverId);
@@ -260,7 +277,7 @@ export function renderServerView(
           showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
         }
       }
-    };
+    });
   }
 
   void load();

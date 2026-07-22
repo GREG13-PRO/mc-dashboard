@@ -1,11 +1,30 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { serverRegistry } from "./registry";
 import { startServer, stopServer, restartServer, isServerRunning, sendCommand } from "./process-manager";
 import { getCachedPlayers } from "./rcon-poller";
 import { filesRouter } from "../files/fs.routes";
+import { requireAdmin, requirePermission } from "../auth/auth.middleware";
 import type { ServerEntryInput } from "../types";
 
 export const serversRouter = Router();
+
+function hasAnyPermission(req: Request, serverId: string): boolean {
+  if (req.user?.isAdmin) return true;
+  const perms = req.user?.permissions[serverId];
+  return Boolean(perms && (perms.console || perms.files || perms.players || perms.settings));
+}
+
+// Gate for routes with a `:id` param where any granted capability on that
+// server is enough to view it (the list and detail endpoints) - the finer
+// per-capability checks (console/files/players/settings) are applied on top
+// of this for the actions that actually do something.
+function requireAnyPermission(req: Request, res: Response, next: NextFunction) {
+  if (!hasAnyPermission(req, req.params.id)) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  next();
+}
 
 // Vanilla Minecraft usernames only ever contain these characters - reject
 // anything else so a player name can never be used to smuggle extra
@@ -30,8 +49,8 @@ function toPublicEntry(entry: ReturnType<typeof serverRegistry.get>) {
   return { ...rest, rcon: { enabled: rcon.enabled, host: rcon.host, port: rcon.port } };
 }
 
-serversRouter.get("/", async (_req, res) => {
-  const entries = serverRegistry.list();
+serversRouter.get("/", async (req, res) => {
+  const entries = serverRegistry.list().filter((entry) => hasAnyPermission(req, entry.id));
   const withStatus = await Promise.all(
     entries.map(async (entry) => ({
       ...toPublicEntry(entry),
@@ -42,7 +61,7 @@ serversRouter.get("/", async (_req, res) => {
   res.json({ servers: withStatus });
 });
 
-serversRouter.post("/", (req, res) => {
+serversRouter.post("/", requireAdmin, (req, res) => {
   const input = req.body as ServerEntryInput;
   if (!input?.name || !input?.folder || !input?.startScript) {
     res.status(400).json({ error: "name, folder and startScript are required" });
@@ -56,7 +75,7 @@ serversRouter.post("/", (req, res) => {
   }
 });
 
-serversRouter.get("/:id", async (req, res) => {
+serversRouter.get("/:id", requireAnyPermission, async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -69,7 +88,7 @@ serversRouter.get("/:id", async (req, res) => {
   });
 });
 
-serversRouter.put("/:id", (req, res) => {
+serversRouter.put("/:id", requirePermission("settings"), (req, res) => {
   try {
     const entry = serverRegistry.update(req.params.id, req.body as Partial<ServerEntryInput>);
     res.json({ server: toPublicEntry(entry) });
@@ -78,7 +97,7 @@ serversRouter.put("/:id", (req, res) => {
   }
 });
 
-serversRouter.delete("/:id", async (req, res) => {
+serversRouter.delete("/:id", requireAdmin, async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -96,7 +115,7 @@ serversRouter.delete("/:id", async (req, res) => {
   }
 });
 
-serversRouter.post("/:id/start", async (req, res) => {
+serversRouter.post("/:id/start", requirePermission("console"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -110,7 +129,7 @@ serversRouter.post("/:id/start", async (req, res) => {
   }
 });
 
-serversRouter.post("/:id/stop", async (req, res) => {
+serversRouter.post("/:id/stop", requirePermission("console"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -124,7 +143,7 @@ serversRouter.post("/:id/stop", async (req, res) => {
   }
 });
 
-serversRouter.post("/:id/restart", async (req, res) => {
+serversRouter.post("/:id/restart", requirePermission("console"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -138,7 +157,7 @@ serversRouter.post("/:id/restart", async (req, res) => {
   }
 });
 
-serversRouter.get("/:id/players", (req, res) => {
+serversRouter.get("/:id/players", requirePermission("players"), (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -147,7 +166,7 @@ serversRouter.get("/:id/players", (req, res) => {
   res.json({ players: getCachedPlayers(entry.id) ?? null });
 });
 
-serversRouter.post("/:id/players/:name/action", async (req, res) => {
+serversRouter.post("/:id/players/:name/action", requirePermission("players"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
     res.status(404).json({ error: "Server not found" });
@@ -174,4 +193,4 @@ serversRouter.post("/:id/players/:name/action", async (req, res) => {
   }
 });
 
-serversRouter.use("/:id/files", filesRouter);
+serversRouter.use("/:id/files", requirePermission("files"), filesRouter);

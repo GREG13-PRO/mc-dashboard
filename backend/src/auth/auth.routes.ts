@@ -1,6 +1,7 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { verifyPassword } from "./password";
+import { userStore } from "./user-store";
+import { requireAuth, userToPublic } from "./auth.middleware";
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -13,22 +14,15 @@ const loginLimiter = rateLimit({
 export const authRouter = Router();
 
 authRouter.post("/login", loginLimiter, (req, res) => {
-  const { password } = req.body ?? {};
-  if (typeof password !== "string" || password.length === 0) {
-    res.status(400).json({ error: "Password is required" });
+  const { username, password } = req.body ?? {};
+  if (typeof username !== "string" || !username || typeof password !== "string" || !password) {
+    res.status(400).json({ error: "Username and password are required" });
     return;
   }
 
-  let valid: boolean;
-  try {
-    valid = verifyPassword(password);
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-    return;
-  }
-
-  if (!valid) {
-    res.status(401).json({ error: "Invalid password" });
+  const user = userStore.verifyLogin(username, password);
+  if (!user) {
+    res.status(401).json({ error: "Invalid username or password" });
     return;
   }
 
@@ -37,8 +31,8 @@ authRouter.post("/login", loginLimiter, (req, res) => {
       res.status(500).json({ error: "Failed to establish session" });
       return;
     }
-    req.session.authenticated = true;
-    res.json({ ok: true });
+    req.session.userId = user.id;
+    res.json({ ok: true, user: userToPublic(user) });
   });
 });
 
@@ -50,5 +44,14 @@ authRouter.post("/logout", (req, res) => {
 });
 
 authRouter.get("/status", (req, res) => {
-  res.json({ authenticated: Boolean(req.session.authenticated) });
+  const user = req.session.userId ? userStore.get(req.session.userId) : undefined;
+  if (!user) {
+    res.json({ authenticated: false });
+    return;
+  }
+  res.json({ authenticated: true, user: userToPublic(user) });
+});
+
+authRouter.get("/me", requireAuth, (req, res) => {
+  res.json({ user: userToPublic(req.user!) });
 });

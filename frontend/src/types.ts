@@ -58,3 +58,26 @@ export interface FileEntryInfo {
   size: number;
   mtime: string;
 }
+
+export interface ServerPermissions {
+  console: boolean;
+  files: boolean;
+  players: boolean;
+  settings: boolean;
+}
+
+export interface UserPublic {
+  id: string;
+  username: string;
+  isAdmin: boolean;
+  permissions: Record<string, ServerPermissions>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UserInput {
+  username: string;
+  password?: string;
+  isAdmin?: boolean;
+  permissions?: Record<string, Partial<ServerPermissions>>;
+}
