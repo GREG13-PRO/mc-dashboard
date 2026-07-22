@@ -3,6 +3,7 @@ import path from "node:path";
 import { v4 as uuidv4 } from "uuid";
 import { paths } from "../config/env";
 import { assertFileInsideRoot } from "../files/safe-path";
+import { syncRconToServerProperties } from "./rcon-sync";
 import type { ScheduledRestartConfig, ServerEntry, ServerEntryInput } from "../types";
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -102,6 +103,7 @@ class ServerRegistry {
 
     this.entries.set(id, entry);
     this.persist();
+    syncRconToServerProperties(entry);
     return entry;
   }
 
@@ -141,6 +143,7 @@ class ServerRegistry {
 
     this.entries.set(id, updated);
     this.persist();
+    syncRconToServerProperties(updated);
     return updated;
   }
 
