@@ -103,3 +103,17 @@ export interface UserInput {
   isAdmin?: boolean;
   permissions?: Record<string, Partial<ServerPermissions>>;
 }
+
+export type ServerInstallType = "paper" | "vanilla" | "fabric" | "bungeecord";
+
+export interface ServerTypeOption {
+  id: ServerInstallType;
+  label: string;
+}
+
+export interface ServerInstallInput {
+  name: string;
+  folder: string;
+  type: ServerInstallType;
+  version: string;
+}

@@ -3,6 +3,9 @@ import type {
   FileEntryInfo,
   PlayerAction,
   ServerEntryInput,
+  ServerInstallInput,
+  ServerTypeOption,
+  ServerInstallType,
   ServerWithStatus,
   UserInput,
   UserPublic,
@@ -167,6 +170,22 @@ export const api = {
   },
   downloadUrl(serverId: string, filePath: string): string {
     return `/api/servers/${serverId}/files/download?path=${encodeURIComponent(filePath)}`;
+  },
+
+  async listServerTypes(): Promise<ServerTypeOption[]> {
+    const { types } = await request<{ types: ServerTypeOption[] }>("/install-server/types");
+    return types;
+  },
+  async listServerVersions(type: ServerInstallType): Promise<string[]> {
+    const { versions } = await request<{ versions: string[] }>(`/install-server/types/${type}/versions`);
+    return versions;
+  },
+  async installServer(input: ServerInstallInput): Promise<ServerWithStatus> {
+    const { server } = await request<{ server: ServerWithStatus }>("/install-server", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return server;
   },
 };
 

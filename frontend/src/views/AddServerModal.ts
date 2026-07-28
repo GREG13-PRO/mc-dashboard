@@ -1,12 +1,28 @@
 import { api, ApiError } from "../api";
 import { openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
-import type { ServerEntry, ServerEntryInput } from "../types";
+import type { ServerEntry, ServerEntryInput, ServerInstallType } from "../types";
 
 export function openAddServerModal(onCreated: () => void, existing?: ServerEntry) {
   const form = document.createElement("div");
   form.innerHTML = `
     <h3>${existing ? "Szerver szerkesztése" : "Szerver hozzáadása"}</h3>
+    ${
+      existing
+        ? ""
+        : `
+    <div class="field">
+      <label for="f-install-type">Telepítési mód</label>
+      <select id="f-install-type">
+        <option value="manual">Meglévő mappa/parancsfájl megadása</option>
+      </select>
+    </div>
+    <div class="field" id="install-version-field" style="display:none">
+      <label for="f-install-version">Verzió</label>
+      <select id="f-install-version"><option value="">Betöltés...</option></select>
+    </div>
+    `
+    }
     <div class="field">
       <label for="f-name">Név</label>
       <input id="f-name" placeholder="pl. Survival, BungeeCord Proxy" value="${existing?.name ?? ""}" />
@@ -15,11 +31,11 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       <label for="f-folder">Mappa (abszolút útvonal a szerveren)</label>
       <input id="f-folder" placeholder="/home/mc/servers/survival" value="${existing?.folder ?? ""}" />
     </div>
-    <div class="field">
+    <div class="field" id="start-script-field">
       <label for="f-start">Start script (a mappán belül)</label>
       <input id="f-start" placeholder="start.sh" value="${existing?.startScript ?? "start.sh"}" />
     </div>
-    <div class="field">
+    <div class="field" id="stop-command-field">
       <label for="f-stop">Stop parancs (konzolba küldve)</label>
       <input id="f-stop" placeholder="stop" value="${existing?.stopCommand ?? "stop"}" />
     </div>
@@ -57,12 +73,87 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
   const close = openModal(form);
   form.querySelector<HTMLButtonElement>("#cancel-btn")!.onclick = () => close();
 
+  const installTypeSelect = form.querySelector<HTMLSelectElement>("#f-install-type");
+  const installVersionField = form.querySelector<HTMLDivElement>("#install-version-field");
+  const installVersionSelect = form.querySelector<HTMLSelectElement>("#f-install-version");
+  const startScriptField = form.querySelector<HTMLDivElement>("#start-script-field")!;
+  const stopCommandField = form.querySelector<HTMLDivElement>("#stop-command-field")!;
+
+  if (installTypeSelect) {
+    api.listServerTypes().then((types) => {
+      for (const t of types) {
+        const opt = document.createElement("option");
+        opt.value = t.id;
+        opt.textContent = t.label;
+        installTypeSelect.appendChild(opt);
+      }
+    });
+
+    installTypeSelect.onchange = () => {
+      const type = installTypeSelect.value;
+      if (type === "manual") {
+        installVersionField!.style.display = "none";
+        startScriptField.style.display = "";
+        stopCommandField.style.display = "";
+        return;
+      }
+      startScriptField.style.display = "none";
+      stopCommandField.style.display = "none";
+      installVersionField!.style.display = "";
+      installVersionSelect!.innerHTML = `<option value="">Verziók betöltése...</option>`;
+      api
+        .listServerVersions(type as ServerInstallType)
+        .then((versions) => {
+          installVersionSelect!.innerHTML = "";
+          for (const v of versions) {
+            const opt = document.createElement("option");
+            opt.value = v;
+            opt.textContent = v;
+            installVersionSelect!.appendChild(opt);
+          }
+        })
+        .catch(() => {
+          installVersionSelect!.innerHTML = `<option value="">Nem sikerült betölteni a verziókat</option>`;
+        });
+    };
+  }
+
   form.querySelector<HTMLButtonElement>("#save-btn")!.onclick = async () => {
     const errorEl = form.querySelector<HTMLDivElement>("#form-error")!;
     errorEl.textContent = "";
 
     const name = form.querySelector<HTMLInputElement>("#f-name")!.value.trim();
     const folder = form.querySelector<HTMLInputElement>("#f-folder")!.value.trim();
+    const installType = installTypeSelect?.value ?? "manual";
+
+    if (installType !== "manual") {
+      const version = installVersionSelect?.value ?? "";
+      if (!name || !folder) {
+        errorEl.textContent = "Név és mappa megadása kötelező.";
+        return;
+      }
+      if (!version) {
+        errorEl.textContent = "Válassz verziót.";
+        return;
+      }
+
+      const saveBtn = form.querySelector<HTMLButtonElement>("#save-btn")!;
+      const originalLabel = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Telepítés...";
+      try {
+        await api.installServer({ name, folder, type: installType as ServerInstallType, version });
+        showToast("Szerver telepítve");
+        close();
+        onCreated();
+      } catch (err) {
+        errorEl.textContent = err instanceof ApiError ? err.message : "Ismeretlen hiba történt";
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalLabel;
+      }
+      return;
+    }
+
     const startScript = form.querySelector<HTMLInputElement>("#f-start")!.value.trim();
     const stopCommand = form.querySelector<HTMLInputElement>("#f-stop")!.value.trim();
     const rconEnabled = form.querySelector<HTMLInputElement>("#f-rcon-enabled")!.checked;
