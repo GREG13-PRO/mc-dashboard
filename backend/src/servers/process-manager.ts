@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import { promisify } from "node:util";
 import type { ResourceUsage, ServerEntry } from "../types";
 
@@ -201,6 +201,82 @@ async function readProcessTable(): Promise<PsRow[]> {
 }
 
 /**
+ * Instantaneous CPU usage, as a percentage of one core.
+ *
+ * `ps pcpu` reports CPU averaged over the process's whole lifetime, which is
+ * useless for a chart: a server that has been up for hours barely moves no
+ * matter what it is doing right now. This instead reads the process's
+ * cumulative CPU ticks out of /proc and divides the delta by the wall time
+ * since the previous sample, which is what "CPU right now" actually means.
+ *
+ * The first sample for a process has no predecessor to diff against, so it
+ * falls back to the lifetime average rather than reporting a misleading zero.
+ */
+const CLOCK_TICKS_PER_SEC = 100; // Linux USER_HZ; constant on every supported platform here.
+
+interface CpuSample {
+  ticks: number;
+  atMs: number;
+  percent: number;
+}
+
+const lastCpuSample = new Map<number, CpuSample>();
+
+// getResourceUsageMap has several independent callers (the server list poll,
+// the detail view, the history sampler). Each one recomputing the delta would
+// mean they keep resetting each other's baseline, and a delta measured over a
+// few milliseconds is mostly noise - which showed up as the value jumping
+// between ~5% and ~380% between adjacent samples. Below this spacing, callers
+// get the last computed figure instead of a fresh, meaningless one.
+const MIN_CPU_SAMPLE_GAP_MS = 2_000;
+
+function readCpuTicks(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf-8");
+    // The comm field can contain spaces and parentheses, so fields are counted
+    // from after the final ')' rather than by splitting the whole line.
+    const afterComm = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    // Fields 14/15 in proc(5) are utime/stime; they are indices 11/12 here.
+    const utime = Number(afterComm[11]);
+    const stime = Number(afterComm[12]);
+    if (!Number.isFinite(utime) || !Number.isFinite(stime)) return null;
+    return utime + stime;
+  } catch {
+    return null;
+  }
+}
+
+function instantaneousCpuPercent(pid: number, fallback: number): number {
+  const ticks = readCpuTicks(pid);
+  const now = Date.now();
+  if (ticks === null) return fallback;
+
+  const previous = lastCpuSample.get(pid);
+  if (!previous) {
+    lastCpuSample.set(pid, { ticks, atMs: now, percent: fallback });
+    return fallback;
+  }
+
+  const elapsedMs = now - previous.atMs;
+  if (elapsedMs < MIN_CPU_SAMPLE_GAP_MS) return previous.percent;
+
+  const cpuSec = (ticks - previous.ticks) / CLOCK_TICKS_PER_SEC;
+  const rawPercent = (cpuSec / (elapsedMs / 1000)) * 100;
+  const percent =
+    Number.isFinite(rawPercent) && rawPercent >= 0 ? Math.round(rawPercent * 10) / 10 : previous.percent;
+  lastCpuSample.set(pid, { ticks, atMs: now, percent });
+  return percent;
+}
+
+/** Drops bookkeeping for processes that no longer exist, so the sample map
+ * does not grow for the life of the dashboard. */
+function pruneCpuSamples(livePids: Set<number>): void {
+  for (const pid of lastCpuSample.keys()) {
+    if (!livePids.has(pid)) lastCpuSample.delete(pid);
+  }
+}
+
+/**
  * Resource usage (CPU%, RAM) for every currently running server, keyed by
  * server id. A single `ps` + `screen -ls` call is shared across all servers
  * rather than spawning one of each per server, since this is polled on
@@ -212,6 +288,7 @@ async function readProcessTable(): Promise<PsRow[]> {
  */
 export async function getResourceUsageMap(entries: ServerEntry[]): Promise<Map<string, ResourceUsage>> {
   const result = new Map<string, ResourceUsage>();
+  const livePids = new Set<number>();
   const screenPids = await listScreenPids();
   const relevant = entries.filter((e) => screenPids.has(e.screenName));
   if (relevant.length === 0) return result;
@@ -235,12 +312,17 @@ export async function getResourceUsageMap(entries: ServerEntry[]): Promise<Map<s
       const children = byPpid.get(pid) ?? [];
       const javaProc = children.find((c) => c.comm.includes("java"));
       if (javaProc) {
-        result.set(entry.id, { cpuPercent: javaProc.cpu, memoryMb: Math.round(javaProc.rssKb / 1024) });
+        livePids.add(javaProc.pid);
+        result.set(entry.id, {
+          cpuPercent: instantaneousCpuPercent(javaProc.pid, javaProc.cpu),
+          memoryMb: Math.round(javaProc.rssKb / 1024),
+        });
         break;
       }
       for (const child of children) queue.push(child.pid);
     }
   }
 
+  pruneCpuSamples(livePids);
   return result;
 }

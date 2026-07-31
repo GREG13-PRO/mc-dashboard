@@ -3,6 +3,7 @@ import { ConsoleSocket } from "../ws-client";
 import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
 import { openPluginBrowser } from "../components/PluginBrowser";
+import { sparklineSvg } from "../components/Sparkline";
 import { confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { escapeHtml } from "../lib/escape";
@@ -32,6 +33,7 @@ export function renderServerView(
   let terminal: ConsoleLogView | null = null;
   let socket: ConsoleSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let statsTimer: ReturnType<typeof setInterval> | null = null;
   const consoleHistory: string[] = [];
 
   root.innerHTML = `<div class="empty-state">Betöltés…</div>`;
@@ -75,6 +77,7 @@ export function renderServerView(
           )
           .join("")}
       </div>
+      <div id="resource-charts"></div>
       <div class="tab-content" id="tab-content"></div>
     `;
 
@@ -107,6 +110,56 @@ export function renderServerView(
     });
 
     renderTabContent();
+    void refreshCharts();
+  }
+
+  /**
+   * The detail view otherwise only reloads on a start/stop action, so the
+   * chart (and the CPU/RAM figure beside the title) would freeze at whatever
+   * it was when the page opened. This polls just the series.
+   */
+  async function refreshCharts() {
+    const holder = root.querySelector<HTMLDivElement>("#resource-charts");
+    if (!holder || !server) return;
+    if (!server.running) {
+      holder.innerHTML = "";
+      return;
+    }
+    let samples;
+    try {
+      samples = await api.getResourceHistory(serverId);
+    } catch {
+      return;
+    }
+    if (disposed) return;
+    const target = root.querySelector<HTMLDivElement>("#resource-charts");
+    if (!target) return;
+    if (samples.length === 0) {
+      target.innerHTML = "";
+      return;
+    }
+    const cpu = samples.map((x) => x.cpuPercent);
+    const mem = samples.map((x) => x.memoryMb);
+    const last = samples[samples.length - 1];
+    const peakMem = Math.max(...mem);
+    target.innerHTML = `
+      <div style="display:flex;gap:1.2rem;padding:0.9rem 1.5rem 0.2rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-dim);">
+            <span>CPU</span><span>${last.cpuPercent.toFixed(0)}%</span>
+          </div>
+          ${sparklineSvg({ values: cpu, color: "var(--accent)" })}
+        </div>
+        <div style="flex:1;min-width:220px;">
+          <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-dim);">
+            <span>RAM</span><span>${last.memoryMb} MB</span>
+          </div>
+          ${sparklineSvg({ values: mem, color: "var(--yellow)", max: peakMem * 1.15 })}
+        </div>
+      </div>
+      <div style="padding:0 1.5rem;font-size:0.72rem;color:var(--text-dim);">utolsó ${Math.round(
+        (samples.length * 5) / 60
+      )} perc</div>`;
   }
 
   function labelFor(tab: Tab): string {
@@ -222,6 +275,14 @@ export function renderServerView(
         reconnectTimer = setTimeout(connectSocket, 3000);
       },
     });
+  }
+
+  function startStatsLoop() {
+    if (statsTimer) return;
+    statsTimer = setInterval(() => {
+      if (disposed) return;
+      void refreshCharts();
+    }, 5000);
   }
 
   function teardownConsole() {
@@ -646,10 +707,12 @@ export function renderServerView(
     }
   }
 
-  void load();
+  void load().then(startStatsLoop);
 
   return () => {
     disposed = true;
+    if (statsTimer) clearInterval(statsTimer);
+    statsTimer = null;
     teardownConsole();
   };
 }

@@ -12,6 +12,7 @@ import {
 import { getCachedPlayers } from "./rcon-poller";
 import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
 import { readAccessLists, setWhitelistEnforced } from "./access-manager";
+import { getResourceHistory } from "./resource-history";
 import {
   searchPlugins,
   listPluginVersions,
@@ -298,6 +299,18 @@ serversRouter.post("/:id/players/:name/action", requirePermission("players"), as
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
+});
+
+// Served separately rather than embedded in the server list: that list is
+// refreshed every 5s by every open dashboard, and N samples x M servers on
+// each of those responses is a lot of payload for data only one view shows.
+serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ history: getResourceHistory(entry.id) });
 });
 
 serversRouter.get("/:id/access", requirePermission("players"), async (req, res) => {

@@ -7,6 +7,7 @@ import type {
   PluginSearchResult,
   PluginSource,
   PluginVersionInfo,
+  ResourceSample,
   ServerEntryInput,
   ServerInstallInput,
   ServerTypeOption,
@@ -191,6 +192,11 @@ export const api = {
       body: JSON.stringify(input),
     });
     return server;
+  },
+
+  async getResourceHistory(serverId: string): Promise<ResourceSample[]> {
+    const { history } = await request<{ history: ResourceSample[] }>(`/servers/${serverId}/resource-history`);
+    return history;
   },
 
   async getAccessLists(serverId: string): Promise<AccessLists> {

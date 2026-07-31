@@ -41,6 +41,12 @@ export interface ResourceUsage {
   memoryMb: number;
 }
 
+export interface ResourceSample {
+  at: string;
+  cpuPercent: number;
+  memoryMb: number;
+}
+
 export interface ServerWithStatus extends ServerEntry {
   running: boolean;
   players: PlayersSnapshot | null;
