@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { ConsoleSocket } from "../ws-client";
 import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
@@ -79,7 +80,7 @@ export function renderServerView(
   let statsTimer: ReturnType<typeof setInterval> | null = null;
   const consoleHistory: string[] = [];
 
-  root.innerHTML = `<div class="empty-state">Betöltés…</div>`;
+  root.innerHTML = `<div class="empty-state">${t("betoltes")}</div>`;
 
   async function load() {
     try {
@@ -90,7 +91,7 @@ export function renderServerView(
       renderShell();
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${
-        err instanceof ApiError ? err.message : "Szerver betöltése sikertelen"
+        err instanceof ApiError ? err.message : t("szerver_betoltese_sikertelen")
       }</div>`;
     }
   }
@@ -225,19 +226,19 @@ export function renderServerView(
 
   function labelFor(tab: Tab): string {
     return {
-      console: "Konzol",
-      files: "Fájlok",
-      plugins: "Bővítmények",
-      players: "Játékosok",
+      console: t("konzol"),
+      files: t("fajlok"),
+      plugins: t("bovitmenyek"),
+      players: t("jatekosok"),
       access: "Whitelist / Ban",
       luckperms: "LuckPerms",
       timeline: "Time Machine",
-      performance: "Teljesítmény",
-      content: "Csomagok",
-      macros: "Makrók",
-      stats: "Statisztika",
-      schematics: "Schematicek",
-      settings: "Beállítások",
+      performance: t("teljesitmeny"),
+      content: t("csomagok"),
+      macros: t("makrok"),
+      stats: t("statisztika"),
+      schematics: t("schematicek"),
+      settings: t("beallitasok"),
     }[tab];
   }
 
@@ -247,7 +248,7 @@ export function renderServerView(
       await load();
       callbacks.onChanged();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Művelet sikertelen", "error");
+      showToast(err instanceof ApiError ? err.message : t("muvelet_sikertelen"), "error");
     }
   }
 
@@ -258,9 +259,9 @@ export function renderServerView(
         <div class="console-container">
           <div class="terminal-wrap" id="terminal-wrap"></div>
           <div class="console-input-row">
-            <input id="console-input" placeholder="Parancs a szerver konzoljába…" />
-            <button class="btn btn-primary" id="console-send">Küldés</button>
-            <button class="btn" id="console-history" title="Korábbi futások naplói">Előzmények</button>
+            <input id="console-input" placeholder="${t("parancs_a_szerver_konzoljaba")}" />
+            <button class="btn btn-primary" id="console-send">${t("kuldes")}</button>
+            <button class="btn" id="console-history" title="${t("korabbi_futasok_naploi")}">${t("elozmenyek")}</button>
           </div>
         </div>
       `;
@@ -381,7 +382,7 @@ export function renderServerView(
    * the live log - including the restart you do to recover from a crash. */
   async function openLogArchive() {
     const wrap = document.createElement("div");
-    wrap.innerHTML = `<h3>Korábbi futások naplói</h3><p style="color:var(--text-dim);">Betöltés…</p>`;
+    wrap.innerHTML = `<h3>${t("korabbi_futasok_naploi")}</h3><p style="color:var(--text-dim);">${t("betoltes")}</p>`;
     const close = openModal(wrap);
 
     async function render() {
@@ -389,21 +390,19 @@ export function renderServerView(
       try {
         logs = await api.listConsoleLogs(serverId);
       } catch (err) {
-        wrap.innerHTML = `<h3>Korábbi futások naplói</h3><p class="error-text">${escapeHtml(
-          err instanceof ApiError ? err.message : "Nem sikerült betölteni"
-        )}</p><div class="modal-actions"><button class="btn" id="la-close">Bezárás</button></div>`;
+        wrap.innerHTML = `<h3>${t("korabbi_futasok_naploi")}</h3><p class="error-text">${escapeHtml(
+          err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
+        )}</p><div class="modal-actions"><button class="btn" id="la-close">${t("bezaras")}</button></div>`;
         wrap.querySelector<HTMLButtonElement>("#la-close")!.onclick = () => close();
         return;
       }
 
       wrap.innerHTML = `
-        <h3>Korábbi futások naplói</h3>
-        <p style="color:var(--text-dim);font-size:12px;margin:0 0 16px;">
-          A dashboard az utolsó 14 futás konzolnaplóját őrzi meg.
-        </p>
+        <h3>${t("korabbi_futasok_naploi")}</h3>
+        <p style="color:var(--text-dim);font-size:12px;margin:0 0 16px;">${t("a_dashboard_az_utolso_14_futas_konzolnaplojat_or")}</p>
         ${
           logs.length === 0
-            ? `<div class="empty-state" style="padding:16px;">Még nincs archivált napló.</div>`
+            ? `<div class="empty-state" style="padding:16px;">${t("meg_nincs_archivalt_naplo")}</div>`
             : logs
                 .map(
                   (l) => `
@@ -413,14 +412,14 @@ export function renderServerView(
               <div style="color:var(--text-dim);font-size:11px;">${(l.sizeBytes / 1024).toFixed(0)} kB</div>
             </div>
             <div style="display:flex;gap:6px;">
-              <button class="btn" data-view="${escapeHtml(l.filename)}">Megnyitás</button>
-              <button class="btn btn-danger" data-del="${escapeHtml(l.filename)}">Törlés</button>
+              <button class="btn" data-view="${escapeHtml(l.filename)}">${t("megnyitas")}</button>
+              <button class="btn btn-danger" data-del="${escapeHtml(l.filename)}">${t("torles")}</button>
             </div>
           </div>`
                 )
                 .join("")
         }
-        <div class="modal-actions"><button class="btn" id="la-close">Bezárás</button></div>
+        <div class="modal-actions"><button class="btn" id="la-close">${t("bezaras")}</button></div>
       `;
       wrap.querySelector<HTMLButtonElement>("#la-close")!.onclick = () => close();
 
@@ -431,17 +430,17 @@ export function renderServerView(
         btn.onclick = async () => {
           try {
             await api.deleteConsoleLog(serverId, btn.dataset.del!);
-            showToast("Napló törölve");
+            showToast(t("naplo_torolve"));
             await render();
           } catch (err) {
-            showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+            showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
           }
         };
       });
     }
 
     async function viewLog(filename: string) {
-      wrap.innerHTML = `<h3>Napló</h3><p style="color:var(--text-dim);">Betöltés…</p>`;
+      wrap.innerHTML = `<h3>${t("naplo")}</h3><p style="color:var(--text-dim);">${t("betoltes")}</p>`;
       try {
         const content = await api.readConsoleLog(serverId, filename);
         wrap.innerHTML = `
@@ -453,8 +452,8 @@ export function renderServerView(
               .join("")}</div>
           </div>
           <div class="modal-actions">
-            <button class="btn" id="la-back">Vissza</button>
-            <button class="btn" id="la-close2">Bezárás</button>
+            <button class="btn" id="la-back">${t("vissza")}</button>
+            <button class="btn" id="la-close2">${t("bezaras")}</button>
           </div>`;
         wrap.querySelector<HTMLButtonElement>("#la-back")!.onclick = () => void render();
         wrap.querySelector<HTMLButtonElement>("#la-close2")!.onclick = () => close();
@@ -462,7 +461,7 @@ export function renderServerView(
         const log = wrap.querySelector<HTMLDivElement>(".console-log");
         if (log) log.scrollTop = log.scrollHeight;
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült megnyitni", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult_megnyitni"), "error");
         void render();
       }
     }
@@ -471,13 +470,13 @@ export function renderServerView(
   }
 
   async function renderSchematics(content: HTMLElement) {
-    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
     let data;
     try {
       data = await api.listSchematics(serverId);
     } catch (err) {
       content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
-        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
       )}</div>`;
       return;
     }
@@ -491,15 +490,12 @@ export function renderServerView(
         ${
           data.worldEdit
             ? ""
-            : `<strong style="color:var(--yellow);">Ezen a szerveren nincs WorldEdit, a bepakolás nem fog működni.</strong>`
+            : `<strong style="color:var(--yellow);">${t("nincs_worldedit")}</strong>`
         }
       </p>
 
       <div id="schem-drop" style="border:1.5px dashed var(--border-strong);border-radius:var(--radius-md);
-           padding:20px;text-align:center;color:var(--text-dim);font-size:12px;margin:16px 0;">
-        Húzd ide a .schem fájlt, vagy
-        <label style="display:inline;color:var(--accent);cursor:pointer;text-decoration:underline;">
-          válassz fájlt<input type="file" id="schem-file" accept=".schem,.schematic" style="display:none;" />
+           padding:20px;text-align:center;color:var(--text-dim);font-size:12px;margin:16px 0;">${t("huzd_ide_a_schem_fajlt_vagy")}<label style="display:inline;color:var(--accent);cursor:pointer;text-decoration:underline;">${t("valassz_fajlt")}<input type="file" id="schem-file" accept=".schem,.schematic" style="display:none;" />
         </label>
       </div>
 
@@ -509,7 +505,7 @@ export function renderServerView(
     const listEl = content.querySelector<HTMLDivElement>("#schem-list")!;
     listEl.innerHTML =
       data.schematics.length === 0
-        ? `<div class="empty-state" style="padding:16px;">Még nincs schematic.</div>`
+        ? `<div class="empty-state" style="padding:16px;">${t("meg_nincs_schematic")}</div>`
         : data.schematics
             .map(
               (sc) => `
@@ -525,9 +521,9 @@ export function renderServerView(
         <div style="display:flex;gap:6px;">
           <button class="btn btn-primary" data-paste="${escapeHtml(sc.filename)}" ${
             running && data.worldEdit ? "" : "disabled"
-          }>Bepakolás</button>
-          <a class="btn" href="${api.schematicDownloadUrl(serverId, sc.filename)}">Letöltés</a>
-          <button class="btn btn-danger" data-del-schem="${escapeHtml(sc.filename)}">Törlés</button>
+          }>${t("bepakolas")}</button>
+          <a class="btn" href="${api.schematicDownloadUrl(serverId, sc.filename)}">${t("letoltes")}</a>
+          <button class="btn btn-danger" data-del-schem="${escapeHtml(sc.filename)}">${t("torles")}</button>
         </div>
       </div>`
             )
@@ -536,10 +532,10 @@ export function renderServerView(
     const upload = async (file: File) => {
       try {
         await api.uploadSchematic(serverId, file);
-        showToast("Feltöltve");
+        showToast(t("feltoltve"));
         await renderSchematics(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Feltöltés sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("feltoltes_sikertelen"), "error");
       }
     };
 
@@ -568,10 +564,10 @@ export function renderServerView(
         if (!(await confirmModal(`Törlöd? <strong>${escapeHtml(filename)}</strong>`))) return;
         try {
           await api.deleteSchematic(serverId, filename);
-          showToast("Törölve");
+          showToast(t("torolve"));
           await renderSchematics(content);
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+          showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
         }
       };
     });
@@ -585,32 +581,30 @@ export function renderServerView(
       // WorldEdit is session-based, so a paste needs either a player whose
       // session it can borrow or explicit coordinates.
       wrap.innerHTML = `
-        <h3>Bepakolás</h3>
+        <h3>${t("bepakolas")}</h3>
         <p style="color:var(--text-dim);font-size:12px;">${escapeHtml(filename)}</p>
         <div class="field">
-          <label for="ps-player">Játékos (az ő pozíciójába kerül)</label>
+          <label for="ps-player">${t("jatekos_az_o_poziciojaba_kerul")}</label>
           <input id="ps-player" placeholder="pl. Bumimaci" />
         </div>
-        <p style="color:var(--text-dim);font-size:12px;margin:-8px 0 12px;">
-          Vagy hagyd üresen, és adj meg koordinátákat:
-        </p>
+        <p style="color:var(--text-dim);font-size:12px;margin:-8px 0 12px;">${t("vagy_hagyd_uresen_es_adj_meg_koordinatakat")}</p>
         <div style="display:flex;gap:8px;">
           <div class="field" style="flex:1;"><label for="ps-x">X</label><input id="ps-x" type="number" /></div>
           <div class="field" style="flex:1;"><label for="ps-y">Y</label><input id="ps-y" type="number" /></div>
           <div class="field" style="flex:1;"><label for="ps-z">Z</label><input id="ps-z" type="number" /></div>
         </div>
         <div class="field">
-          <label for="ps-world">Világ</label>
+          <label for="ps-world">${t("vilag")}</label>
           <input id="ps-world" value="world" />
         </div>
         <div class="field checkbox-row">
           <input id="ps-air" type="checkbox" />
-          <label for="ps-air" style="margin:0">Levegő blokkok kihagyása</label>
+          <label for="ps-air" style="margin:0">${t("levego_blokkok_kihagyasa")}</label>
         </div>
         <div id="form-error" class="error-text"></div>
         <div class="modal-actions">
-          <button class="btn" id="ps-cancel">Mégse</button>
-          <button class="btn btn-primary" id="ps-go">Bepakolás</button>
+          <button class="btn" id="ps-cancel">${t("megse")}</button>
+          <button class="btn btn-primary" id="ps-go">${t("bepakolas")}</button>
         </div>`;
       const close = openModal(wrap);
       wrap.querySelector<HTMLButtonElement>("#ps-cancel")!.onclick = () => close();
@@ -627,10 +621,10 @@ export function renderServerView(
             world: wrap.querySelector<HTMLInputElement>("#ps-world")!.value.trim() || undefined,
             ignoreAir: wrap.querySelector<HTMLInputElement>("#ps-air")!.checked,
           });
-          showToast("Parancsok elküldve — nézd meg a konzolt az eredményért");
+          showToast(t("parancsok_elkuldve_nezd_meg_a_konzolt_az_eredmen"));
           close();
         } catch (err) {
-          errorEl.textContent = err instanceof ApiError ? err.message : "Nem sikerült";
+          errorEl.textContent = err instanceof ApiError ? err.message : t("nem_sikerult");
           btn.disabled = false;
         }
       };
@@ -638,13 +632,13 @@ export function renderServerView(
   }
 
   async function renderStats(content: HTMLElement) {
-    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
     let c;
     try {
       c = await api.getWeeklyStats(serverId);
     } catch (err) {
       content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
-        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
       )}</div>`;
       return;
     }
@@ -653,7 +647,7 @@ export function renderServerView(
     // A change is only meaningful once last week has something in it; before
     // that the panel says so rather than showing a percentage from nothing.
     const delta = (value: number | null) => {
-      if (value === null) return `<span style="color:var(--text-dim);">nincs viszonyítás</span>`;
+      if (value === null) return `<span style="color:var(--text-dim);">${t("nincs_viszonyitas")}</span>`;
       const colour = value > 0 ? "var(--green)" : value < 0 ? "var(--red)" : "var(--text-dim)";
       const sign = value > 0 ? "+" : "";
       return `<span style="color:${colour};">${sign}${value}%</span>`;
@@ -665,16 +659,13 @@ export function renderServerView(
     const maxPeak = Math.max(1, ...c.daily.map((d) => d.peak));
 
     content.innerHTML = `
-      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
-        A dashboard 5 percenként mintát vesz a futó szerverek játékosszámából, és óránként
-        összesíti. A játékidő ezekből becsült játékos-perc, nem a szerver saját statisztikája.
-      </p>
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("a_dashboard_5_percenkent_mintat_vesz_a_futo_szer")}</p>
 
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin:20px 0;">
         ${[
-          { label: "Csúcs egyidejű játékos", now: c.thisWeek.peak, before: c.lastWeek.peak, change: c.peakChange },
+          { label: t("csucs_egyideju_jatekos"), now: c.thisWeek.peak, before: c.lastWeek.peak, change: c.peakChange },
           {
-            label: "Átlagos online",
+            label: t("atlagos_online"),
             now: c.thisWeek.averageOnline,
             before: c.lastWeek.averageOnline,
             change: c.averageChange,
@@ -692,20 +683,20 @@ export function renderServerView(
           )
           .join("")}
         <div style="flex:1;min-width:190px;padding:12px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
-          <div style="color:var(--text-dim);font-size:11px;">Becsült játékidő</div>
+          <div style="color:var(--text-dim);font-size:11px;">${t("becsult_jatekido")}</div>
           <div style="font-size:22px;font-weight:600;">${hours(c.thisWeek.playtimeMinutes)}</div>
           <div style="font-size:12px;">${delta(c.playtimeChange)} <span style="color:var(--text-dim);">múlt hét: ${hours(
             c.lastWeek.playtimeMinutes
           )}</span></div>
         </div>
         <div style="flex:1;min-width:190px;padding:12px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
-          <div style="color:var(--text-dim);font-size:11px;">Üzemidő ezen a héten</div>
+          <div style="color:var(--text-dim);font-size:11px;">${t("uzemido_ezen_a_heten")}</div>
           <div style="font-size:22px;font-weight:600;">${hours(c.thisWeek.upMinutes)}</div>
           <div style="font-size:12px;color:var(--text-dim);">múlt hét: ${hours(c.lastWeek.upMinutes)}</div>
         </div>
       </div>
 
-      <h4 style="margin-bottom:8px;">Napi csúcs, utolsó 14 nap</h4>
+      <h4 style="margin-bottom:8px;">${t("napi_csucs_utolso_14_nap")}</h4>
       <div style="display:flex;align-items:flex-end;gap:4px;height:120px;">
         ${c.daily
           .map(
@@ -735,13 +726,13 @@ export function renderServerView(
   }
 
   async function renderMacros(content: HTMLElement) {
-    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
     let data;
     try {
       data = await api.listMacros(serverId);
     } catch (err) {
       content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
-        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
       )}</div>`;
       return;
     }
@@ -749,16 +740,13 @@ export function renderServerView(
     const running = server?.running ?? false;
 
     content.innerHTML = `
-      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
-        A makró parancsok sorozata, egy gombra kötve. A felvétel közben a konzolba írt
-        parancsok automatikusan lépésekké válnak, a köztük eltelt idő pedig várakozássá.
-      </p>
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("a_makro_parancsok_sorozata_egy_gombra_kotve_a_fe")}</p>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
         <button class="btn ${data.recording ? "btn-danger" : ""}" id="mac-record">
-          ${data.recording ? "Felvétel leállítása" : "Felvétel indítása"}
+          ${data.recording ? t("felvetel_leallitasa") : t("felvetel_inditasa")}
         </button>
-        <button class="btn btn-primary" id="mac-new">+ Új makró</button>
+        <button class="btn btn-primary" id="mac-new">${t("uj_makro")}</button>
       </div>
 
       <div id="mac-list"></div>
@@ -767,7 +755,7 @@ export function renderServerView(
     const list = content.querySelector<HTMLDivElement>("#mac-list")!;
     list.innerHTML =
       data.macros.length === 0
-        ? `<div class="empty-state" style="padding:16px;">Még nincs makró.</div>`
+        ? `<div class="empty-state" style="padding:16px;">${t("meg_nincs_makro")}</div>`
         : data.macros
             .map(
               (m) => `
@@ -780,9 +768,9 @@ export function renderServerView(
             </div>
           </div>
           <div style="display:flex;gap:6px;">
-            <button class="btn btn-primary" data-run="${m.id}" ${running ? "" : "disabled"}>Futtatás</button>
-            <button class="btn" data-edit-macro="${m.id}">Szerkesztés</button>
-            <button class="btn btn-danger" data-del-macro="${m.id}">Törlés</button>
+            <button class="btn btn-primary" data-run="${m.id}" ${running ? "" : "disabled"}>${t("futtatas")}</button>
+            <button class="btn" data-edit-macro="${m.id}">${t("szerkesztes")}</button>
+            <button class="btn btn-danger" data-del-macro="${m.id}">${t("torles")}</button>
           </div>
         </div>
         <div style="color:var(--text-dim);font-size:11px;font-family:'SF Mono',ui-monospace,monospace;margin-top:6px;">
@@ -800,18 +788,18 @@ export function renderServerView(
           const res = await api.setMacroRecording(serverId, "stop");
           const steps = res.steps ?? [];
           if (steps.length === 0) {
-            showToast("Nem rögzült parancs.");
+            showToast(t("nem_rogzult_parancs"));
             await renderMacros(content);
             return;
           }
           openMacroEditor(null, steps);
         } else {
           await api.setMacroRecording(serverId, "start");
-          showToast("Felvétel elindult — írj parancsokat a konzolba.");
+          showToast(t("felvetel_elindult_irj_parancsokat_a_konzolba"));
           await renderMacros(content);
         }
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
       }
     };
 
@@ -828,7 +816,7 @@ export function renderServerView(
               : `${r.executed} parancs lefutott`
           );
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
         }
       };
     });
@@ -842,13 +830,13 @@ export function renderServerView(
 
     list.querySelectorAll<HTMLButtonElement>("[data-del-macro]").forEach((btn) => {
       btn.onclick = async () => {
-        if (!(await confirmModal("Törlöd ezt a makrót?"))) return;
+        if (!(await confirmModal(t("torlod_ezt_a_makrot")))) return;
         try {
           await api.deleteMacro(serverId, btn.dataset.delMacro!);
-          showToast("Törölve");
+          showToast(t("torolve"));
           await renderMacros(content);
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+          showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
         }
       };
     });
@@ -859,16 +847,16 @@ export function renderServerView(
 
       const draw = () => {
         wrap.innerHTML = `
-          <h3>${macro ? "Makró szerkesztése" : "Új makró"}</h3>
+          <h3>${macro ? t("makro_szerkesztese") : t("uj_makro_2")}</h3>
           <div class="field">
-            <label for="mac-name">Név</label>
-            <input id="mac-name" value="${escapeHtml(macro?.name ?? "")}" placeholder="pl. Esemény indítás" />
+            <label for="mac-name">${t("nev")}</label>
+            <input id="mac-name" value="${escapeHtml(macro?.name ?? "")}" placeholder="${t("pl_esemeny_inditas")}" />
           </div>
           <div class="field">
-            <label for="mac-desc">Leírás</label>
+            <label for="mac-desc">${t("leiras")}</label>
             <input id="mac-desc" value="${escapeHtml(macro?.description ?? "")}" />
           </div>
-          <label>Lépések</label>
+          <label>${t("lepesek")}</label>
           <div id="mac-steps">
             ${working
               .map(
@@ -883,11 +871,11 @@ export function renderServerView(
               )
               .join("")}
           </div>
-          <button class="btn" id="mac-add-step" style="margin-top:4px;">+ Lépés</button>
+          <button class="btn" id="mac-add-step" style="margin-top:4px;">${t("lepes")}</button>
           <div id="form-error" class="error-text"></div>
           <div class="modal-actions">
-            <button class="btn" id="mac-cancel">Mégse</button>
-            <button class="btn btn-primary" id="mac-save">Mentés</button>
+            <button class="btn" id="mac-cancel">${t("megse")}</button>
+            <button class="btn btn-primary" id="mac-save">${t("mentes")}</button>
           </div>`;
 
         const sync = () => {
@@ -918,12 +906,12 @@ export function renderServerView(
           const errorEl = wrap.querySelector<HTMLDivElement>("#form-error")!;
           const name = wrap.querySelector<HTMLInputElement>("#mac-name")!.value.trim();
           if (!name) {
-            errorEl.textContent = "Adj nevet a makrónak.";
+            errorEl.textContent = t("adj_nevet_a_makronak");
             return;
           }
           const cleaned = working.filter((st) => st.command.trim());
           if (cleaned.length === 0) {
-            errorEl.textContent = "Legalább egy parancs kell.";
+            errorEl.textContent = t("legalabb_egy_parancs_kell");
             return;
           }
           try {
@@ -933,11 +921,11 @@ export function renderServerView(
               description: wrap.querySelector<HTMLInputElement>("#mac-desc")!.value.trim(),
               steps: cleaned,
             });
-            showToast("Makró mentve");
+            showToast(t("makro_mentve"));
             close();
             await renderMacros(content);
           } catch (err) {
-            errorEl.textContent = err instanceof ApiError ? err.message : "Mentés sikertelen";
+            errorEl.textContent = err instanceof ApiError ? err.message : t("mentes_sikertelen");
           }
         };
       };
@@ -948,14 +936,14 @@ export function renderServerView(
   }
 
   async function renderContent(content: HTMLElement) {
-    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
     let rp;
     let dp;
     try {
       [rp, dp] = await Promise.all([api.listPacks(serverId, "resourcepack"), api.listPacks(serverId, "datapack")]);
     } catch (err) {
       content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
-        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
       )}</div>`;
       return;
     }
@@ -968,14 +956,14 @@ export function renderServerView(
 
     const packRows = (packs: typeof rp.packs, kind: "resourcepack" | "datapack") =>
       packs.length === 0
-        ? `<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">Nincs feltöltve.</div>`
+        ? `<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">${t("nincs_feltoltve")}</div>`
         : packs
             .map(
               (p) => `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border);">
         <div style="min-width:0;">
           <div>${escapeHtml(p.filename)}${
-            p.active ? ` <span class="pb-badge" style="color:var(--green);">aktív</span>` : ""
+            p.active ? ` <span class="pb-badge" style="color:var(--green);">${t("aktiv")}</span>` : ""
           }</div>
           <div style="color:var(--text-dim);font-size:11px;">
             ${(p.sizeBytes / 1024 / 1024).toFixed(1)} MB · SHA-1 ${escapeHtml(p.sha1.slice(0, 12))}…
@@ -984,10 +972,10 @@ export function renderServerView(
         <div style="display:flex;gap:6px;">
           ${
             kind === "resourcepack"
-              ? `<button class="btn" data-activate="${escapeHtml(p.filename)}">Kiosztás</button>`
+              ? `<button class="btn" data-activate="${escapeHtml(p.filename)}">${t("kiosztas")}</button>`
               : ""
           }
-          <button class="btn btn-danger" data-del-pack="${kind}|${escapeHtml(p.filename)}">Törlés</button>
+          <button class="btn btn-danger" data-del-pack="${kind}|${escapeHtml(p.filename)}">${t("torles")}</button>
         </div>
       </div>`
             )
@@ -995,26 +983,22 @@ export function renderServerView(
 
     content.innerHTML = `
       <h4 style="margin-bottom:4px;">Resource pack</h4>
-      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
-        A resource packet nem a szerver küldi el: csak egy linket és egy SHA-1 ellenőrzőösszeget
-        ad a kliensnek, ami maga tölti le. A „Kiosztás” ezt írja be a server.properties-be —
-        a címnek a <strong>játékosok gépéről</strong> kell elérhetőnek lennie.
-      </p>
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("a_resource_packet_nem_a_szerver_kuldi_el_csak_eg")}<strong>${t("jatekosok_geperol")}</strong>${t("kell_elerhetonek_lennie")}</p>
 
       <div class="field" style="max-width:520px;">
-        <label for="pack-base">Nyilvános alapcím</label>
+        <label for="pack-base">${t("nyilvanos_alapcim")}</label>
         <input id="pack-base" value="${escapeHtml(suggestedBase)}" />
       </div>
 
       <div class="field checkbox-row">
         <input id="pack-required" type="checkbox" ${rp.status?.required ? "checked" : ""} />
-        <label for="pack-required" style="margin:0">Kötelező (aki nem fogadja el, nem tud belépni)</label>
+        <label for="pack-required" style="margin:0">${t("kotelezo_aki_nem_fogadja_el_nem_tud_belepni")}</label>
       </div>
 
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;">
         <input type="file" id="rp-file" accept=".zip" style="max-width:280px;" />
-        <button class="btn btn-primary" id="rp-upload">Feltöltés</button>
-        ${rp.status?.url ? `<button class="btn" id="rp-clear">Kiosztás visszavonása</button>` : ""}
+        <button class="btn btn-primary" id="rp-upload">${t("feltoltes")}</button>
+        ${rp.status?.url ? `<button class="btn" id="rp-clear">${t("kiosztas_visszavonasa")}</button>` : ""}
       </div>
       ${
         rp.status?.url
@@ -1025,14 +1009,11 @@ export function renderServerView(
       }
       <div>${packRows(rp.packs, "resourcepack")}</div>
 
-      <h4 style="margin:28px 0 4px;">Datapackek</h4>
-      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
-        A datapackek a világ <code>datapacks</code> mappájába kerülnek, és a szerver maga tölti be
-        őket — újraindítás vagy <code>/datapack enable</code> után lépnek életbe.
-      </p>
+      <h4 style="margin:28px 0 4px;">${t("datapackek")}</h4>
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("a_datapackek_a_vilag")}<code>datapacks</code>${t("mappajaba_kerulnek_es_a_szerver_maga_tolti_be_ok")}<code>/datapack enable</code>${t("utan_lepnek_eletbe")}</p>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;">
         <input type="file" id="dp-file" accept=".zip" style="max-width:280px;" />
-        <button class="btn btn-primary" id="dp-upload">Feltöltés</button>
+        <button class="btn btn-primary" id="dp-upload">${t("feltoltes")}</button>
       </div>
       <div>${packRows(dp.packs, "datapack")}</div>
     `;
@@ -1041,15 +1022,15 @@ export function renderServerView(
       const input = content.querySelector<HTMLInputElement>(`#${inputId}`)!;
       const file = input.files?.[0];
       if (!file) {
-        showToast("Válassz egy .zip fájlt", "error");
+        showToast(t("valassz_egy_zip_fajlt"), "error");
         return;
       }
       try {
         await api.uploadPack(serverId, kind, file);
-        showToast("Feltöltve");
+        showToast(t("feltoltve"));
         await renderContent(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Feltöltés sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("feltoltes_sikertelen"), "error");
       }
     };
 
@@ -1060,20 +1041,20 @@ export function renderServerView(
       const el = e.target as HTMLInputElement;
       try {
         await api.setRequireResourcePack(serverId, el.checked);
-        showToast(el.checked ? "Kötelezővé téve" : "Már nem kötelező");
+        showToast(el.checked ? t("kotelezove_teve") : t("mar_nem_kotelezo"));
       } catch (err) {
         el.checked = !el.checked;
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
       }
     };
 
     content.querySelector<HTMLButtonElement>("#rp-clear")?.addEventListener("click", async () => {
       try {
         await api.clearResourcePack(serverId);
-        showToast("Kiosztás visszavonva");
+        showToast(t("kiosztas_visszavonva"));
         await renderContent(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
       }
     });
 
@@ -1085,7 +1066,7 @@ export function renderServerView(
           showToast(`Kiosztva (SHA-1 ${sha1.slice(0, 8)}…)`);
           await renderContent(content);
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
         }
       };
     });
@@ -1096,10 +1077,10 @@ export function renderServerView(
         if (!(await confirmModal(`Törlöd ezt a csomagot? <strong>${escapeHtml(filename)}</strong>`))) return;
         try {
           await api.deletePack(serverId, kind as "resourcepack" | "datapack", filename);
-          showToast("Törölve");
+          showToast(t("torolve"));
           await renderContent(content);
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+          showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
         }
       };
     });
@@ -1108,20 +1089,17 @@ export function renderServerView(
   async function renderPerformance(content: HTMLElement) {
     const running = server?.running ?? false;
     content.innerHTML = `
-      <h4 style="margin-bottom:8px;">Bővítmény-ütközések</h4>
-      <div id="perf-conflicts"><div style="color:var(--text-dim);font-size:12px;">Ellenőrzés…</div></div>
+      <h4 style="margin-bottom:8px;">${t("bovitmeny_utkozesek")}</h4>
+      <div id="perf-conflicts"><div style="color:var(--text-dim);font-size:12px;">${t("ellenorzes")}</div></div>
 
       <h4 style="margin:24px 0 8px;">Lag doctor</h4>
-      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">
-        Lefuttatja a diagnosztikai parancsokat, és összeszedi, mi tűnik fel. Pontos okhoz
-        (melyik entity vagy chunk) a Spark plugin kell — ezt a dashboard nem tudja kiváltani.
-      </p>
-      <button class="btn" id="perf-lag" ${running ? "" : "disabled"}>Diagnosztika futtatása</button>
-      ${running ? "" : `<span style="color:var(--text-dim);font-size:12px;margin-left:8px;">Futnia kell a szervernek.</span>`}
+      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("lefuttatja_a_diagnosztikai_parancsokat_es_osszes")}</p>
+      <button class="btn" id="perf-lag" ${running ? "" : "disabled"}>${t("diagnosztika_futtatasa")}</button>
+      ${running ? "" : `<span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${t("futnia_kell_a_szervernek")}</span>`}
       <div id="perf-lag-out" style="margin-top:12px;"></div>
 
-      <h4 style="margin:24px 0 8px;">JVM paraméterek</h4>
-      <div id="perf-jvm"><div style="color:var(--text-dim);font-size:12px;">Betöltés…</div></div>
+      <h4 style="margin:24px 0 8px;">${t("jvm_parameterek")}</h4>
+      <div id="perf-jvm"><div style="color:var(--text-dim);font-size:12px;">${t("betoltes")}</div></div>
     `;
 
     void (async () => {
@@ -1130,13 +1108,13 @@ export function renderServerView(
         const conflicts = await api.getPluginConflicts(serverId);
         box.innerHTML =
           conflicts.length === 0
-            ? `<div style="color:var(--green);font-size:12px;">Nem találtam ismert ütközést.</div>`
+            ? `<div style="color:var(--green);font-size:12px;">${t("nem_talaltam_ismert_utkozest")}</div>`
             : conflicts
                 .map(
                   (c) => `
           <div style="padding:8px 0;border-bottom:0.5px solid var(--border);">
             <div style="color:${c.severity === "conflict" ? "var(--red)" : "var(--yellow)"};font-size:13px;">
-              ${c.severity === "conflict" ? "Ütközés" : "Figyelmeztetés"}: ${escapeHtml(c.plugins.join(" + "))}
+              ${c.severity === "conflict" ? t("utkozes") : t("figyelmeztetes")}: ${escapeHtml(c.plugins.join(" + "))}
             </div>
             <div style="color:var(--text-dim);font-size:12px;">${escapeHtml(c.message)}</div>
           </div>`
@@ -1144,7 +1122,7 @@ export function renderServerView(
                 .join("");
       } catch (err) {
         box.innerHTML = `<div class="error-text">${escapeHtml(
-          err instanceof ApiError ? err.message : "Nem sikerült ellenőrizni"
+          err instanceof ApiError ? err.message : t("nem_sikerult_ellenorizni")
         )}</div>`;
       }
     })();
@@ -1164,11 +1142,11 @@ export function renderServerView(
           </ul>`;
       } catch (err) {
         out.innerHTML = `<div class="error-text">${escapeHtml(
-          err instanceof ApiError ? err.message : "Nem sikerült"
+          err instanceof ApiError ? err.message : t("nem_sikerult")
         )}</div>`;
       } finally {
         btn.disabled = !(server?.running ?? false);
-        btn.textContent = "Diagnosztika futtatása";
+        btn.textContent = t("diagnosztika_futtatasa");
       }
     };
 
@@ -1184,42 +1162,40 @@ export function renderServerView(
           <ul style="margin:0 0 12px;padding-left:18px;color:var(--text-dim);font-size:12px;">
             ${rec.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
           </ul>
-          <label>Jelenlegi start script</label>
+          <label>${t("jelenlegi_start_script")}</label>
           <pre class="pb-body" style="max-height:90px;">${escapeHtml(rec.currentScript.trim())}</pre>
-          <label style="margin-top:12px;">Ajánlott start script</label>
+          <label style="margin-top:12px;">${t("ajanlott_start_script")}</label>
           <pre class="pb-body" style="max-height:150px;">${escapeHtml(rec.script.trim())}</pre>
           <button class="btn btn-primary" id="perf-apply" style="margin-top:8px;" ${
-            running ? "disabled title='Állítsd le előbb a szervert'" : ""
-          }>Alkalmazás a start scriptre</button>
-          <div style="color:var(--text-dim);font-size:11px;margin-top:6px;">
-            A régi script .bak kiterjesztéssel megmarad.
-          </div>`;
+            running ? t("disabled_title_allitsd_le_elobb_a_szervert") : ""
+          }>${t("alkalmazas_a_start_scriptre")}</button>
+          <div style="color:var(--text-dim);font-size:11px;margin-top:6px;">${t("a_regi_script_bak_kiterjesztessel_megmarad")}</div>`;
 
         box.querySelector<HTMLButtonElement>("#perf-apply")?.addEventListener("click", async () => {
-          if (!(await confirmModal("Felülírod a start scriptet az ajánlott paraméterekkel?"))) return;
+          if (!(await confirmModal(t("felulirod_a_start_scriptet_az_ajanlott_parameter")))) return;
           try {
             await api.applyJvmScript(serverId, rec.script);
-            showToast("Start script frissítve");
+            showToast(t("start_script_frissitve"));
           } catch (err) {
-            showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+            showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
           }
         });
       } catch (err) {
         box.innerHTML = `<div class="error-text">${escapeHtml(
-          err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+          err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
         )}</div>`;
       }
     })();
   }
 
   async function renderTimeline(content: HTMLElement) {
-    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
     let data;
     try {
       data = await api.getTimeline(serverId);
     } catch (err) {
       content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
-        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
       )}</div>`;
       return;
     }
@@ -1232,39 +1208,35 @@ export function renderServerView(
     content.innerHTML = `
       <div class="field checkbox-row">
         <input id="tm-enabled" type="checkbox" ${config.enabled ? "checked" : ""} />
-        <label for="tm-enabled" style="margin:0">Time Machine bekapcsolva</label>
+        <label for="tm-enabled" style="margin:0">${t("time_machine_bekapcsolva")}</label>
       </div>
-      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">
-        Bekapcsolva a dashboard percenként pillanatképet készít a világról, és csak a
-        megváltozott régiófájlokat tárolja el. Alapból ki van kapcsolva, mert egy aktív
-        világ így is sok helyet tud enni.
-      </p>
+      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("bekapcsolva_a_dashboard_percenkent_pillanatkepet")}</p>
 
       <div style="display:flex;gap:16px;flex-wrap:wrap;margin:16px 0;">
         <div class="field" style="max-width:170px;">
-          <label for="tm-interval">Gyakoriság (perc)</label>
+          <label for="tm-interval">${t("gyakorisag_perc")}</label>
           <input id="tm-interval" type="number" min="1" max="60" value="${config.intervalMinutes}" />
         </div>
         <div class="field" style="max-width:190px;">
-          <label for="tm-max">Megőrzött pillanatképek</label>
+          <label for="tm-max">${t("megorzott_pillanatkepek")}</label>
           <input id="tm-max" type="number" min="5" max="500" value="${config.maxSnapshots}" />
         </div>
         <div class="field" style="align-self:flex-end;">
-          <button class="btn" id="tm-save">Mentés</button>
+          <button class="btn" id="tm-save">${t("mentes")}</button>
         </div>
       </div>
 
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
-        <button class="btn" id="tm-now" ${running ? "" : "disabled"}>Pillanatkép most</button>
-        <button class="btn btn-danger" id="tm-clear">Előzmények törlése</button>
+        <button class="btn" id="tm-now" ${running ? "" : "disabled"}>${t("pillanatkep_most")}</button>
+        <button class="btn btn-danger" id="tm-clear">${t("elozmenyek_torlese")}</button>
         <span style="color:var(--text-dim);font-size:12px;">${snapshots.length} pillanatkép · ${mb} MB</span>
       </div>
 
       ${
         snapshots.length === 0
-          ? `<div class="empty-state" style="padding:16px;">Még nincs pillanatkép.</div>`
+          ? `<div class="empty-state" style="padding:16px;">${t("meg_nincs_pillanatkep")}</div>`
           : `
-        <label for="tm-slider">Időpont</label>
+        <label for="tm-slider">${t("idopont")}</label>
         <input type="range" id="tm-slider" min="0" max="${snapshots.length - 1}" value="${
           snapshots.length - 1
         }" style="width:100%;" />
@@ -1276,8 +1248,8 @@ export function renderServerView(
           <div id="tm-selected" style="font-size:14px;font-weight:600;"></div>
           <div id="tm-selected-meta" style="color:var(--text-dim);font-size:12px;margin-top:2px;"></div>
           <button class="btn btn-primary" id="tm-restore" style="margin-top:12px;" ${
-            running ? "disabled title='Állítsd le előbb a szervert'" : ""
-          }>Visszaállítás erre az időpontra</button>
+            running ? t("disabled_title_allitsd_le_elobb_a_szervert") : ""
+          }>${t("visszaallitas_erre_az_idopontra")}</button>
         </div>`
       }
     `;
@@ -1290,7 +1262,7 @@ export function renderServerView(
         callbacks.onChanged();
       } catch (err) {
         el.checked = !el.checked;
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült állítani", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult_allitani"), "error");
       }
     };
 
@@ -1303,37 +1275,37 @@ export function renderServerView(
             maxSnapshots: Number(content.querySelector<HTMLInputElement>("#tm-max")!.value),
           },
         });
-        showToast("Beállítás mentve");
+        showToast(t("beallitas_mentve"));
         await renderTimeline(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Mentés sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("mentes_sikertelen"), "error");
       }
     };
 
     content.querySelector<HTMLButtonElement>("#tm-now")!.onclick = async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
       btn.disabled = true;
-      btn.textContent = "Készül…";
+      btn.textContent = t("keszul");
       try {
         await api.takeSnapshot(serverId);
-        showToast("Pillanatkép elkészült");
+        showToast(t("pillanatkep_elkeszult"));
         await renderTimeline(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
         btn.disabled = false;
-        btn.textContent = "Pillanatkép most";
+        btn.textContent = t("pillanatkep_most");
       }
     };
 
     content.querySelector<HTMLButtonElement>("#tm-clear")!.onclick = async () => {
-      if (!(await confirmModal("Biztosan törlöd az összes pillanatképet? Ez <strong>nem</strong> vonható vissza.")))
+      if (!(await confirmModal(t("biztosan_torlod_az_osszes_pillanatkepet_ez_stron"))))
         return;
       try {
         await api.clearTimeline(serverId);
-        showToast("Előzmények törölve");
+        showToast(t("elozmenyek_torolve"));
         await renderTimeline(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
       }
     };
 
@@ -1364,7 +1336,7 @@ export function renderServerView(
           const restored = await api.restoreSnapshot(serverId, snap.id);
           showToast(`Visszaállítva: ${restored} fájl`);
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Visszaállítás sikertelen", "error");
+          showToast(err instanceof ApiError ? err.message : t("visszaallitas_sikertelen"), "error");
         }
       };
     }
@@ -1373,14 +1345,10 @@ export function renderServerView(
   function renderLuckPerms(content: HTMLElement) {
     const running = server?.running ?? false;
     content.innerHTML = `
-      <p style="max-width:560px;color:var(--text-dim);font-size:12px;">
-        A LuckPerms saját webes szerkesztőjét nyitja meg — ugyanaz, mint amikor a játékban
-        kiadod az <code>/lp editor</code> parancsot. A gomb megnyomásakor a szerver feltölt egy
-        pillanatképet a jogosultságokról, és egy egyszer használatos linket ad vissza.
-      </p>
+      <p style="max-width:560px;color:var(--text-dim);font-size:12px;">${t("a_luckperms_sajat_webes_szerkesztojet_nyitja_meg")}<code>/lp editor</code>${t("parancsot_a_gomb_megnyomasakor_a_szerver_feltolt")}</p>
       <div style="display:flex;gap:8px;align-items:center;margin-top:16px;">
-        <button class="btn btn-primary" id="lp-open" ${running ? "" : "disabled"}>Szerkesztő megnyitása</button>
-        ${running ? "" : `<span style="color:var(--text-dim);font-size:12px;">A szervernek futnia kell.</span>`}
+        <button class="btn btn-primary" id="lp-open" ${running ? "" : "disabled"}>${t("szerkeszto_megnyitasa")}</button>
+        ${running ? "" : `<span style="color:var(--text-dim);font-size:12px;">${t("a_szervernek_futnia_kell")}</span>`}
       </div>
       <div id="lp-result" style="margin-top:16px;"></div>
     `;
@@ -1389,7 +1357,7 @@ export function renderServerView(
     content.querySelector<HTMLButtonElement>("#lp-open")!.onclick = async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
       btn.disabled = true;
-      btn.textContent = "Link kérése…";
+      btn.textContent = t("link_kerese");
       resultEl.innerHTML = "";
       try {
         const url = await api.createLuckPermsEditor(serverId);
@@ -1397,29 +1365,27 @@ export function renderServerView(
         // meant to run on its own origin.
         window.open(url, "_blank", "noopener,noreferrer");
         resultEl.innerHTML = `
-          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">
-            Ha nem nyílt meg magától, itt a link (egyszer használatos):
-          </div>
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">${t("ha_nem_nyilt_meg_magatol_itt_a_link_egyszer_hasz")}</div>
           <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
       } catch (err) {
         resultEl.innerHTML = `<div class="error-text">${escapeHtml(
-          err instanceof ApiError ? err.message : "Nem sikerült megnyitni a szerkesztőt"
+          err instanceof ApiError ? err.message : t("nem_sikerult_megnyitni_a_szerkesztot")
         )}</div>`;
       } finally {
         btn.disabled = !(server?.running ?? false);
-        btn.textContent = "Szerkesztő megnyitása";
+        btn.textContent = t("szerkeszto_megnyitasa");
       }
     };
   }
 
   async function renderAccess(content: HTMLElement) {
-    content.innerHTML = `<div class="empty-state" style="padding:1rem;">Betöltés…</div>`;
+    content.innerHTML = `<div class="empty-state" style="padding:1rem;">${t("betoltes")}</div>`;
     let access;
     try {
       access = await api.getAccessLists(serverId);
     } catch (err) {
       content.innerHTML = `<div class="empty-state" style="padding:1rem;">${escapeHtml(
-        err instanceof ApiError ? err.message : "A listák betöltése sikertelen"
+        err instanceof ApiError ? err.message : t("a_listak_betoltese_sikertelen")
       )}</div>`;
       return;
     }
@@ -1450,7 +1416,7 @@ export function renderServerView(
           </div>
           <button class="btn" data-remove="${removeAction}" data-name="${escapeHtml(e.name)}" ${
             running ? "" : "disabled title='A szervernek futnia kell'"
-          }>Eltávolítás</button>
+          }>${t("eltavolitas")}</button>
         </div>`
             )
             .join("");
@@ -1458,27 +1424,27 @@ export function renderServerView(
     content.innerHTML = `
       <div class="field checkbox-row">
         <input id="wl-mode" type="checkbox" ${access.whitelistEnforced ? "checked" : ""} />
-        <label for="wl-mode" style="margin:0">Whitelist bekapcsolva (csak a listán szereplők léphetnek be)</label>
+        <label for="wl-mode" style="margin:0">${t("whitelist_bekapcsolva_csak_a_listan_szereplok_le")}</label>
       </div>
 
       <h4 style="margin:1.2rem 0 0.4rem;">Whitelist (${access.whitelist.length})</h4>
       <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">
-        <input id="wl-name" placeholder="Játékosnév" style="max-width:200px;" ${running ? "" : "disabled"} />
-        <button class="btn btn-primary" id="wl-add" ${running ? "" : "disabled"}>Hozzáadás</button>
+        <input id="wl-name" placeholder="${t("jatekosnev")}" style="max-width:200px;" ${running ? "" : "disabled"} />
+        <button class="btn btn-primary" id="wl-add" ${running ? "" : "disabled"}>${t("hozzaadas")}</button>
       </div>
-      <div id="wl-list">${listHtml(access.whitelist, "whitelist_remove", "A whitelist üres.")}</div>
+      <div id="wl-list">${listHtml(access.whitelist, "whitelist_remove", t("a_whitelist_ures"))}</div>
 
       <h4 style="margin:1.5rem 0 0.4rem;">Kitiltott játékosok (${access.bannedPlayers.length})</h4>
       <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">
-        <input id="ban-name" placeholder="Játékosnév" style="max-width:200px;" ${running ? "" : "disabled"} />
-        <button class="btn btn-danger" id="ban-add" ${running ? "" : "disabled"}>Kitiltás</button>
+        <input id="ban-name" placeholder="${t("jatekosnev")}" style="max-width:200px;" ${running ? "" : "disabled"} />
+        <button class="btn btn-danger" id="ban-add" ${running ? "" : "disabled"}>${t("kitiltas")}</button>
       </div>
       <div id="ban-list">${listHtml(access.bannedPlayers, "pardon", "Senki nincs kitiltva.")}</div>
 
       <h4 style="margin:1.5rem 0 0.4rem;">Kitiltott IP-címek (${access.bannedIps.length})</h4>
       <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">
         <input id="ip-value" placeholder="pl. 192.168.1.10" style="max-width:200px;" ${running ? "" : "disabled"} />
-        <button class="btn btn-danger" id="ip-add" ${running ? "" : "disabled"}>IP kitiltása</button>
+        <button class="btn btn-danger" id="ip-add" ${running ? "" : "disabled"}>${t("ip_kitiltasa")}</button>
       </div>
       <div id="ip-list">${listHtml(access.bannedIps, "pardon_ip", "Nincs kitiltott IP.")}</div>
 
@@ -1496,7 +1462,7 @@ export function renderServerView(
         showToast(el.checked ? "Whitelist bekapcsolva" : "Whitelist kikapcsolva");
       } catch (err) {
         el.checked = !el.checked;
-        showToast(err instanceof ApiError ? err.message : "Nem sikerült állítani", "error");
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult_allitani"), "error");
       }
     };
 
@@ -1508,7 +1474,7 @@ export function renderServerView(
         await new Promise((r) => setTimeout(r, 700));
         await renderAccess(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Művelet sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("muvelet_sikertelen"), "error");
       }
     };
 
@@ -1546,29 +1512,27 @@ export function renderServerView(
   async function renderPlugins(content: HTMLElement) {
     content.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;margin-bottom:0.9rem;flex-wrap:wrap;">
-        <div style="color:var(--text-dim);font-size:0.85rem;">Telepített bővítmények</div>
+        <div style="color:var(--text-dim);font-size:0.85rem;">${t("telepitett_bovitmenyek")}</div>
         <div style="display:flex;gap:0.4rem;">
-          <button class="btn" id="plugins-refresh">Frissítések keresése</button>
-          <button class="btn btn-primary" id="plugins-add">+ Bővítmény telepítése</button>
+          <button class="btn" id="plugins-refresh">${t("frissitesek_keresese")}</button>
+          <button class="btn btn-primary" id="plugins-add">${t("bovitmeny_telepitese")}</button>
         </div>
       </div>
-      <div id="plugins-list"><div class="empty-state" style="padding:1rem;">Betöltés…</div></div>
-      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.9rem;">
-        A módosítások a szerver következő újraindításakor lépnek életbe.
-      </p>
+      <div id="plugins-list"><div class="empty-state" style="padding:1rem;">${t("betoltes")}</div></div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.9rem;">${t("a_modositasok_a_szerver_kovetkezo_ujrainditasako")}</p>
     `;
 
     const listEl = content.querySelector<HTMLDivElement>("#plugins-list")!;
 
     async function reload(checkUpdates = false) {
       listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">${
-        checkUpdates ? "Frissítések keresése…" : "Betöltés…"
+        checkUpdates ? t("frissitesek_keresese_2") : t("betoltes")
       }</div>`;
       try {
         const plugins = await api.listPlugins(serverId, checkUpdates);
         if (disposed) return;
         if (plugins.length === 0) {
-          listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">Nincs telepített bővítmény.</div>`;
+          listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">${t("nincs_telepitett_bovitmeny")}</div>`;
           return;
         }
         listEl.innerHTML = plugins
@@ -1581,7 +1545,7 @@ export function renderServerView(
               }</div>
               <div style="color:var(--text-dim);font-size:0.78rem;">
                 ${escapeHtml(p.filename)} · ${(p.sizeBytes / 1024 / 1024).toFixed(1)} MB${
-                  p.source ? ` · ${escapeHtml(p.source)}` : " · kézzel telepítve"
+                  p.source ? ` · ${escapeHtml(p.source)}` : t("kezzel_telepitve")
                 }
               </div>
               ${
@@ -1592,7 +1556,7 @@ export function renderServerView(
                   : ""
               }
             </div>
-            <button class="btn btn-danger" data-del-plugin="${escapeHtml(p.filename)}">Törlés</button>
+            <button class="btn btn-danger" data-del-plugin="${escapeHtml(p.filename)}">${t("torles")}</button>
           </div>`
           )
           .join("");
@@ -1605,16 +1569,16 @@ export function renderServerView(
             }
             try {
               await api.deletePlugin(serverId, filename);
-              showToast("Bővítmény törölve");
+              showToast(t("bovitmeny_torolve"));
               await reload();
             } catch (err) {
-              showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+              showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
             }
           };
         });
       } catch (err) {
         listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">${escapeHtml(
-          err instanceof ApiError ? err.message : "A bővítmények betöltése sikertelen"
+          err instanceof ApiError ? err.message : t("a_bovitmenyek_betoltese_sikertelen")
         )}</div>`;
       }
     }
@@ -1639,7 +1603,7 @@ export function renderServerView(
       await api.playerAction(serverId, name, action);
       showToast(`${action} elküldve: ${name}`);
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Művelet sikertelen", "error");
+      showToast(err instanceof ApiError ? err.message : t("muvelet_sikertelen"), "error");
     }
   }
 
@@ -1649,9 +1613,9 @@ export function renderServerView(
     const players = server.rcon.enabled ? server.players : null;
 
     const listSection = !server.rcon.enabled
-      ? `<div class="empty-state" style="padding:1rem 0;">Ehhez a szerverhez nincs RCON beállítva, így a játékoslista nem tölthető be automatikusan (a lenti gyorsparancsok RCON nélkül is működnek).</div>`
+      ? `<div class="empty-state" style="padding:1rem 0;">${t("ehhez_a_szerverhez_nincs_rcon_beallitva_igy_a_ja")}</div>`
       : !players
-        ? `<div class="empty-state" style="padding:1rem 0;">Nincs adat (a szerver áll, vagy még nem érkezett RCON válasz).</div>`
+        ? `<div class="empty-state" style="padding:1rem 0;">${t("nincs_adat_a_szerver_all_vagy_meg_nem_erkezett_r")}</div>`
         : `
           <p>${players.online} / ${players.max} játékos online</p>
           <div id="player-chips">
@@ -1664,7 +1628,7 @@ export function renderServerView(
                 ${actionButtonsHtml("chip")}
               </div>`
                 )
-                .join("") || "<em>Senki nincs bent.</em>"
+                .join("") || `<em>${t("senki_nincs_bent")}</em>`
             }
           </div>
           <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.5rem;">Frissítve: ${new Date(players.fetchedAt).toLocaleTimeString()}</p>
@@ -1674,18 +1638,18 @@ export function renderServerView(
     // a running world.
     const worldButtons = [
       { action: "day", label: "Nappal" },
-      { action: "night", label: "Éjszaka" },
-      { action: "clear", label: "Napos idő" },
-      { action: "rain", label: "Eső" },
+      { action: "night", label: t("ejszaka") },
+      { action: "clear", label: t("napos_ido") },
+      { action: "rain", label: t("eso") },
       { action: "thunder", label: "Vihar" },
-      { action: "freeze_time", label: "Idő megállítása" },
-      { action: "resume_time", label: "Idő indítása" },
+      { action: "freeze_time", label: t("ido_megallitasa") },
+      { action: "resume_time", label: t("ido_inditasa") },
     ];
 
     content.innerHTML = `
       ${listSection}
       <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);">
-        <label>Világ gyorsvezérlés</label>
+        <label>${t("vilag_gyorsvezerles")}</label>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="world-buttons">
           ${worldButtons
             .map(
@@ -1696,12 +1660,12 @@ export function renderServerView(
         </div>
       </div>
       <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);">
-        <label for="manual-player-name">Gyorsparancs játékosnévvel</label>
+        <label for="manual-player-name">${t("gyorsparancs_jatekosnevvel")}</label>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-          <input id="manual-player-name" placeholder="Játékosnév" style="max-width:200px;" ${running ? "" : "disabled"} />
+          <input id="manual-player-name" placeholder="${t("jatekosnev")}" style="max-width:200px;" ${running ? "" : "disabled"} />
           ${actionButtonsHtml("manual")}
         </div>
-        ${running ? "" : `<p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.4rem;">A szervernek futnia kell a parancsok küldéséhez.</p>`}
+        ${running ? "" : `<p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.4rem;">${t("futnia_kell_parancsokhoz")}</p>`}
       </div>
     `;
 
@@ -1711,7 +1675,7 @@ export function renderServerView(
           await api.worldAction(serverId, btn.dataset.world!);
           showToast(`${btn.textContent} elküldve`);
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Művelet sikertelen", "error");
+          showToast(err instanceof ApiError ? err.message : t("muvelet_sikertelen"), "error");
         }
       };
     });
@@ -1736,33 +1700,33 @@ export function renderServerView(
   function renderSettings(content: HTMLElement) {
     if (!server) return;
     content.innerHTML = `
-      <div class="field"><label>Mappa</label><div>${server.folder}</div></div>
+      <div class="field"><label>${t("mappa")}</label><div>${server.folder}</div></div>
       <div class="field"><label>Start script</label><div>${server.startScript}</div></div>
-      <div class="field"><label>Stop parancs</label><div>${server.stopCommand}</div></div>
+      <div class="field"><label>${t("stop_parancs")}</label><div>${server.stopCommand}</div></div>
       <div class="field"><label>Screen session</label><div>${server.screenName}</div></div>
       <div class="field"><label>RCON</label><div>${server.rcon.enabled ? `${server.rcon.host}:${server.rcon.port}` : "kikapcsolva"}</div></div>
-      <div class="field"><label>Ütemezett újraindítás</label><div>${
+      <div class="field"><label>${t("utemezett_ujrainditas")}</label><div>${
         server.scheduledRestart.enabled ? `minden nap ${server.scheduledRestart.time}-kor` : "kikapcsolva"
       }</div></div>
-      <div class="field"><label>Újraindítás összeomlás után</label><div>${
+      <div class="field"><label>${t("ujrainditas_osszeomlas_utan")}</label><div>${
         server.crashRestart?.enabled
           ? `bekapcsolva (max ${server.crashRestart.maxAttempts} próbálkozás 10 percen belül)`
           : "kikapcsolva"
       }</div></div>
       <div style="display:flex;gap:0.5rem;margin-top:1rem;">
-        <button class="btn" id="edit-btn">Szerkesztés</button>
+        <button class="btn" id="edit-btn">${t("szerkesztes")}</button>
         ${
           isAdmin()
-            ? `<button class="btn btn-danger" id="delete-btn" ${server.running ? "disabled title='Állítsd le előbb'" : ""}>Törlés</button>`
+            ? `<button class="btn btn-danger" id="delete-btn" ${server.running ? t("disabled_title_allitsd_le_elobb") : ""}>${t("torles")}</button>`
             : ""
         }
       </div>
       <div style="margin-top:2rem;padding-top:1.2rem;border-top:1px solid var(--border);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
-          <h3 style="margin:0;font-size:1rem;">Mentések</h3>
-          <button class="btn btn-primary" id="create-backup-btn">+ Mentés készítése</button>
+          <h3 style="margin:0;font-size:1rem;">${t("mentesek")}</h3>
+          <button class="btn btn-primary" id="create-backup-btn">${t("mentes_keszitese")}</button>
         </div>
-        <div id="backups-list"><div class="empty-state" style="padding:0.5rem 0;">Betöltés…</div></div>
+        <div id="backups-list"><div class="empty-state" style="padding:0.5rem 0;">${t("betoltes")}</div></div>
       </div>
     `;
     content.querySelector<HTMLButtonElement>("#edit-btn")!.onclick = () => {
@@ -1777,7 +1741,7 @@ export function renderServerView(
           await api.deleteServer(serverId);
           callbacks.onDeleted();
         } catch (err) {
-          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+          showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
         }
       }
     });
@@ -1786,10 +1750,10 @@ export function renderServerView(
       btn.disabled = true;
       try {
         await api.createBackup(serverId);
-        showToast("Mentés elkészült");
+        showToast(t("mentes_elkeszult"));
         await renderBackupsList(content);
       } catch (err) {
-        showToast(err instanceof ApiError ? err.message : "Mentés sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("mentes_sikertelen"), "error");
       } finally {
         btn.disabled = false;
       }
@@ -1803,7 +1767,7 @@ export function renderServerView(
     try {
       const backups = await api.listBackups(serverId);
       if (backups.length === 0) {
-        listEl.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">Még nincs mentés.</div>`;
+        listEl.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">${t("meg_nincs_mentes")}</div>`;
         return;
       }
       listEl.innerHTML = backups
@@ -1815,9 +1779,9 @@ export function renderServerView(
             <div style="color:var(--text-dim);font-size:0.8rem;">${(b.size / 1024 / 1024).toFixed(1)} MB</div>
           </div>
           <div style="display:flex;gap:0.4rem;">
-            <a class="btn" href="${api.backupDownloadUrl(serverId, b.filename)}">Letöltés</a>
-            <button class="btn" data-restore="${b.filename}" ${server?.running ? "disabled title='Állítsd le előbb'" : ""}>Visszaállítás</button>
-            <button class="btn btn-danger" data-delete-backup="${b.filename}">Törlés</button>
+            <a class="btn" href="${api.backupDownloadUrl(serverId, b.filename)}">${t("letoltes")}</a>
+            <button class="btn" data-restore="${b.filename}" ${server?.running ? t("disabled_title_allitsd_le_elobb") : ""}>${t("visszaallitas")}</button>
+            <button class="btn btn-danger" data-delete-backup="${b.filename}">${t("torles")}</button>
           </div>
         </div>`
         )
@@ -1828,14 +1792,14 @@ export function renderServerView(
           const filename = btn.dataset.restore!;
           if (
             await confirmModal(
-              `Biztosan visszaállítod ezt a mentést? Ez <strong>felülírja</strong> a jelenlegi szerver-mappa tartalmát.`
+              `Biztosan visszaállítod ezt a mentést? Ez <strong>${t("felulirja")}</strong> a jelenlegi szerver-mappa tartalmát.`
             )
           ) {
             try {
               await api.restoreBackup(serverId, filename);
-              showToast("Visszaállítva");
+              showToast(t("visszaallitva"));
             } catch (err) {
-              showToast(err instanceof ApiError ? err.message : "Visszaállítás sikertelen", "error");
+              showToast(err instanceof ApiError ? err.message : t("visszaallitas_sikertelen"), "error");
             }
           }
         };
@@ -1843,19 +1807,19 @@ export function renderServerView(
       listEl.querySelectorAll<HTMLButtonElement>("[data-delete-backup]").forEach((btn) => {
         btn.onclick = async () => {
           const filename = btn.dataset.deleteBackup!;
-          if (await confirmModal("Biztosan törlöd ezt a mentést?")) {
+          if (await confirmModal(t("biztosan_torlod_ezt_a_mentest"))) {
             try {
               await api.deleteBackup(serverId, filename);
               await renderBackupsList(content);
             } catch (err) {
-              showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+              showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
             }
           }
         };
       });
     } catch (err) {
       listEl.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">${
-        err instanceof ApiError ? err.message : "Mentések betöltése sikertelen"
+        err instanceof ApiError ? err.message : t("mentesek_betoltese_sikertelen")
       }</div>`;
     }
   }

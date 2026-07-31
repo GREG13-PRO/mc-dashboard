@@ -1,4 +1,5 @@
 import { ansiLineToHtml } from "../lib/ansi";
+import { t } from "../lib/i18n";
 
 const MAX_LINES = 3000;
 // Consider the view "at the bottom" within this many pixels, so a little bit
@@ -16,7 +17,7 @@ export class ConsoleLogView {
     container.classList.add("console-log-outer");
     container.innerHTML = `
       <div class="console-log"></div>
-      <button class="console-scroll-btn" type="button">↓ Görgetés a legaljára</button>
+      <button class="console-scroll-btn" type="button">${t("gorgetes_a_legaljara")}</button>
     `;
     this.logEl = container.querySelector<HTMLDivElement>(".console-log")!;
     this.scrollBtn = container.querySelector<HTMLButtonElement>(".console-scroll-btn")!;

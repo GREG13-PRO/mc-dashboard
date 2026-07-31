@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { escapeHtml } from "../lib/escape";
 import { currentUsername } from "../auth-state";
 import type { AdminXp } from "../types";
@@ -6,7 +7,7 @@ import type { AdminXp } from "../types";
 export function renderXpView(root: HTMLElement): () => void {
   let disposed = false;
 
-  root.innerHTML = `<div class="empty-state">Betöltés…</div>`;
+  root.innerHTML = `<div class="empty-state">${t("betoltes")}</div>`;
 
   async function load() {
     let data;
@@ -14,7 +15,7 @@ export function renderXpView(root: HTMLElement): () => void {
       data = await api.getAdminXp();
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${escapeHtml(
-        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
       )}</div>`;
       return;
     }
@@ -27,18 +28,15 @@ export function renderXpView(root: HTMLElement): () => void {
 
     root.innerHTML = `
       <div class="server-view-header">
-        <h2>Admin szintek</h2>
-        <div class="server-actions"><button class="btn" id="xp-refresh">Frissítés</button></div>
+        <h2>${t("admin_szintek")}</h2>
+        <div class="server-actions"><button class="btn" id="xp-refresh">${t("frissites")}</button></div>
       </div>
       <div class="tab-content">
-        <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
-          A pontok az auditnaplóból számolódnak visszamenőleg — nem külön számláló, ezért nem
-          tud elcsúszni, és a korábbi munka is beleszámít. A sikertelen műveletek nem érnek pontot.
-        </p>
+        <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("a_pontok_az_auditnaplobol_szamolodnak_visszameno")}</p>
 
         ${
           board.length === 0
-            ? `<div class="empty-state" style="padding:16px;">Még nincs pontszerző tevékenység.</div>`
+            ? `<div class="empty-state" style="padding:16px;">${t("meg_nincs_pontszerzo")}</div>`
             : board
                 .map((a, i) => {
                   const mine = a.username === me;
@@ -51,7 +49,7 @@ export function renderXpView(root: HTMLElement): () => void {
             <div>
               <span style="color:var(--text-dim);font-size:12px;">#${i + 1}</span>
               <span style="font-weight:600;margin-left:6px;">${escapeHtml(a.username)}</span>
-              ${mine ? `<span class="pb-badge" style="margin-left:6px;">te</span>` : ""}
+              ${mine ? `<span class="pb-badge" style="margin-left:6px;">${t("te")}</span>` : ""}
             </div>
             <div style="font-size:13px;">
               <strong>${a.level}. szint</strong>
@@ -85,7 +83,7 @@ export function renderXpView(root: HTMLElement): () => void {
                 .join("")
         }
 
-        <h4 style="margin:24px 0 8px;">Pontozás</h4>
+        <h4 style="margin:24px 0 8px;">${t("pontozas")}</h4>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${rules
             .map((r) => `<span class="pb-badge">${escapeHtml(r.label)} · ${r.points}p</span>`)

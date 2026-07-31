@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { setCurrentUser } from "../auth-state";
 
 export function renderLoginView(root: HTMLElement, onSuccess: () => void) {
@@ -7,14 +8,14 @@ export function renderLoginView(root: HTMLElement, onSuccess: () => void) {
       <div class="login-card">
         <h1>Minecraft Dashboard</h1>
         <div class="field">
-          <label for="username">Felhasználónév</label>
+          <label for="username">${t("felhasznalonev")}</label>
           <input id="username" type="text" autocomplete="username" />
         </div>
         <div class="field">
-          <label for="password">Jelszó</label>
+          <label for="password">${t("jelszo")}</label>
           <input id="password" type="password" autocomplete="current-password" />
         </div>
-        <button id="login-btn" class="btn btn-primary" style="width:100%">Belépés</button>
+        <button id="login-btn" class="btn btn-primary" style="width:100%">${t("belepes")}</button>
         <div id="login-error" class="error-text"></div>
       </div>
     </div>
@@ -35,7 +36,7 @@ export function renderLoginView(root: HTMLElement, onSuccess: () => void) {
       setCurrentUser(user);
       onSuccess();
     } catch (err) {
-      errorEl.textContent = err instanceof ApiError ? err.message : "Ismeretlen hiba történt";
+      errorEl.textContent = err instanceof ApiError ? err.message : t("ismeretlen_hiba_tortent");
     } finally {
       loginBtn.disabled = false;
     }

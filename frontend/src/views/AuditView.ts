@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { escapeHtml } from "../lib/escape";
 import type { AuditRecord } from "../types";
 
@@ -7,7 +8,7 @@ export function renderAuditView(root: HTMLElement): () => void {
   let entries: AuditRecord[] = [];
   let filter = "";
 
-  root.innerHTML = `<div class="empty-state">Betöltés…</div>`;
+  root.innerHTML = `<div class="empty-state">${t("betoltes")}</div>`;
 
   async function load() {
     try {
@@ -16,7 +17,7 @@ export function renderAuditView(root: HTMLElement): () => void {
       render();
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${escapeHtml(
-        err instanceof ApiError ? err.message : "A napló betöltése sikertelen"
+        err instanceof ApiError ? err.message : t("a_naplo_betoltese_sikertelen")
       )}</div>`;
     }
   }
@@ -24,12 +25,12 @@ export function renderAuditView(root: HTMLElement): () => void {
   function render() {
     root.innerHTML = `
       <div class="server-view-header">
-        <h2>Auditnapló</h2>
+        <h2>${t("auditnaplo")}</h2>
         <div class="server-actions">
-          <input id="audit-filter" placeholder="Szűrés (név, művelet, szerver)" style="max-width:260px;" value="${escapeHtml(
+          <input id="audit-filter" placeholder="${t("szures_nev_muvelet_szerver")}" style="max-width:260px;" value="${escapeHtml(
             filter
           )}" />
-          <button class="btn" id="audit-refresh">Frissítés</button>
+          <button class="btn" id="audit-refresh">${t("frissites")}</button>
         </div>
       </div>
       <div class="tab-content"><div id="audit-list"></div></div>
@@ -58,7 +59,7 @@ export function renderAuditView(root: HTMLElement): () => void {
 
     if (shown.length === 0) {
       list.innerHTML = `<div class="empty-state" style="padding:1rem;">${
-        entries.length === 0 ? "A napló még üres." : "Nincs találat."
+        entries.length === 0 ? t("a_naplo_meg_ures") : t("nincs_talalat")
       }</div>`;
       return;
     }
@@ -66,7 +67,7 @@ export function renderAuditView(root: HTMLElement): () => void {
     list.innerHTML = `
       <table class="file-table">
         <thead>
-          <tr><th>Időpont</th><th>Ki</th><th>Művelet</th><th>Szerver</th><th>Részlet</th><th>Eredmény</th></tr>
+          <tr><th>${t("idopont")}</th><th>${t("ki_oszlop")}</th><th>${t("muvelet")}</th><th>${t("szerver_oszlop")}</th><th>${t("reszlet")}</th><th>${t("eredmeny")}</th></tr>
         </thead>
         <tbody>
           ${shown

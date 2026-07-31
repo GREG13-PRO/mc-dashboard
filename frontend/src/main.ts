@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { applyDisplayPreferences } from "./lib/display";
+import { applyLanguage } from "./lib/i18n";
 import { setCurrentUser } from "./auth-state";
 import { renderLoginView } from "./views/LoginView";
 import { renderDashboard } from "./views/DashboardView";
@@ -22,6 +23,7 @@ function showDashboard() {
 async function boot() {
   // Before the first render so nothing paints at the wrong size.
   applyDisplayPreferences();
+  applyLanguage();
   try {
     const { authenticated, user } = await api.authStatus();
     if (authenticated && user) {

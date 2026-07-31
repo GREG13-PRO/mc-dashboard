@@ -1,3 +1,5 @@
+import { t } from "../lib/i18n";
+
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
@@ -61,7 +63,7 @@ export function confirmModal(message: string): Promise<boolean> {
     actions.className = "modal-actions";
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "btn";
-    cancelBtn.textContent = "Mégse";
+    cancelBtn.textContent = t("megse");
     const okBtn = document.createElement("button");
     okBtn.className = "btn btn-danger";
     okBtn.textContent = "Igen";

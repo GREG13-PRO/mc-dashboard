@@ -1,4 +1,5 @@
 import { EditorView, basicSetup } from "codemirror";
+import { t } from "../lib/i18n";
 import { api, ApiError } from "../api";
 import { showToast } from "../components/Toast";
 
@@ -16,10 +17,10 @@ export function openFileEditor(serverId: string, filePath: string, initialConten
   const actions = document.createElement("div");
   const saveBtn = document.createElement("button");
   saveBtn.className = "btn btn-primary";
-  saveBtn.textContent = "Mentés";
+  saveBtn.textContent = t("mentes");
   const closeBtn = document.createElement("button");
   closeBtn.className = "btn";
-  closeBtn.textContent = "Bezárás";
+  closeBtn.textContent = t("bezaras");
   closeBtn.style.marginLeft = "0.5rem";
   actions.append(saveBtn, closeBtn);
   header.appendChild(actions);
@@ -56,10 +57,10 @@ export function openFileEditor(serverId: string, filePath: string, initialConten
     saveBtn.disabled = true;
     try {
       await api.writeFile(serverId, filePath, view.state.doc.toString());
-      showToast("Fájl elmentve");
+      showToast(t("fajl_elmentve"));
       close();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Mentés sikertelen", "error");
+      showToast(err instanceof ApiError ? err.message : t("mentes_sikertelen"), "error");
     } finally {
       saveBtn.disabled = false;
     }

@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import type { ServerEntry, ServerEntryInput, ServerInstallSettings, ServerInstallType } from "../types";
@@ -6,24 +7,24 @@ import type { ServerEntry, ServerEntryInput, ServerInstallSettings, ServerInstal
 export function openAddServerModal(onCreated: () => void, existing?: ServerEntry) {
   const form = document.createElement("div");
   form.innerHTML = `
-    <h3>${existing ? "Szerver szerkesztése" : "Szerver hozzáadása"}</h3>
+    <h3>${existing ? t("szerver_szerkesztese") : t("szerver_hozzaadasa")}</h3>
     ${
       existing
         ? ""
         : `
     <div class="field">
-      <label for="f-install-type">Telepítési mód</label>
+      <label for="f-install-type">${t("telepitesi_mod")}</label>
       <select id="f-install-type">
-        <option value="manual">Meglévő mappa/parancsfájl megadása</option>
+        <option value="manual">${t("meglevo_mappa_parancsfajl")}</option>
       </select>
     </div>
     <div class="field" id="install-version-field" style="display:none">
-      <label for="f-install-version">Verzió</label>
-      <select id="f-install-version"><option value="">Betöltés...</option></select>
+      <label for="f-install-version">${t("verzio")}</label>
+      <select id="f-install-version"><option value="">${t("betoltes_dots")}</option></select>
     </div>
     <div id="install-settings" style="display:none">
       <div class="field">
-        <label for="f-memory">Memória</label>
+        <label for="f-memory">${t("memoria")}</label>
         <select id="f-memory">
           <option value="1024">1 GB</option>
           <option value="2048">2 GB</option>
@@ -42,16 +43,16 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
           <input id="f-motd" placeholder="Egy Minecraft szerver" />
         </div>
         <div class="field">
-          <label for="f-difficulty">Nehézség</label>
+          <label for="f-difficulty">${t("nehezseg")}</label>
           <select id="f-difficulty">
-            <option value="peaceful">Békés</option>
-            <option value="easy">Könnyű</option>
-            <option value="normal" selected>Normál</option>
-            <option value="hard">Nehéz</option>
+            <option value="peaceful">${t("bekes")}</option>
+            <option value="easy">${t("konnyu")}</option>
+            <option value="normal" selected>${t("normal")}</option>
+            <option value="hard">${t("nehez")}</option>
           </select>
         </div>
         <div class="field">
-          <label for="f-gamemode">Játékmód</label>
+          <label for="f-gamemode">${t("jatekmod")}</label>
           <select id="f-gamemode">
             <option value="survival" selected>Survival</option>
             <option value="creative">Creative</option>
@@ -60,7 +61,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
           </select>
         </div>
         <div class="field">
-          <label for="f-max-players">Max játékosszám</label>
+          <label for="f-max-players">${t("max_jatekosszam")}</label>
           <input id="f-max-players" type="number" value="20" />
         </div>
       </div>
@@ -68,24 +69,24 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     `
     }
     <div class="field">
-      <label for="f-name">Név</label>
+      <label for="f-name">${t("nev")}</label>
       <input id="f-name" placeholder="pl. Survival, BungeeCord Proxy" value="${existing?.name ?? ""}" />
     </div>
     <div class="field">
-      <label for="f-folder">Mappa (abszolút útvonal a szerveren)</label>
+      <label for="f-folder">${t("mappa_abszolut_utvonal_a_szerveren")}</label>
       <input id="f-folder" placeholder="/home/minecraft/Documents/Server/survival" value="${existing?.folder ?? ""}" />
     </div>
     <div class="field" id="start-script-field">
-      <label for="f-start">Start script (a mappán belül)</label>
+      <label for="f-start">${t("start_script_a_mappan_belul")}</label>
       <input id="f-start" placeholder="start.sh" value="${existing?.startScript ?? "start.sh"}" />
     </div>
     <div class="field" id="stop-command-field">
-      <label for="f-stop">Stop parancs (konzolba küldve)</label>
+      <label for="f-stop">${t("stop_parancs_konzolba_kuldve")}</label>
       <input id="f-stop" placeholder="stop" value="${existing?.stopCommand ?? "stop"}" />
     </div>
     <div class="field checkbox-row">
       <input id="f-rcon-enabled" type="checkbox" ${existing?.rcon.enabled ? "checked" : ""} />
-      <label for="f-rcon-enabled" style="margin:0">RCON engedélyezve (játékoslistához)</label>
+      <label for="f-rcon-enabled" style="margin:0">${t("rcon_engedelyezve_jatekoslistahoz")}</label>
     </div>
     <div class="field">
       <label for="f-rcon-host">RCON host</label>
@@ -96,31 +97,31 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       <input id="f-rcon-port" type="number" value="${existing?.rcon.port ?? 25575}" />
     </div>
     <div class="field">
-      <label for="f-rcon-password">RCON jelszó ${existing ? "(üresen hagyva nem változik)" : ""}</label>
+      <label for="f-rcon-password">RCON jelszó ${existing ? t("uresen_hagyva_nem_valtozik") : ""}</label>
       <input id="f-rcon-password" type="password" />
     </div>
     <div class="field checkbox-row">
       <input id="f-restart-enabled" type="checkbox" ${existing?.scheduledRestart.enabled ? "checked" : ""} />
-      <label for="f-restart-enabled" style="margin:0">Ütemezett napi újraindítás</label>
+      <label for="f-restart-enabled" style="margin:0">${t("utemezett_napi_ujrainditas")}</label>
     </div>
     <div class="field">
-      <label for="f-restart-time">Időpont (ha fut a szerver akkor)</label>
+      <label for="f-restart-time">${t("idopont_ha_fut_a_szerver_akkor")}</label>
       <input id="f-restart-time" type="time" value="${existing?.scheduledRestart.time ?? "04:00"}" />
     </div>
     <div class="field checkbox-row">
       <input id="f-crash-enabled" type="checkbox" ${existing?.crashRestart?.enabled ? "checked" : ""} />
-      <label for="f-crash-enabled" style="margin:0">Automatikus újraindítás összeomlás után</label>
+      <label for="f-crash-enabled" style="margin:0">${t("automatikus_ujrainditas_osszeomlas_utan")}</label>
     </div>
     <div class="field">
-      <label for="f-crash-attempts">Max próbálkozás 10 percen belül</label>
+      <label for="f-crash-attempts">${t("max_probalkozas_10_percen_belul")}</label>
       <input id="f-crash-attempts" type="number" min="1" max="20" value="${
         existing?.crashRestart?.maxAttempts ?? 3
       }" />
     </div>
     <div id="form-error" class="error-text"></div>
     <div class="modal-actions">
-      <button id="cancel-btn" class="btn">Mégse</button>
-      <button id="save-btn" class="btn btn-primary">${existing ? "Mentés" : "Hozzáadás"}</button>
+      <button id="cancel-btn" class="btn">${t("megse")}</button>
+      <button id="save-btn" class="btn btn-primary">${existing ? t("mentes") : t("hozzaadas")}</button>
     </div>
   `;
 
@@ -139,11 +140,11 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
 
   if (installTypeSelect) {
     api.listServerTypes().then((types) => {
-      for (const t of types) {
-        typeKinds.set(t.id, t.kind);
+      for (const option of types) {
+        typeKinds.set(option.id, option.kind);
         const opt = document.createElement("option");
-        opt.value = t.id;
-        opt.textContent = t.label;
+        opt.value = option.id;
+        opt.textContent = option.label;
         installTypeSelect.appendChild(opt);
       }
     });
@@ -162,7 +163,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       installVersionField!.style.display = "";
       installSettings!.style.display = "";
       mcSettings!.style.display = typeKinds.get(type) === "proxy" ? "none" : "";
-      installVersionSelect!.innerHTML = `<option value="">Verziók betöltése...</option>`;
+      installVersionSelect!.innerHTML = `<option value="">${t("verziok_betoltese")}</option>`;
       api
         .listServerVersions(type as ServerInstallType)
         .then((versions) => {
@@ -175,7 +176,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
           }
         })
         .catch(() => {
-          installVersionSelect!.innerHTML = `<option value="">Nem sikerült betölteni a verziókat</option>`;
+          installVersionSelect!.innerHTML = `<option value="">${t("nem_sikerult_betolteni_a_verziokat")}</option>`;
         });
     };
   }
@@ -191,11 +192,11 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     if (installType !== "manual") {
       const version = installVersionSelect?.value ?? "";
       if (!name || !folder) {
-        errorEl.textContent = "Név és mappa megadása kötelező.";
+        errorEl.textContent = t("nev_es_mappa_megadasa_kotelezo");
         return;
       }
       if (!version) {
-        errorEl.textContent = "Válassz verziót.";
+        errorEl.textContent = t("valassz_verziot");
         return;
       }
 
@@ -215,14 +216,14 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       saveBtn.disabled = true;
       // Forge/NeoForge/Quilt run a real installer that pulls dependencies, so
       // this can legitimately take a couple of minutes.
-      saveBtn.textContent = "Telepítés… (eltarthat pár percig)";
+      saveBtn.textContent = t("telepites_eltarthat_par_percig");
       try {
         await api.installServer({ name, folder, type: installType as ServerInstallType, version, settings });
-        showToast("Szerver telepítve");
+        showToast(t("szerver_telepitve"));
         close();
         onCreated();
       } catch (err) {
-        errorEl.textContent = err instanceof ApiError ? err.message : "Ismeretlen hiba történt";
+        errorEl.textContent = err instanceof ApiError ? err.message : t("ismeretlen_hiba_tortent");
         saveBtn.disabled = false;
         saveBtn.textContent = originalLabel;
       }
@@ -241,11 +242,11 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     const crashAttempts = Number(form.querySelector<HTMLInputElement>("#f-crash-attempts")!.value);
 
     if (!name || !folder || !startScript) {
-      errorEl.textContent = "Név, mappa és start script megadása kötelező.";
+      errorEl.textContent = t("nev_mappa_es_start_script_megadasa_kotelezo");
       return;
     }
     if (restartEnabled && !restartTime) {
-      errorEl.textContent = "Add meg az ütemezett újraindítás időpontját.";
+      errorEl.textContent = t("add_meg_az_utemezett_ujrainditas_idopontjat");
       return;
     }
 
@@ -274,15 +275,15 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     try {
       if (existing) {
         await api.updateServer(existing.id, input);
-        showToast("Szerver frissítve");
+        showToast(t("szerver_frissitve"));
       } else {
         await api.createServer(input);
-        showToast("Szerver hozzáadva");
+        showToast(t("szerver_hozzaadva"));
       }
       close();
       onCreated();
     } catch (err) {
-      errorEl.textContent = err instanceof ApiError ? err.message : "Ismeretlen hiba történt";
+      errorEl.textContent = err instanceof ApiError ? err.message : t("ismeretlen_hiba_tortent");
     }
   };
 }

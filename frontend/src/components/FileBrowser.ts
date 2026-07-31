@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { openFileEditor } from "./FileEditor";
 import { confirmModal } from "./Modal";
 import { showToast } from "./Toast";
@@ -30,14 +31,12 @@ export class FileBrowser {
     this.container.innerHTML = `
       <div class="file-toolbar">
         <div class="breadcrumbs" id="breadcrumbs"></div>
-        <button class="btn" id="mkdir-btn">+ Mappa</button>
-        <label class="btn" style="display:inline-flex;align-items:center;">
-          Feltöltés
-          <input type="file" id="upload-input" style="display:none" />
+        <button class="btn" id="mkdir-btn">${t("plus_mappa")}</button>
+        <label class="btn" style="display:inline-flex;align-items:center;">${t("feltoltes")}<input type="file" id="upload-input" style="display:none" />
         </label>
       </div>
       <table class="file-table">
-        <thead><tr><th>Név</th><th>Méret</th><th>Módosítva</th><th></th></tr></thead>
+        <thead><tr><th>${t("nev")}</th><th>${t("meret")}</th><th>${t("modositva")}</th><th></th></tr></thead>
         <tbody id="file-tbody"></tbody>
       </table>
     `;
@@ -52,7 +51,7 @@ export class FileBrowser {
       const items = await api.listFiles(this.serverId, this.currentPath);
       this.renderItems(items);
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Fájllista betöltése sikertelen", "error");
+      showToast(err instanceof ApiError ? err.message : t("fajllista_betoltese_sikertelen"), "error");
     }
   }
 
@@ -129,7 +128,7 @@ export class FileBrowser {
             await api.deleteFile(this.serverId, path);
             void this.render();
           } catch (err) {
-            showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+            showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
           }
         }
       };
@@ -142,23 +141,23 @@ export class FileBrowser {
       openFileEditor(this.serverId, path, content);
     } catch (err) {
       if (err instanceof ApiError && err.status === 413) {
-        showToast("A fájl túl nagy szerkesztéshez, letöltés indítva.", "error");
+        showToast(t("a_fajl_tul_nagy_szerkeszteshez_letoltes_inditva"), "error");
         window.open(api.downloadUrl(this.serverId, path), "_blank");
       } else {
-        showToast(err instanceof ApiError ? err.message : "Fájl megnyitása sikertelen", "error");
+        showToast(err instanceof ApiError ? err.message : t("fajl_megnyitasa_sikertelen"), "error");
       }
     }
   }
 
   private async handleMkdir() {
-    const name = prompt("Új mappa neve:");
+    const name = prompt(t("uj_mappa_neve"));
     if (!name) return;
     const path = this.currentPath ? `${this.currentPath}/${name}` : name;
     try {
       await api.mkdir(this.serverId, path);
       void this.render();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Mappa létrehozása sikertelen", "error");
+      showToast(err instanceof ApiError ? err.message : t("mappa_letrehozasa_sikertelen"), "error");
     }
   }
 
@@ -166,10 +165,10 @@ export class FileBrowser {
     if (!file) return;
     try {
       await api.uploadFile(this.serverId, this.currentPath, file);
-      showToast("Feltöltve");
+      showToast(t("feltoltve"));
       void this.render();
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Feltöltés sikertelen", "error");
+      showToast(err instanceof ApiError ? err.message : t("feltoltes_sikertelen"), "error");
     }
   }
 }

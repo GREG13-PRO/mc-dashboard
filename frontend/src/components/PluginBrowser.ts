@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { showToast } from "./Toast";
 import { openModal, confirmModal } from "./Modal";
 import { escapeHtml } from "../lib/escape";
@@ -42,8 +43,8 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
 
   panel.innerHTML = `
     <div class="file-editor-header">
-      <strong>Bővítmény hozzáadása</strong>
-      <div><button class="btn" id="pb-close">Bezárás</button></div>
+      <strong>${t("bovitmeny_hozzaadasa")}</strong>
+      <div><button class="btn" id="pb-close">${t("bezaras")}</button></div>
     </div>
     <div class="file-editor-body" style="padding:16px;overflow:auto;">
       <div class="pb-toolbar">
@@ -53,17 +54,15 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
         </select>
         <input class="pb-search" id="pb-query" placeholder="pl. LuckPerms, WorldEdit, EssentialsX" />
         <select id="pb-sort" style="max-width:150px;">
-          <option value="relevance">Találati sorrend</option>
-          <option value="downloads">Népszerűség</option>
-          <option value="name">Név szerint</option>
+          <option value="relevance">${t("talalati_sorrend")}</option>
+          <option value="downloads">${t("nepszeruseg")}</option>
+          <option value="name">${t("nev_szerint")}</option>
         </select>
-        <button class="btn btn-primary" id="pb-search-btn">Keresés</button>
+        <button class="btn btn-primary" id="pb-search-btn">${t("kereses")}</button>
       </div>
       <div class="pb-chips" id="pb-chips"></div>
       <div id="pb-results"></div>
-      <p style="color:var(--text-dim);font-size:12px;margin-top:16px;">
-        Csak hivatalos bővítmény-regiszterekből tölt le, ellenőrizetlen oldalakról soha.
-      </p>
+      <p style="color:var(--text-dim);font-size:12px;margin-top:16px;">${t("csak_hivatalos_bovitmeny_regiszterekbol_tolt_le_")}</p>
     </div>
   `;
 
@@ -85,7 +84,7 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
   async function runSearch() {
     const q = queryInput.value.trim();
     source = sourceSelect.value as PluginSource;
-    resultsEl.innerHTML = `<div class="empty-state" style="padding:20px;">Keresés…</div>`;
+    resultsEl.innerHTML = `<div class="empty-state" style="padding:20px;">${t("kereses_2")}</div>`;
     chipsEl.innerHTML = "";
     try {
       results = await api.searchPlugins(serverId, q, source);
@@ -95,7 +94,7 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
       renderGrid();
     } catch (err) {
       resultsEl.innerHTML = `<div class="empty-state" style="padding:20px;">${escapeHtml(
-        err instanceof ApiError ? err.message : "A keresés nem sikerült"
+        err instanceof ApiError ? err.message : t("a_kereses_nem_sikerult")
       )}</div>`;
     }
   }
@@ -113,7 +112,7 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
       return;
     }
     chipsEl.innerHTML = [
-      `<div class="pb-chip ${category === null ? "active" : ""}" data-cat="">Összes</div>`,
+      `<div class="pb-chip ${category === null ? "active" : ""}" data-cat="">${t("osszes")}</div>`,
       ...top.map(
         ([c, n]) =>
           `<div class="pb-chip ${category === c ? "active" : ""}" data-cat="${escapeHtml(c)}">${escapeHtml(
@@ -164,7 +163,7 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
           <span class="pb-downloads">↓ ${formatDownloads(r.downloads)}</span>
           <span class="pb-badge" data-compat="${escapeHtml(r.id)}">…</span>
         </div>
-        <button class="btn btn-primary pb-add" data-add="${escapeHtml(r.id)}">Hozzáadás</button>
+        <button class="btn btn-primary pb-add" data-add="${escapeHtml(r.id)}">${t("hozzaadas")}</button>
       </div>`
       )
       .join("")}</div>`;
@@ -229,14 +228,14 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
       // blocks.
       const compatible = versions.find((v) => v.downloadUrl && v.compatibility?.compatible !== false);
       const version = compatible ?? versions.find((v) => v.downloadUrl);
-      if (!version) throw new ApiError(400, "Ehhez a szerverhez nincs telepíthető build.");
+      if (!version) throw new ApiError(400, t("ehhez_a_szerverhez_nincs_telepitheto_build"));
       if (!compatible && version.compatibility?.message) {
         const proceed = await confirmModal(
           `${escapeHtml(version.compatibility.message)}<br><br>Mindenképp telepíted?`
         );
         if (!proceed) {
           btn.classList.remove("installing");
-          btn.textContent = "Hozzáadás";
+          btn.textContent = t("hozzaadas");
           return;
         }
       }
@@ -244,19 +243,19 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
       showToast(`Telepítve: ${plugin.filename}`);
       onInstalled();
       btn.classList.remove("installing");
-      btn.textContent = "✓ Telepítve";
+      btn.textContent = t("telepitve");
       btn.disabled = true;
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "A telepítés nem sikerült", "error");
+      showToast(err instanceof ApiError ? err.message : t("a_telepites_nem_sikerult"), "error");
       btn.classList.remove("installing");
-      btn.textContent = "Hozzáadás";
+      btn.textContent = t("hozzaadas");
     }
   }
 
   async function openDetails(projectId: string) {
     const result = results.find((r) => r.id === projectId);
     const wrap = document.createElement("div");
-    wrap.innerHTML = `<h3>${escapeHtml(result?.name ?? projectId)}</h3><p style="color:var(--text-dim);">Betöltés…</p>`;
+    wrap.innerHTML = `<h3>${escapeHtml(result?.name ?? projectId)}</h3><p style="color:var(--text-dim);">${t("betoltes")}</p>`;
     const closeModal = openModal(wrap);
 
     try {
@@ -279,10 +278,10 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
             : ""
         }
         ${details.body ? `<div class="pb-body">${escapeHtml(details.body)}</div>` : ""}
-        <h4 style="margin:16px 0 8px;">Legutóbbi kiadások</h4>
+        <h4 style="margin:16px 0 8px;">${t("legutobbi_kiadasok")}</h4>
         <div>${
           versions.length === 0
-            ? `<div style="color:var(--text-dim);font-size:12px;">Nincs elérhető verzió.</div>`
+            ? `<div style="color:var(--text-dim);font-size:12px;">${t("nincs_elerheto_verzio")}</div>`
             : versions
                 .slice(0, 6)
                 .map(
@@ -303,9 +302,9 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
                 .join("")
         }</div>
         <div class="modal-actions">
-          <a class="btn" href="${escapeHtml(details.pageUrl)}" target="_blank" rel="noopener noreferrer">Oldal</a>
-          <button class="btn" id="pd-close">Bezárás</button>
-          <button class="btn btn-primary" id="pd-install">Hozzáadás</button>
+          <a class="btn" href="${escapeHtml(details.pageUrl)}" target="_blank" rel="noopener noreferrer">${t("oldal")}</a>
+          <button class="btn" id="pd-close">${t("bezaras")}</button>
+          <button class="btn btn-primary" id="pd-install">${t("hozzaadas")}</button>
         </div>
       `;
       wrap.querySelector<HTMLButtonElement>("#pd-close")!.onclick = () => closeModal();
@@ -314,9 +313,9 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
     } catch (err) {
       wrap.innerHTML = `<h3>${escapeHtml(result?.name ?? projectId)}</h3>
         <p class="error-text">${escapeHtml(
-          err instanceof ApiError ? err.message : "A részletek betöltése nem sikerült"
+          err instanceof ApiError ? err.message : t("a_reszletek_betoltese_nem_sikerult")
         )}</p>
-        <div class="modal-actions"><button class="btn" id="pd-close2">Bezárás</button></div>`;
+        <div class="modal-actions"><button class="btn" id="pd-close2">${t("bezaras")}</button></div>`;
       wrap.querySelector<HTMLButtonElement>("#pd-close2")!.onclick = () => closeModal();
     }
   }

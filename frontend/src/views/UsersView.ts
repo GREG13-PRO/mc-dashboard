@@ -1,4 +1,5 @@
 import { api, ApiError } from "../api";
+import { t } from "../lib/i18n";
 import { openModal, confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { getCurrentUser } from "../auth-state";
@@ -6,9 +7,9 @@ import type { ServerPermissions, ServerWithStatus, UserInput, UserPublic } from 
 
 const CAPABILITIES: { key: keyof ServerPermissions; label: string }[] = [
   { key: "console", label: "Konzol" },
-  { key: "files", label: "Fájlok" },
-  { key: "players", label: "Játékosok" },
-  { key: "settings", label: "Beállítások" },
+  { key: "files", label: t("fajlok") },
+  { key: "players", label: t("jatekosok") },
+  { key: "settings", label: t("beallitasok") },
 ];
 
 export function renderUsersView(root: HTMLElement): () => void {
@@ -16,7 +17,7 @@ export function renderUsersView(root: HTMLElement): () => void {
   let users: UserPublic[] = [];
   let servers: ServerWithStatus[] = [];
 
-  root.innerHTML = `<div class="empty-state">Betöltés…</div>`;
+  root.innerHTML = `<div class="empty-state">${t("betoltes")}</div>`;
 
   async function load() {
     try {
@@ -25,7 +26,7 @@ export function renderUsersView(root: HTMLElement): () => void {
       render();
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${
-        err instanceof ApiError ? err.message : "Felhasználók betöltése sikertelen"
+        err instanceof ApiError ? err.message : t("felhasznalok_betoltese_sikertelen")
       }</div>`;
     }
   }
@@ -33,9 +34,9 @@ export function renderUsersView(root: HTMLElement): () => void {
   function render() {
     root.innerHTML = `
       <div class="server-view-header">
-        <h2>Felhasználók</h2>
+        <h2>${t("felhasznalok")}</h2>
         <div class="server-actions">
-          <button class="btn btn-primary" id="add-user-btn">+ Új felhasználó</button>
+          <button class="btn btn-primary" id="add-user-btn">${t("uj_felhasznalo")}</button>
         </div>
       </div>
       <div id="users-list"></div>
@@ -45,7 +46,7 @@ export function renderUsersView(root: HTMLElement): () => void {
 
     const list = root.querySelector<HTMLDivElement>("#users-list")!;
     if (users.length === 0) {
-      list.innerHTML = `<div class="empty-state" style="padding:1rem;">Még nincs más felhasználó.</div>`;
+      list.innerHTML = `<div class="empty-state" style="padding:1rem;">${t("meg_nincs_mas_felhasznalo")}</div>`;
       return;
     }
 
@@ -56,9 +57,9 @@ export function renderUsersView(root: HTMLElement): () => void {
           return p && (p.console || p.files || p.players || p.settings);
         });
         const summary = u.isAdmin
-          ? "Teljes hozzáférés (admin)"
+          ? t("teljes_hozzaferes_admin")
           : grantedServers.length === 0
-            ? "Nincs hozzáférése egyetlen szerverhez sem"
+            ? t("nincs_hozzaferese_egyetlen_szerverhez_sem")
             : grantedServers
                 .map((s) => {
                   const p = u.permissions[s.id];
@@ -74,10 +75,10 @@ export function renderUsersView(root: HTMLElement): () => void {
           </div>
           <div class="server-meta">${summary}</div>
           <div style="display:flex;gap:0.5rem;margin-top:0.6rem;">
-            <button class="btn" data-edit="${u.id}">Szerkesztés</button>
+            <button class="btn" data-edit="${u.id}">${t("szerkesztes")}</button>
             ${
               u.id !== getCurrentUser()?.id
-                ? `<button class="btn btn-danger" data-delete="${u.id}">Törlés</button>`
+                ? `<button class="btn btn-danger" data-delete="${u.id}">${t("torles")}</button>`
                 : ""
             }
           </div>
@@ -98,10 +99,10 @@ export function renderUsersView(root: HTMLElement): () => void {
         if (await confirmModal(`Biztosan törlöd a(z) <strong>${user.username}</strong> felhasználót?`)) {
           try {
             await api.deleteUser(user.id);
-            showToast("Felhasználó törölve");
+            showToast(t("felhasznalo_torolve"));
             await load();
           } catch (err) {
-            showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+            showToast(err instanceof ApiError ? err.message : t("torles_sikertelen"), "error");
           }
         }
       };
@@ -111,21 +112,21 @@ export function renderUsersView(root: HTMLElement): () => void {
   function openUserModal(existing?: UserPublic) {
     const form = document.createElement("div");
     form.innerHTML = `
-      <h3>${existing ? "Felhasználó szerkesztése" : "Felhasználó hozzáadása"}</h3>
+      <h3>${existing ? t("felhasznalo_szerkesztese") : t("felhasznalo_hozzaadasa")}</h3>
       <div class="field">
-        <label for="u-username">Felhasználónév</label>
+        <label for="u-username">${t("felhasznalonev")}</label>
         <input id="u-username" value="${existing?.username ?? ""}" />
       </div>
       <div class="field">
-        <label for="u-password">Jelszó ${existing ? "(üresen hagyva nem változik)" : ""}</label>
+        <label for="u-password">Jelszó ${existing ? t("uresen_hagyva_nem_valtozik") : ""}</label>
         <input id="u-password" type="password" />
       </div>
       <div class="field checkbox-row">
         <input id="u-admin" type="checkbox" ${existing?.isAdmin ? "checked" : ""} />
-        <label for="u-admin" style="margin:0">Admin (teljes hozzáférés minden szerverhez, felhasználókezeléshez)</label>
+        <label for="u-admin" style="margin:0">${t("admin_teljes_hozzaferes_minden_szerverhez_felhas")}</label>
       </div>
       <div id="perm-section">
-        <p style="margin:0.8rem 0 0.4rem;color:var(--text-dim);font-size:0.85rem;">Per-szerver jogosultságok (adminnál figyelmen kívül marad)</p>
+        <p style="margin:0.8rem 0 0.4rem;color:var(--text-dim);font-size:0.85rem;">${t("per_szerver_jogosultsagok_adminnal_figyelmen_kiv")}</p>
         ${servers
           .map(
             (s) => `
@@ -148,8 +149,8 @@ export function renderUsersView(root: HTMLElement): () => void {
       </div>
       <div id="form-error" class="error-text"></div>
       <div class="modal-actions">
-        <button id="cancel-btn" class="btn">Mégse</button>
-        <button id="save-btn" class="btn btn-primary">${existing ? "Mentés" : "Hozzáadás"}</button>
+        <button id="cancel-btn" class="btn">${t("megse")}</button>
+        <button id="save-btn" class="btn btn-primary">${existing ? t("mentes") : t("hozzaadas")}</button>
       </div>
     `;
 
@@ -176,11 +177,11 @@ export function renderUsersView(root: HTMLElement): () => void {
       const isAdminChecked = adminCheckbox.checked;
 
       if (!username) {
-        errorEl.textContent = "Felhasználónév megadása kötelező.";
+        errorEl.textContent = t("felhasznalonev_megadasa_kotelezo");
         return;
       }
       if (!existing && !password) {
-        errorEl.textContent = "Jelszó megadása kötelező új felhasználónál.";
+        errorEl.textContent = t("jelszo_megadasa_kotelezo_uj_felhasznalonal");
         return;
       }
 
@@ -202,15 +203,15 @@ export function renderUsersView(root: HTMLElement): () => void {
       try {
         if (existing) {
           await api.updateUser(existing.id, input);
-          showToast("Felhasználó frissítve");
+          showToast(t("felhasznalo_frissitve"));
         } else {
           await api.createUser(input as UserInput);
-          showToast("Felhasználó hozzáadva");
+          showToast(t("felhasznalo_hozzaadva"));
         }
         close();
         await load();
       } catch (err) {
-        errorEl.textContent = err instanceof ApiError ? err.message : "Ismeretlen hiba történt";
+        errorEl.textContent = err instanceof ApiError ? err.message : t("ismeretlen_hiba_tortent");
       }
     };
   }

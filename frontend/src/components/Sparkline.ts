@@ -1,3 +1,5 @@
+import { t } from "../lib/i18n";
+
 /**
  * Renders a series as an inline SVG polyline.
  *
@@ -17,7 +19,7 @@ export interface SparklineOptions {
 
 export function sparklineSvg({ values, color, width = 260, height = 44, max }: SparklineOptions): string {
   if (values.length === 0) {
-    return `<div style="color:var(--text-dim);font-size:0.78rem;">Nincs még adat.</div>`;
+    return `<div style="color:var(--text-dim);font-size:0.78rem;">${t("nincs_meg_adat")}</div>`;
   }
 
   const pad = 2;
