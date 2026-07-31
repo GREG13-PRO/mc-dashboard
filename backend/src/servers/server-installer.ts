@@ -1,79 +1,13 @@
-import https from "node:https";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fetchText, fetchJson, downloadFile } from "./http-download";
 import { writeProperties } from "./properties";
 import type { ServerInstallSettings, ServerInstallType } from "../types";
 
 const execFileAsync = promisify(execFile);
-
-function fetchText(url: string, redirectsLeft = 5): Promise<string> {
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers: { "User-Agent": "mc-dashboard" } }, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          if (redirectsLeft === 0) {
-            reject(new Error(`Too many redirects fetching ${url}`));
-            return;
-          }
-          res.resume();
-          fetchText(new URL(res.headers.location, url).toString(), redirectsLeft - 1).then(resolve, reject);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          reject(new Error(`HTTP ${res.statusCode} fetching ${url}`));
-          return;
-        }
-        let data = "";
-        res.on("data", (c) => (data += c));
-        res.on("end", () => resolve(data));
-      })
-      .on("error", reject);
-  });
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const body = await fetchText(url);
-  try {
-    return JSON.parse(body) as T;
-  } catch {
-    throw new Error(`Invalid JSON from ${url}`);
-  }
-}
-
-function downloadFile(url: string, dest: string, redirectsLeft = 5): Promise<void> {
-  return new Promise((resolve, reject) => {
-    https
-      .get(url, { headers: { "User-Agent": "mc-dashboard" } }, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          if (redirectsLeft === 0) {
-            reject(new Error(`Too many redirects downloading ${url}`));
-            return;
-          }
-          res.resume();
-          downloadFile(new URL(res.headers.location, url).toString(), dest, redirectsLeft - 1).then(resolve, reject);
-          return;
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          reject(new Error(`Download failed: HTTP ${res.statusCode} for ${url}`));
-          return;
-        }
-        const file = fs.createWriteStream(dest);
-        res.pipe(file);
-        file.on("finish", () => file.close(() => resolve()));
-        // A half-written jar is worse than none - a later start would fail with
-        // a confusing "invalid or corrupt jarfile" instead of a download error.
-        file.on("error", (err) => {
-          fs.rm(dest, { force: true }, () => reject(err));
-        });
-      })
-      .on("error", reject);
-  });
-}
 
 export type ServerTypeKind = "server" | "proxy";
 

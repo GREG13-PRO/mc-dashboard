@@ -11,6 +11,14 @@ import {
 } from "./process-manager";
 import { getCachedPlayers } from "./rcon-poller";
 import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
+import {
+  searchPlugins,
+  listPluginVersions,
+  listInstalledPlugins,
+  installPlugin,
+  deletePlugin,
+  detectPlatform,
+} from "./plugin-manager";
 import { filesRouter } from "../files/fs.routes";
 import { requireAdmin, requirePermission } from "../auth/auth.middleware";
 import type { ServerEntryInput } from "../types";
@@ -280,6 +288,94 @@ serversRouter.post("/:id/players/:name/action", requirePermission("players"), as
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Plugin management is gated on "files" - installing a jar into plugins/ is
+// exactly a privileged write into the server folder, so it reuses that
+// capability rather than introducing a fifth one.
+serversRouter.get("/:id/plugins", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const plugins = await listInstalledPlugins(entry, req.query.checkUpdates === "1");
+    res.json({ plugins });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/plugins/search", requirePermission("files"), async (req, res) => {
+  const source = String(req.query.source ?? "modrinth");
+  if (source !== "modrinth" && source !== "hangar") {
+    res.status(400).json({ error: `Unknown plugin source: ${source}` });
+    return;
+  }
+  try {
+    const results = await searchPlugins(String(req.query.q ?? ""), source);
+    res.json({ results });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/plugins/versions", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const source = String(req.query.source ?? "modrinth");
+  const projectId = String(req.query.projectId ?? "");
+  if (source !== "modrinth" && source !== "hangar") {
+    res.status(400).json({ error: `Unknown plugin source: ${source}` });
+    return;
+  }
+  if (!projectId) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+  try {
+    const versions = await listPluginVersions(source, projectId, detectPlatform(entry));
+    res.json({ versions });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/plugins", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const { source, projectId, versionId } = req.body ?? {};
+  if ((source !== "modrinth" && source !== "hangar") || !projectId || !versionId) {
+    res.status(400).json({ error: "source, projectId and versionId are required" });
+    return;
+  }
+  try {
+    const plugin = await installPlugin(entry, source, projectId, versionId);
+    res.status(201).json({ plugin });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/plugins/:filename", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deletePlugin(entry, req.params.filename);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

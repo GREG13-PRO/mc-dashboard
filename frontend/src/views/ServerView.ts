@@ -2,22 +2,27 @@ import { api, ApiError } from "../api";
 import { ConsoleSocket } from "../ws-client";
 import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
+import { openPluginBrowser } from "../components/PluginBrowser";
 import { confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
+import { escapeHtml } from "../lib/escape";
 import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
 
-type Tab = "console" | "files" | "players" | "settings";
-const ALL_TABS: Tab[] = ["console", "files", "players", "settings"];
+type Tab = "console" | "files" | "plugins" | "players" | "settings";
+const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "settings"];
 
+// Tabs map onto the four server capabilities; the plugin browser writes jars
+// into the server folder, so it rides on "files" rather than adding a fifth
+// permission that would have to be migrated into every existing user record.
 export function renderServerView(
   root: HTMLElement,
   serverId: string,
   callbacks: { onDeleted: () => void; onChanged: () => void }
 ): () => void {
   const perms = permissionsFor(serverId);
-  const availableTabs = ALL_TABS.filter((tab) => perms[tab]);
+  const availableTabs = ALL_TABS.filter((tab) => perms[tab === "plugins" ? "files" : tab]);
   let activeTab: Tab = availableTabs[0] ?? "console";
   let server: ServerWithStatus | null = null;
   let disposed = false;
@@ -103,7 +108,13 @@ export function renderServerView(
   }
 
   function labelFor(tab: Tab): string {
-    return { console: "Konzol", files: "Fájlok", players: "Játékosok", settings: "Beállítások" }[tab];
+    return {
+      console: "Konzol",
+      files: "Fájlok",
+      plugins: "Bővítmények",
+      players: "Játékosok",
+      settings: "Beállítások",
+    }[tab];
   }
 
   async function runAction(fn: () => Promise<void>) {
@@ -131,6 +142,8 @@ export function renderServerView(
       setupConsole();
     } else if (activeTab === "files") {
       new FileBrowser(content, serverId);
+    } else if (activeTab === "plugins") {
+      void renderPlugins(content);
     } else if (activeTab === "players") {
       renderPlayers(content);
     } else if (activeTab === "settings") {
@@ -212,6 +225,90 @@ export function renderServerView(
     socket = null;
     terminal?.dispose();
     terminal = null;
+  }
+
+  async function renderPlugins(content: HTMLElement) {
+    content.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;margin-bottom:0.9rem;flex-wrap:wrap;">
+        <div style="color:var(--text-dim);font-size:0.85rem;">Telepített bővítmények</div>
+        <div style="display:flex;gap:0.4rem;">
+          <button class="btn" id="plugins-refresh">Frissítések keresése</button>
+          <button class="btn btn-primary" id="plugins-add">+ Bővítmény telepítése</button>
+        </div>
+      </div>
+      <div id="plugins-list"><div class="empty-state" style="padding:1rem;">Betöltés…</div></div>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.9rem;">
+        A módosítások a szerver következő újraindításakor lépnek életbe.
+      </p>
+    `;
+
+    const listEl = content.querySelector<HTMLDivElement>("#plugins-list")!;
+
+    async function reload(checkUpdates = false) {
+      listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">${
+        checkUpdates ? "Frissítések keresése…" : "Betöltés…"
+      }</div>`;
+      try {
+        const plugins = await api.listPlugins(serverId, checkUpdates);
+        if (disposed) return;
+        if (plugins.length === 0) {
+          listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">Nincs telepített bővítmény.</div>`;
+          return;
+        }
+        listEl.innerHTML = plugins
+          .map(
+            (p) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.55rem 0;border-bottom:1px solid var(--border);">
+            <div style="min-width:0;">
+              <div>${escapeHtml(p.name ?? p.filename)}${
+                p.version ? ` <span style="color:var(--text-dim);font-size:0.82rem;">v${escapeHtml(p.version)}</span>` : ""
+              }</div>
+              <div style="color:var(--text-dim);font-size:0.78rem;">
+                ${escapeHtml(p.filename)} · ${(p.sizeBytes / 1024 / 1024).toFixed(1)} MB${
+                  p.source ? ` · ${escapeHtml(p.source)}` : " · kézzel telepítve"
+                }
+              </div>
+              ${
+                p.updateAvailable
+                  ? `<div style="color:var(--yellow);font-size:0.8rem;margin-top:0.2rem;">Elérhető frissítés: ${escapeHtml(
+                      p.latestVersion ?? ""
+                    )}</div>`
+                  : ""
+              }
+            </div>
+            <button class="btn btn-danger" data-del-plugin="${escapeHtml(p.filename)}">Törlés</button>
+          </div>`
+          )
+          .join("");
+
+        listEl.querySelectorAll<HTMLButtonElement>("[data-del-plugin]").forEach((btn) => {
+          btn.onclick = async () => {
+            const filename = btn.dataset.delPlugin!;
+            if (!(await confirmModal(`Biztosan törlöd ezt a bővítményt? <strong>${escapeHtml(filename)}</strong>`))) {
+              return;
+            }
+            try {
+              await api.deletePlugin(serverId, filename);
+              showToast("Bővítmény törölve");
+              await reload();
+            } catch (err) {
+              showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+            }
+          };
+        });
+      } catch (err) {
+        listEl.innerHTML = `<div class="empty-state" style="padding:1rem;">${escapeHtml(
+          err instanceof ApiError ? err.message : "A bővítmények betöltése sikertelen"
+        )}</div>`;
+      }
+    }
+
+    content.querySelector<HTMLButtonElement>("#plugins-refresh")!.onclick = () => void reload(true);
+    content.querySelector<HTMLButtonElement>("#plugins-add")!.onclick = () => {
+      openPluginBrowser(serverId, () => void reload());
+    };
+
+    await reload();
   }
 
   function actionButtonsHtml(prefix: string): string {

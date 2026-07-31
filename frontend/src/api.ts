@@ -1,7 +1,11 @@
 import type {
   BackupInfo,
   FileEntryInfo,
+  InstalledPlugin,
   PlayerAction,
+  PluginSearchResult,
+  PluginSource,
+  PluginVersionInfo,
   ServerEntryInput,
   ServerInstallInput,
   ServerTypeOption,
@@ -186,6 +190,40 @@ export const api = {
       body: JSON.stringify(input),
     });
     return server;
+  },
+
+  async listPlugins(serverId: string, checkUpdates = false): Promise<InstalledPlugin[]> {
+    const { plugins } = await request<{ plugins: InstalledPlugin[] }>(
+      `/servers/${serverId}/plugins${checkUpdates ? "?checkUpdates=1" : ""}`
+    );
+    return plugins;
+  },
+  async searchPlugins(serverId: string, query: string, source: PluginSource): Promise<PluginSearchResult[]> {
+    const { results } = await request<{ results: PluginSearchResult[] }>(
+      `/servers/${serverId}/plugins/search?q=${encodeURIComponent(query)}&source=${source}`
+    );
+    return results;
+  },
+  async listPluginVersions(serverId: string, source: PluginSource, projectId: string): Promise<PluginVersionInfo[]> {
+    const { versions } = await request<{ versions: PluginVersionInfo[] }>(
+      `/servers/${serverId}/plugins/versions?source=${source}&projectId=${encodeURIComponent(projectId)}`
+    );
+    return versions;
+  },
+  async installPlugin(
+    serverId: string,
+    source: PluginSource,
+    projectId: string,
+    versionId: string
+  ): Promise<InstalledPlugin> {
+    const { plugin } = await request<{ plugin: InstalledPlugin }>(`/servers/${serverId}/plugins`, {
+      method: "POST",
+      body: JSON.stringify({ source, projectId, versionId }),
+    });
+    return plugin;
+  },
+  async deletePlugin(serverId: string, filename: string): Promise<void> {
+    await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });
   },
 };
 

@@ -3,6 +3,8 @@
 // terminal - see process-manager's TERM=xterm-256color) into styled HTML,
 // for a plain scrolling log view rather than a full terminal emulator.
 
+import { escapeHtml } from "./escape";
+
 const FG_COLORS: Record<number, string> = {
   30: "#5c6370",
   31: "#e06c75",
@@ -54,10 +56,6 @@ const SGR_RE = /\x1b\[([0-9;]*)m/g;
 // only make sense against a live terminal grid, meaningless in a scrolling
 // log, so they're dropped rather than rendered.
 const OTHER_CSI_RE = /\x1b\[[0-9;?]*[A-LN-Za-ln-z]/g;
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
 
 function styleFor(state: AnsiState): string {
   const parts: string[] = [];

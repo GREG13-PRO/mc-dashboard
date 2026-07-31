@@ -139,3 +139,37 @@ export interface ServerInstallInput {
   version: string;
   settings?: ServerInstallSettings;
 }
+
+export type PluginSource = "modrinth" | "hangar";
+
+export interface PluginSearchResult {
+  source: PluginSource;
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  downloads: number;
+  pageUrl: string;
+}
+
+export interface PluginVersionInfo {
+  id: string;
+  name: string;
+  gameVersions: string[];
+  loaders: string[];
+  filename: string | null;
+  downloadUrl: string | null;
+  externalUrl: string | null;
+  datePublished: string | null;
+}
+
+export interface InstalledPlugin {
+  filename: string;
+  name: string | null;
+  version: string | null;
+  sizeBytes: number;
+  source: PluginSource | null;
+  projectId: string | null;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+}
