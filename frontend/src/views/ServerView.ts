@@ -12,8 +12,8 @@ import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
 
-type Tab = "console" | "files" | "plugins" | "players" | "access" | "luckperms" | "settings";
-const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "access", "luckperms", "settings"];
+type Tab = "console" | "files" | "plugins" | "players" | "access" | "luckperms" | "timeline" | "settings";
+const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "access", "luckperms", "timeline", "settings"];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
 // into the server folder, so it rides on "files" rather than adding a fifth
@@ -28,7 +28,13 @@ export function renderServerView(
   // installed, which is only known after the first load - see refreshLuckPerms.
   let luckPermsInstalled = false;
   const capabilityFor = (tab: Tab) =>
-    tab === "plugins" ? "files" : tab === "access" ? "players" : tab === "luckperms" ? "settings" : tab;
+    tab === "plugins"
+      ? "files"
+      : tab === "access"
+        ? "players"
+        : tab === "luckperms" || tab === "timeline"
+          ? "settings"
+          : tab;
   const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
   const visibleTabs = () => permittedTabs.filter((tab) => tab !== "luckperms" || luckPermsInstalled);
   const availableTabs = permittedTabs;
@@ -179,6 +185,7 @@ export function renderServerView(
       players: "Játékosok",
       access: "Whitelist / Ban",
       luckperms: "LuckPerms",
+      timeline: "Time Machine",
       settings: "Beállítások",
     }[tab];
   }
@@ -218,6 +225,8 @@ export function renderServerView(
       void renderAccess(content);
     } else if (activeTab === "luckperms") {
       renderLuckPerms(content);
+    } else if (activeTab === "timeline") {
+      void renderTimeline(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -398,6 +407,164 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderTimeline(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    let data;
+    try {
+      data = await api.getTimeline(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+
+    const { config, snapshots, sizeBytes } = data;
+    const running = server?.running ?? false;
+    const mb = (sizeBytes / 1024 / 1024).toFixed(1);
+
+    content.innerHTML = `
+      <div class="field checkbox-row">
+        <input id="tm-enabled" type="checkbox" ${config.enabled ? "checked" : ""} />
+        <label for="tm-enabled" style="margin:0">Time Machine bekapcsolva</label>
+      </div>
+      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        Bekapcsolva a dashboard percenként pillanatképet készít a világról, és csak a
+        megváltozott régiófájlokat tárolja el. Alapból ki van kapcsolva, mert egy aktív
+        világ így is sok helyet tud enni.
+      </p>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:16px 0;">
+        <div class="field" style="max-width:170px;">
+          <label for="tm-interval">Gyakoriság (perc)</label>
+          <input id="tm-interval" type="number" min="1" max="60" value="${config.intervalMinutes}" />
+        </div>
+        <div class="field" style="max-width:190px;">
+          <label for="tm-max">Megőrzött pillanatképek</label>
+          <input id="tm-max" type="number" min="5" max="500" value="${config.maxSnapshots}" />
+        </div>
+        <div class="field" style="align-self:flex-end;">
+          <button class="btn" id="tm-save">Mentés</button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn" id="tm-now" ${running ? "" : "disabled"}>Pillanatkép most</button>
+        <button class="btn btn-danger" id="tm-clear">Előzmények törlése</button>
+        <span style="color:var(--text-dim);font-size:12px;">${snapshots.length} pillanatkép · ${mb} MB</span>
+      </div>
+
+      ${
+        snapshots.length === 0
+          ? `<div class="empty-state" style="padding:16px;">Még nincs pillanatkép.</div>`
+          : `
+        <label for="tm-slider">Időpont</label>
+        <input type="range" id="tm-slider" min="0" max="${snapshots.length - 1}" value="${
+          snapshots.length - 1
+        }" style="width:100%;" />
+        <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:11px;">
+          <span>${new Date(snapshots[0].at).toLocaleString("hu-HU")}</span>
+          <span>${new Date(snapshots[snapshots.length - 1].at).toLocaleString("hu-HU")}</span>
+        </div>
+        <div style="margin-top:16px;padding:12px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
+          <div id="tm-selected" style="font-size:14px;font-weight:600;"></div>
+          <div id="tm-selected-meta" style="color:var(--text-dim);font-size:12px;margin-top:2px;"></div>
+          <button class="btn btn-primary" id="tm-restore" style="margin-top:12px;" ${
+            running ? "disabled title='Állítsd le előbb a szervert'" : ""
+          }>Visszaállítás erre az időpontra</button>
+        </div>`
+      }
+    `;
+
+    content.querySelector<HTMLInputElement>("#tm-enabled")!.onchange = async (e) => {
+      const el = e.target as HTMLInputElement;
+      try {
+        await api.updateServer(serverId, { timeMachine: { ...config, enabled: el.checked } });
+        showToast(el.checked ? "Time Machine bekapcsolva" : "Time Machine kikapcsolva");
+        callbacks.onChanged();
+      } catch (err) {
+        el.checked = !el.checked;
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült állítani", "error");
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#tm-save")!.onclick = async () => {
+      try {
+        await api.updateServer(serverId, {
+          timeMachine: {
+            enabled: content.querySelector<HTMLInputElement>("#tm-enabled")!.checked,
+            intervalMinutes: Number(content.querySelector<HTMLInputElement>("#tm-interval")!.value),
+            maxSnapshots: Number(content.querySelector<HTMLInputElement>("#tm-max")!.value),
+          },
+        });
+        showToast("Beállítás mentve");
+        await renderTimeline(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Mentés sikertelen", "error");
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#tm-now")!.onclick = async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = "Készül…";
+      try {
+        await api.takeSnapshot(serverId);
+        showToast("Pillanatkép elkészült");
+        await renderTimeline(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        btn.disabled = false;
+        btn.textContent = "Pillanatkép most";
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#tm-clear")!.onclick = async () => {
+      if (!(await confirmModal("Biztosan törlöd az összes pillanatképet? Ez <strong>nem</strong> vonható vissza.")))
+        return;
+      try {
+        await api.clearTimeline(serverId);
+        showToast("Előzmények törölve");
+        await renderTimeline(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+      }
+    };
+
+    const slider = content.querySelector<HTMLInputElement>("#tm-slider");
+    if (slider) {
+      const label = content.querySelector<HTMLDivElement>("#tm-selected")!;
+      const meta = content.querySelector<HTMLDivElement>("#tm-selected-meta")!;
+      const paint = () => {
+        const snap = snapshots[Number(slider.value)];
+        label.textContent = new Date(snap.at).toLocaleString("hu-HU");
+        meta.textContent = `${snap.fileCount} világfájl`;
+      };
+      slider.oninput = paint;
+      paint();
+
+      content.querySelector<HTMLButtonElement>("#tm-restore")!.onclick = async () => {
+        const snap = snapshots[Number(slider.value)];
+        if (
+          !(await confirmModal(
+            `Visszatekered a világot erre: <strong>${escapeHtml(
+              new Date(snap.at).toLocaleString("hu-HU")
+            )}</strong>? Az azóta történt változások elvesznek.`
+          ))
+        ) {
+          return;
+        }
+        try {
+          const restored = await api.restoreSnapshot(serverId, snap.id);
+          showToast(`Visszaállítva: ${restored} fájl`);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Visszaállítás sikertelen", "error");
+        }
+      };
+    }
   }
 
   function renderLuckPerms(content: HTMLElement) {

@@ -4,7 +4,13 @@ import { v4 as uuidv4 } from "uuid";
 import { paths } from "../config/env";
 import { assertFileInsideRoot } from "../files/safe-path";
 import { syncRconToServerProperties } from "./rcon-sync";
-import type { CrashRestartConfig, ScheduledRestartConfig, ServerEntry, ServerEntryInput } from "../types";
+import type {
+  CrashRestartConfig,
+  ScheduledRestartConfig,
+  ServerEntry,
+  ServerEntryInput,
+  TimeMachineConfig,
+} from "../types";
 
 /**
  * Strips the RCON password before an entry is sent to a client. Shared by
@@ -21,6 +27,25 @@ export function toPublicEntry(entry: ServerEntry): Omit<ServerEntry, "rcon"> & {
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const DEFAULT_CRASH_RESTART: CrashRestartConfig = { enabled: false, maxAttempts: 3 };
+
+// Off by default: even diffed, snapshotting an active world costs real disk,
+// and this deployment's VM does not have much of it.
+const DEFAULT_TIME_MACHINE: TimeMachineConfig = { enabled: false, intervalMinutes: 1, maxSnapshots: 60 };
+
+function normalizeTimeMachine(
+  input: Partial<TimeMachineConfig> | undefined,
+  existing: TimeMachineConfig
+): TimeMachineConfig {
+  const intervalMinutes = input?.intervalMinutes ?? existing.intervalMinutes;
+  const maxSnapshots = input?.maxSnapshots ?? existing.maxSnapshots;
+  if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 60) {
+    throw new Error(`Invalid snapshot interval: ${intervalMinutes} (expected 1-60 minutes)`);
+  }
+  if (!Number.isInteger(maxSnapshots) || maxSnapshots < 5 || maxSnapshots > 500) {
+    throw new Error(`Invalid snapshot limit: ${maxSnapshots} (expected 5-500)`);
+  }
+  return { enabled: input?.enabled ?? existing.enabled, intervalMinutes, maxSnapshots };
+}
 
 function normalizeCrashRestart(
   input: Partial<CrashRestartConfig> | undefined,
@@ -79,6 +104,9 @@ class ServerRegistry {
       if (!entry.crashRestart) {
         entry.crashRestart = { ...DEFAULT_CRASH_RESTART };
       }
+      if (!entry.timeMachine) {
+        entry.timeMachine = { ...DEFAULT_TIME_MACHINE };
+      }
       this.entries.set(entry.id, entry);
     }
   }
@@ -125,6 +153,7 @@ class ServerRegistry {
       },
       scheduledRestart: normalizeScheduledRestart(input.scheduledRestart, { enabled: false, time: "04:00" }),
       crashRestart: normalizeCrashRestart(input.crashRestart, DEFAULT_CRASH_RESTART),
+      timeMachine: normalizeTimeMachine(input.timeMachine, DEFAULT_TIME_MACHINE),
       createdAt: now,
       updatedAt: now,
       order: this.entries.size,
@@ -168,6 +197,7 @@ class ServerRegistry {
       },
       scheduledRestart: normalizeScheduledRestart(input.scheduledRestart, existing.scheduledRestart),
       crashRestart: normalizeCrashRestart(input.crashRestart, existing.crashRestart ?? DEFAULT_CRASH_RESTART),
+      timeMachine: normalizeTimeMachine(input.timeMachine, existing.timeMachine ?? DEFAULT_TIME_MACHINE),
       updatedAt: new Date().toISOString(),
     };
 

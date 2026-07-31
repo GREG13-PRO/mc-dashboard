@@ -18,6 +18,12 @@ export interface CrashRestartConfig {
   maxAttempts: number;
 }
 
+export interface TimeMachineConfig {
+  enabled: boolean;
+  intervalMinutes: number;
+  maxSnapshots: number;
+}
+
 export interface ServerEntry {
   id: string;
   name: string;
@@ -28,6 +34,7 @@ export interface ServerEntry {
   rcon: RconConfig;
   scheduledRestart: ScheduledRestartConfig;
   crashRestart: CrashRestartConfig;
+  timeMachine: TimeMachineConfig;
   createdAt: string;
   updatedAt: string;
   order: number;
@@ -41,6 +48,7 @@ export interface ServerEntryInput {
   rcon?: Partial<RconConfig>;
   scheduledRestart?: Partial<ScheduledRestartConfig>;
   crashRestart?: Partial<CrashRestartConfig>;
+  timeMachine?: Partial<TimeMachineConfig>;
 }
 
 export interface ResourceUsage {

@@ -14,6 +14,19 @@ export interface CrashRestartConfig {
   maxAttempts: number;
 }
 
+export interface TimeMachineConfig {
+  enabled: boolean;
+  intervalMinutes: number;
+  maxSnapshots: number;
+}
+
+export interface TimelineSnapshot {
+  id: string;
+  at: string;
+  fileCount: number;
+  addedBytes: number;
+}
+
 export interface ServerEntry {
   id: string;
   name: string;
@@ -24,6 +37,7 @@ export interface ServerEntry {
   rcon: RconPublicConfig;
   scheduledRestart: ScheduledRestartConfig;
   crashRestart: CrashRestartConfig;
+  timeMachine: TimeMachineConfig;
   createdAt: string;
   updatedAt: string;
   order: number;
@@ -71,6 +85,11 @@ export interface ServerEntryInput {
   crashRestart?: {
     enabled: boolean;
     maxAttempts: number;
+  };
+  timeMachine?: {
+    enabled: boolean;
+    intervalMinutes: number;
+    maxSnapshots: number;
   };
 }
 

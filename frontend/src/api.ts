@@ -16,6 +16,8 @@ import type {
   ServerTypeOption,
   ServerInstallType,
   ServerWithStatus,
+  TimeMachineConfig,
+  TimelineSnapshot,
   UserInput,
   UserPublic,
 } from "./types";
@@ -219,6 +221,29 @@ export const api = {
   },
   async deleteConsoleLog(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+
+  async getTimeline(
+    serverId: string
+  ): Promise<{ config: TimeMachineConfig; snapshots: TimelineSnapshot[]; sizeBytes: number }> {
+    return request(`/servers/${serverId}/timeline`);
+  },
+  async takeSnapshot(serverId: string): Promise<TimelineSnapshot> {
+    const { snapshot } = await request<{ snapshot: TimelineSnapshot }>(
+      `/servers/${serverId}/timeline/snapshot`,
+      { method: "POST" }
+    );
+    return snapshot;
+  },
+  async restoreSnapshot(serverId: string, id: string): Promise<number> {
+    const { restored } = await request<{ restored: number }>(`/servers/${serverId}/timeline/restore`, {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    });
+    return restored;
+  },
+  async clearTimeline(serverId: string): Promise<void> {
+    await request(`/servers/${serverId}/timeline`, { method: "DELETE" });
   },
 
   async getLuckPermsStatus(serverId: string): Promise<boolean> {

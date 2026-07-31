@@ -14,6 +14,14 @@ import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPa
 import { readAccessLists, setWhitelistEnforced } from "./access-manager";
 import { listArchivedLogs, readArchivedLog, deleteArchivedLog } from "./console-archive";
 import { hasLuckPerms, createEditorSession, LuckPermsError } from "./luckperms";
+import {
+  takeSnapshot,
+  listSnapshots,
+  restoreSnapshot,
+  timelineSize,
+  deleteTimeline,
+  TimelineError,
+} from "./world-timeline";
 import { getResourceHistory } from "./resource-history";
 import {
   searchPlugins,
@@ -318,6 +326,64 @@ serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
 
 // Gated on "settings": handing someone the LuckPerms editor is handing them
 // every permission on the server, which is a heavier grant than the console.
+serversRouter.get("/:id/timeline", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({
+      config: entry.timeMachine,
+      snapshots: await listSnapshots(entry),
+      sizeBytes: await timelineSize(entry),
+    });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/timeline/snapshot", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.status(201).json({ snapshot: await takeSnapshot(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/timeline/restore", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const restored = await restoreSnapshot(entry, String(req.body?.id ?? ""));
+    res.json({ ok: true, restored });
+  } catch (err) {
+    res.status(err instanceof TimelineError ? 409 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/timeline", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deleteTimeline(entry);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 serversRouter.get("/:id/luckperms", requirePermission("settings"), (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
