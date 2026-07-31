@@ -394,6 +394,11 @@ export function renderServerView(
       <div class="field"><label>Ütemezett újraindítás</label><div>${
         server.scheduledRestart.enabled ? `minden nap ${server.scheduledRestart.time}-kor` : "kikapcsolva"
       }</div></div>
+      <div class="field"><label>Újraindítás összeomlás után</label><div>${
+        server.crashRestart?.enabled
+          ? `bekapcsolva (max ${server.crashRestart.maxAttempts} próbálkozás 10 percen belül)`
+          : "kikapcsolva"
+      }</div></div>
       <div style="display:flex;gap:0.5rem;margin-top:1rem;">
         <button class="btn" id="edit-btn">Szerkesztés</button>
         ${

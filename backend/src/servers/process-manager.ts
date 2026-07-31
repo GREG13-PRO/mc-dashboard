@@ -82,8 +82,30 @@ export async function isServerRunning(entry: ServerEntry): Promise<boolean> {
   return names.has(entry.screenName);
 }
 
+/**
+ * Servers whose current down-ness (or imminent down-ness) was asked for by a
+ * human or by the scheduler, rather than being a crash.
+ *
+ * Nothing else in this module records intent: a graceful `stopServer` can take
+ * the full 30s timeout, and for every second of that `isServerRunning` already
+ * returns false. A crash monitor watching only that signal would therefore
+ * "rescue" every deliberate stop and fight every scheduled restart, so it has
+ * to consult this set instead.
+ */
+const intentionallyStopped = new Set<string>();
+
+export function markIntentionalStop(serverId: string): void {
+  intentionallyStopped.add(serverId);
+}
+
+export function isIntentionallyStopped(serverId: string): boolean {
+  return intentionallyStopped.has(serverId);
+}
+
 export async function startServer(entry: ServerEntry): Promise<void> {
   await assertScreenInstalled();
+  // Starting it is the clearest possible statement that it should be up.
+  intentionallyStopped.delete(entry.id);
   if (await isServerRunning(entry)) {
     return;
   }
@@ -120,6 +142,7 @@ export async function sendCommand(entry: ServerEntry, command: string): Promise<
 }
 
 export async function stopServer(entry: ServerEntry, timeoutMs = 30_000): Promise<void> {
+  markIntentionalStop(entry.id);
   if (!(await isServerRunning(entry))) {
     return;
   }
@@ -150,6 +173,7 @@ export async function restartServer(entry: ServerEntry): Promise<void> {
  * common case.
  */
 export async function killServer(entry: ServerEntry): Promise<void> {
+  markIntentionalStop(entry.id);
   if (!(await isServerRunning(entry))) {
     return;
   }

@@ -11,6 +11,13 @@ export interface ScheduledRestartConfig {
   time: string;
 }
 
+export interface CrashRestartConfig {
+  enabled: boolean;
+  // Give up after this many restarts inside the rolling window, so a server
+  // that crashes on startup can't be restarted forever.
+  maxAttempts: number;
+}
+
 export interface ServerEntry {
   id: string;
   name: string;
@@ -20,6 +27,7 @@ export interface ServerEntry {
   stopCommand: string;
   rcon: RconConfig;
   scheduledRestart: ScheduledRestartConfig;
+  crashRestart: CrashRestartConfig;
   createdAt: string;
   updatedAt: string;
   order: number;
@@ -32,6 +40,7 @@ export interface ServerEntryInput {
   stopCommand?: string;
   rcon?: Partial<RconConfig>;
   scheduledRestart?: Partial<ScheduledRestartConfig>;
+  crashRestart?: Partial<CrashRestartConfig>;
 }
 
 export interface ResourceUsage {

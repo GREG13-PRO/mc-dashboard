@@ -9,6 +9,11 @@ export interface ScheduledRestartConfig {
   time: string;
 }
 
+export interface CrashRestartConfig {
+  enabled: boolean;
+  maxAttempts: number;
+}
+
 export interface ServerEntry {
   id: string;
   name: string;
@@ -18,6 +23,7 @@ export interface ServerEntry {
   stopCommand: string;
   rcon: RconPublicConfig;
   scheduledRestart: ScheduledRestartConfig;
+  crashRestart: CrashRestartConfig;
   createdAt: string;
   updatedAt: string;
   order: number;
@@ -55,6 +61,10 @@ export interface ServerEntryInput {
   scheduledRestart?: {
     enabled: boolean;
     time: string;
+  };
+  crashRestart?: {
+    enabled: boolean;
+    maxAttempts: number;
   };
 }
 

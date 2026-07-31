@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { paths } from "../config/env";
 import { assertFileInsideRoot } from "../files/safe-path";
 import { syncRconToServerProperties } from "./rcon-sync";
-import type { ScheduledRestartConfig, ServerEntry, ServerEntryInput } from "../types";
+import type { CrashRestartConfig, ScheduledRestartConfig, ServerEntry, ServerEntryInput } from "../types";
 
 /**
  * Strips the RCON password before an entry is sent to a client. Shared by
@@ -19,6 +19,19 @@ export function toPublicEntry(entry: ServerEntry): Omit<ServerEntry, "rcon"> & {
 }
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const DEFAULT_CRASH_RESTART: CrashRestartConfig = { enabled: false, maxAttempts: 3 };
+
+function normalizeCrashRestart(
+  input: Partial<CrashRestartConfig> | undefined,
+  existing: CrashRestartConfig
+): CrashRestartConfig {
+  const maxAttempts = input?.maxAttempts ?? existing.maxAttempts;
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 20) {
+    throw new Error(`Invalid crash restart attempt limit: ${maxAttempts} (expected 1-20)`);
+  }
+  return { enabled: input?.enabled ?? existing.enabled, maxAttempts };
+}
 
 function normalizeScheduledRestart(
   input: Partial<ScheduledRestartConfig> | undefined,
@@ -62,6 +75,9 @@ class ServerRegistry {
       // default so downstream code never has to null-check it.
       if (!entry.scheduledRestart) {
         entry.scheduledRestart = { enabled: false, time: "04:00" };
+      }
+      if (!entry.crashRestart) {
+        entry.crashRestart = { ...DEFAULT_CRASH_RESTART };
       }
       this.entries.set(entry.id, entry);
     }
@@ -108,6 +124,7 @@ class ServerRegistry {
         password: input.rcon?.password ?? "",
       },
       scheduledRestart: normalizeScheduledRestart(input.scheduledRestart, { enabled: false, time: "04:00" }),
+      crashRestart: normalizeCrashRestart(input.crashRestart, DEFAULT_CRASH_RESTART),
       createdAt: now,
       updatedAt: now,
       order: this.entries.size,
@@ -150,6 +167,7 @@ class ServerRegistry {
         password: input.rcon?.password || existing.rcon.password,
       },
       scheduledRestart: normalizeScheduledRestart(input.scheduledRestart, existing.scheduledRestart),
+      crashRestart: normalizeCrashRestart(input.crashRestart, existing.crashRestart ?? DEFAULT_CRASH_RESTART),
       updatedAt: new Date().toISOString(),
     };
 

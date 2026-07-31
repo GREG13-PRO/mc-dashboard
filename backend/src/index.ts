@@ -8,6 +8,7 @@ import { apiRouter } from "./routes";
 import { setupConsoleWebSocket } from "./ws/console-ws";
 import { startRconPoller } from "./servers/rcon-poller";
 import { startRestartScheduler } from "./servers/restart-scheduler";
+import { startCrashMonitor } from "./servers/crash-monitor";
 import { assertScreenInstalled } from "./servers/process-manager";
 
 async function main() {
@@ -34,6 +35,7 @@ async function main() {
   setupConsoleWebSocket(httpServer);
   startRconPoller();
   startRestartScheduler();
+  startCrashMonitor();
 
   httpServer.listen(env.port, () => {
     console.log(`mc-dashboard listening on http://localhost:${env.port}`);

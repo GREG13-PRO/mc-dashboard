@@ -107,6 +107,16 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       <label for="f-restart-time">Időpont (ha fut a szerver akkor)</label>
       <input id="f-restart-time" type="time" value="${existing?.scheduledRestart.time ?? "04:00"}" />
     </div>
+    <div class="field checkbox-row">
+      <input id="f-crash-enabled" type="checkbox" ${existing?.crashRestart?.enabled ? "checked" : ""} />
+      <label for="f-crash-enabled" style="margin:0">Automatikus újraindítás összeomlás után</label>
+    </div>
+    <div class="field">
+      <label for="f-crash-attempts">Max próbálkozás 10 percen belül</label>
+      <input id="f-crash-attempts" type="number" min="1" max="20" value="${
+        existing?.crashRestart?.maxAttempts ?? 3
+      }" />
+    </div>
     <div id="form-error" class="error-text"></div>
     <div class="modal-actions">
       <button id="cancel-btn" class="btn">Mégse</button>
@@ -227,6 +237,8 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     const rconPassword = form.querySelector<HTMLInputElement>("#f-rcon-password")!.value;
     const restartEnabled = form.querySelector<HTMLInputElement>("#f-restart-enabled")!.checked;
     const restartTime = form.querySelector<HTMLInputElement>("#f-restart-time")!.value;
+    const crashEnabled = form.querySelector<HTMLInputElement>("#f-crash-enabled")!.checked;
+    const crashAttempts = Number(form.querySelector<HTMLInputElement>("#f-crash-attempts")!.value);
 
     if (!name || !folder || !startScript) {
       errorEl.textContent = "Név, mappa és start script megadása kötelező.";
@@ -252,6 +264,10 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       scheduledRestart: {
         enabled: restartEnabled,
         time: restartTime || "04:00",
+      },
+      crashRestart: {
+        enabled: crashEnabled,
+        maxAttempts: crashAttempts || 3,
       },
     };
 
