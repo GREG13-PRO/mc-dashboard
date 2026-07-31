@@ -237,3 +237,9 @@ export interface AuditRecord {
   ip: string | null;
   ok: boolean;
 }
+
+export interface ArchivedLog {
+  filename: string;
+  endedAt: string;
+  sizeBytes: number;
+}

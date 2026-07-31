@@ -12,6 +12,7 @@ import {
 import { getCachedPlayers } from "./rcon-poller";
 import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
 import { readAccessLists, setWhitelistEnforced } from "./access-manager";
+import { listArchivedLogs, readArchivedLog, deleteArchivedLog } from "./console-archive";
 import { getResourceHistory } from "./resource-history";
 import {
   searchPlugins,
@@ -312,6 +313,46 @@ serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
     return;
   }
   res.json({ history: getResourceHistory(entry.id) });
+});
+
+serversRouter.get("/:id/console-logs", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ logs: await listArchivedLogs(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/console-logs/:filename", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ content: await readArchivedLog(entry, req.params.filename) });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/console-logs/:filename", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deleteArchivedLog(entry, req.params.filename);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
 });
 
 serversRouter.get("/:id/access", requirePermission("players"), async (req, res) => {

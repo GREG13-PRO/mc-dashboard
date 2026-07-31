@@ -1,5 +1,6 @@
 import type {
   AccessLists,
+  ArchivedLog,
   AuditRecord,
   BackupInfo,
   FileEntryInfo,
@@ -204,6 +205,20 @@ export const api = {
   async getResourceHistory(serverId: string): Promise<ResourceSample[]> {
     const { history } = await request<{ history: ResourceSample[] }>(`/servers/${serverId}/resource-history`);
     return history;
+  },
+
+  async listConsoleLogs(serverId: string): Promise<ArchivedLog[]> {
+    const { logs } = await request<{ logs: ArchivedLog[] }>(`/servers/${serverId}/console-logs`);
+    return logs;
+  },
+  async readConsoleLog(serverId: string, filename: string): Promise<string> {
+    const { content } = await request<{ content: string }>(
+      `/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`
+    );
+    return content;
+  },
+  async deleteConsoleLog(serverId: string, filename: string): Promise<void> {
+    await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
   },
 
   async getAccessLists(serverId: string): Promise<AccessLists> {

@@ -110,6 +110,11 @@ export async function startServer(entry: ServerEntry): Promise<void> {
     return;
   }
   const logFile = consoleLogPath(entry);
+  // Whatever is in the live log belongs to the previous run, so it is archived
+  // before being cleared - otherwise restarting a crashed server destroys the
+  // log that explains the crash. Imported lazily to avoid a cycle: the archive
+  // needs consoleLogPath from this module.
+  await (await import("./console-archive")).archiveCurrentLog(entry);
   // Start each run from an empty logfile so the live console never replays
   // stale lines from a previous run on the next attach.
   await fs.writeFile(logFile, "").catch(() => undefined);

@@ -4,9 +4,10 @@ import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
 import { openPluginBrowser } from "../components/PluginBrowser";
 import { sparklineSvg } from "../components/Sparkline";
-import { confirmModal } from "../components/Modal";
+import { confirmModal, openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { escapeHtml } from "../lib/escape";
+import { ansiLineToHtml } from "../lib/ansi";
 import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
@@ -192,10 +193,12 @@ export function renderServerView(
           <div class="console-input-row">
             <input id="console-input" placeholder="Parancs a szerver konzoljába…" />
             <button class="btn btn-primary" id="console-send">Küldés</button>
+            <button class="btn" id="console-history" title="Korábbi futások naplói">Előzmények</button>
           </div>
         </div>
       `;
       setupConsole();
+      content.querySelector<HTMLButtonElement>("#console-history")!.onclick = () => void openLogArchive();
     } else if (activeTab === "files") {
       new FileBrowser(content, serverId);
     } else if (activeTab === "plugins") {
@@ -291,6 +294,99 @@ export function renderServerView(
     socket = null;
     terminal?.dispose();
     terminal = null;
+  }
+
+  /** Console output of previous runs, kept because starting a server clears
+   * the live log - including the restart you do to recover from a crash. */
+  async function openLogArchive() {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `<h3>Korábbi futások naplói</h3><p style="color:var(--text-dim);">Betöltés…</p>`;
+    const close = openModal(wrap);
+
+    async function render() {
+      let logs;
+      try {
+        logs = await api.listConsoleLogs(serverId);
+      } catch (err) {
+        wrap.innerHTML = `<h3>Korábbi futások naplói</h3><p class="error-text">${escapeHtml(
+          err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        )}</p><div class="modal-actions"><button class="btn" id="la-close">Bezárás</button></div>`;
+        wrap.querySelector<HTMLButtonElement>("#la-close")!.onclick = () => close();
+        return;
+      }
+
+      wrap.innerHTML = `
+        <h3>Korábbi futások naplói</h3>
+        <p style="color:var(--text-dim);font-size:12px;margin:0 0 16px;">
+          A dashboard az utolsó 14 futás konzolnaplóját őrzi meg.
+        </p>
+        ${
+          logs.length === 0
+            ? `<div class="empty-state" style="padding:16px;">Még nincs archivált napló.</div>`
+            : logs
+                .map(
+                  (l) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border);">
+            <div>
+              <div style="font-size:13px;">${new Date(l.endedAt).toLocaleString("hu-HU")}</div>
+              <div style="color:var(--text-dim);font-size:11px;">${(l.sizeBytes / 1024).toFixed(0)} kB</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn" data-view="${escapeHtml(l.filename)}">Megnyitás</button>
+              <button class="btn btn-danger" data-del="${escapeHtml(l.filename)}">Törlés</button>
+            </div>
+          </div>`
+                )
+                .join("")
+        }
+        <div class="modal-actions"><button class="btn" id="la-close">Bezárás</button></div>
+      `;
+      wrap.querySelector<HTMLButtonElement>("#la-close")!.onclick = () => close();
+
+      wrap.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((btn) => {
+        btn.onclick = () => void viewLog(btn.dataset.view!);
+      });
+      wrap.querySelectorAll<HTMLButtonElement>("[data-del]").forEach((btn) => {
+        btn.onclick = async () => {
+          try {
+            await api.deleteConsoleLog(serverId, btn.dataset.del!);
+            showToast("Napló törölve");
+            await render();
+          } catch (err) {
+            showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+          }
+        };
+      });
+    }
+
+    async function viewLog(filename: string) {
+      wrap.innerHTML = `<h3>Napló</h3><p style="color:var(--text-dim);">Betöltés…</p>`;
+      try {
+        const content = await api.readConsoleLog(serverId, filename);
+        wrap.innerHTML = `
+          <h3>${escapeHtml(filename)}</h3>
+          <div class="console-log-outer" style="height:50vh;margin-bottom:8px;">
+            <div class="console-log">${content
+              .split("\n")
+              .map((line) => `<div class="console-line">${ansiLineToHtml(line) || "&nbsp;"}</div>`)
+              .join("")}</div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" id="la-back">Vissza</button>
+            <button class="btn" id="la-close2">Bezárás</button>
+          </div>`;
+        wrap.querySelector<HTMLButtonElement>("#la-back")!.onclick = () => void render();
+        wrap.querySelector<HTMLButtonElement>("#la-close2")!.onclick = () => close();
+        // Crashes are at the end, so that is where the view should start.
+        const log = wrap.querySelector<HTMLDivElement>(".console-log");
+        if (log) log.scrollTop = log.scrollHeight;
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült megnyitni", "error");
+        void render();
+      }
+    }
+
+    await render();
   }
 
   async function renderAccess(content: HTMLElement) {
