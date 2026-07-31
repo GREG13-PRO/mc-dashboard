@@ -88,13 +88,19 @@ interface HangarProject {
   category?: string;
 }
 
+/**
+ * An empty query returns the most-downloaded plugins rather than nothing, so
+ * the browser has something to show the moment it opens.
+ */
 export async function searchPlugins(query: string, source: PluginSource): Promise<PluginSearchResult[]> {
   const q = query.trim();
-  if (!q) return [];
   return searchCache(`${source}:${q}`, async () => {
     if (source === "modrinth") {
+      const sort = q ? "" : "&index=downloads";
       const data = await fetchJson<{ hits: ModrinthHit[] }>(
-        `https://api.modrinth.com/v2/search?query=${encodeURIComponent(q)}&limit=20&facets=${MODRINTH_PLUGIN_FACETS}`
+        `https://api.modrinth.com/v2/search?query=${encodeURIComponent(
+          q
+        )}&limit=21${sort}&facets=${MODRINTH_PLUGIN_FACETS}`
       );
       return data.hits.map((h) => ({
         source: "modrinth" as const,
@@ -111,7 +117,7 @@ export async function searchPlugins(query: string, source: PluginSource): Promis
       }));
     }
     const data = await fetchJson<{ result: HangarProject[] }>(
-      `https://hangar.papermc.io/api/v1/projects?q=${encodeURIComponent(q)}&limit=20`
+      `https://hangar.papermc.io/api/v1/projects?q=${encodeURIComponent(q)}&limit=21&sort=-downloads`
     );
     return (data.result ?? []).map((p) => ({
       source: "hangar" as const,

@@ -79,7 +79,6 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
 
   async function runSearch() {
     const q = queryInput.value.trim();
-    if (!q) return;
     source = sourceSelect.value as PluginSource;
     resultsEl.innerHTML = `<div class="empty-state" style="padding:20px;">Keresés…</div>`;
     chipsEl.innerHTML = "";
@@ -289,7 +288,13 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
     sort = sortSelect.value as SortKey;
     if (results.length > 0) renderGrid();
   };
+  // Changing registry re-runs whatever is in the box, including nothing -
+  // which is the "most popular" listing.
+  sourceSelect.onchange = () => void runSearch();
   queryInput.focus();
+
+  // Opens on the popular list rather than an empty panel.
+  void runSearch();
 
   return close;
 }

@@ -1,7 +1,7 @@
 {
   "name": "mc-dashboard-desktop",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Minecraft Dashboard asztali alkalmazás",
   "main": "main.js",
   "scripts": {
@@ -22,6 +22,9 @@
       "main.js",
       "preload.js",
       "setup.html",
+      "profiles.js",
+      "monitor.js",
+      "updater.js",
       "build/icon.*"
     ],
     "directories": {

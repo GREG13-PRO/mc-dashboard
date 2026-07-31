@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld("setupApi", {
   testConnection: (connection) => ipcRenderer.invoke("test-connection", connection),
   saveConnection: (connection) => ipcRenderer.invoke("save-connection", connection),
   getConnection: () => ipcRenderer.invoke("get-connection"),
+  listProfiles: () => ipcRenderer.invoke("list-profiles"),
 });
