@@ -1,0 +1,58 @@
+{
+  "name": "mc-dashboard-desktop",
+  "private": true,
+  "version": "2.2.0",
+  "description": "Minecraft Dashboard asztali alkalmazás",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "playwright": "1.48"
+  },
+  "build": {
+    "appId": "hu.mcdashboard.desktop",
+    "productName": "Minecraft Dashboard",
+    "files": [
+      "main.js",
+      "preload.js",
+      "setup.html",
+      "build/icon.*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}

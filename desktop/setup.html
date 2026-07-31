@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="hu">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Kapcsolódás</title>
+    <style>
+      /* Standalone copy of the dashboard's macOS tokens: this page is served
+         from disk before any server is known, so it cannot pull the app's
+         stylesheet over HTTP. */
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f5f7;
+        --bg-card: #ffffff;
+        --bg-inset: #ececee;
+        --border: rgba(0, 0, 0, 0.1);
+        --border-strong: rgba(0, 0, 0, 0.16);
+        --text: #1d1d1f;
+        --text-dim: #6e6e73;
+        --accent: #007aff;
+        --accent-hover: #0a84ff;
+        --accent-dim: rgba(0, 122, 255, 0.12);
+        --red: #ff3b30;
+        --green: #34c759;
+        --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+        --ease: cubic-bezier(0.4, 0, 0.2, 1);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
+        font-size: 13px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1e1e1e;
+          --bg-card: #2a2a2c;
+          --bg-inset: #171718;
+          --border: rgba(255, 255, 255, 0.1);
+          --border-strong: rgba(255, 255, 255, 0.16);
+          --text: #f5f5f7;
+          --text-dim: #98989d;
+          --accent: #0a84ff;
+          --accent-hover: #409cff;
+          --accent-dim: rgba(10, 132, 255, 0.2);
+          --red: #ff453a;
+          --green: #30d158;
+          --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.6);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg);
+        color: var(--text);
+        /* Leaves room for the traffic lights over the hidden title bar. */
+        padding: 40px 20px 20px;
+        -webkit-app-region: drag;
+      }
+
+      .card {
+        width: 360px;
+        padding: 24px;
+        border: 0.5px solid var(--border);
+        border-radius: 16px;
+        background: var(--bg-card);
+        box-shadow: var(--shadow-lg);
+        -webkit-app-region: no-drag;
+        animation: rise 250ms var(--ease);
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+      }
+
+      h1 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        text-align: center;
+      }
+
+      .sub {
+        margin: 0 0 20px;
+        color: var(--text-dim);
+        font-size: 12px;
+        text-align: center;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--text-dim);
+        font-size: 12px;
+      }
+
+      .field {
+        margin-bottom: 16px;
+      }
+
+      input {
+        width: 100%;
+        min-height: 28px;
+        padding: 5px 10px;
+        border: 0.5px solid var(--border-strong);
+        border-radius: 6px;
+        background: var(--bg-card);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13px;
+        transition: border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+      }
+
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-dim);
+      }
+
+      button {
+        width: 100%;
+        min-height: 30px;
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 150ms var(--ease), opacity 150ms var(--ease);
+      }
+
+      button:hover:not(:disabled) {
+        background: var(--accent-hover);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+
+      .status {
+        margin-top: 12px;
+        min-height: 18px;
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .status.error {
+        color: var(--red);
+      }
+      .status.ok {
+        color: var(--green);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Minecraft Dashboard</h1>
+      <p class="sub">Add meg, hol fut a dashboard szolgáltatás.</p>
+
+      <div class="field">
+        <label for="host">Szerver címe (IP vagy hosztnév)</label>
+        <input id="host" placeholder="192.168.1.10" autocomplete="off" spellcheck="false" />
+      </div>
+
+      <div class="field">
+        <label for="port">Port</label>
+        <input id="port" type="number" value="3000" />
+      </div>
+
+      <button id="connect">Csatlakozás</button>
+      <div class="status" id="status"></div>
+    </div>
+
+    <script>
+      const hostEl = document.getElementById("host");
+      const portEl = document.getElementById("port");
+      const btn = document.getElementById("connect");
+      const status = document.getElementById("status");
+
+      // Pre-fill when reopened from the menu to change an existing address.
+      window.setupApi.getConnection().then((c) => {
+        if (c) {
+          hostEl.value = c.host;
+          portEl.value = c.port;
+        }
+        hostEl.focus();
+      });
+
+      async function connect() {
+        const host = hostEl.value.trim();
+        const port = Number(portEl.value);
+        if (!host) {
+          status.className = "status error";
+          status.textContent = "Add meg a szerver címét.";
+          return;
+        }
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+          status.className = "status error";
+          status.textContent = "Érvénytelen port.";
+          return;
+        }
+
+        btn.disabled = true;
+        status.className = "status";
+        status.textContent = "Kapcsolódás…";
+
+        const result = await window.setupApi.testConnection({ host, port });
+        if (!result.ok) {
+          btn.disabled = false;
+          status.className = "status error";
+          status.textContent = result.error;
+          return;
+        }
+        status.className = "status ok";
+        status.textContent = "Sikerült, betöltés…";
+        await window.setupApi.saveConnection({ host, port });
+      }
+
+      btn.onclick = connect;
+      for (const el of [hostEl, portEl]) {
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") connect();
+        });
+      }
+    </script>
+  </body>
+</html>

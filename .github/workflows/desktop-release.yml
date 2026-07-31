@@ -1,0 +1,53 @@
+name: Desktop release
+
+# Builds the installers on a tag. The Windows one needs a Windows runner:
+# electron-builder can cross-build it from macOS only through wine, and a
+# real runner avoids that whole class of problem. The macOS dmg genuinely
+# cannot be produced anywhere but macOS.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: dist:mac
+            artifact: dmg
+          - os: windows-latest
+            target: dist:win
+            artifact: exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install desktop dependencies
+        working-directory: desktop
+        run: npm ci || npm install
+
+      - name: Build installer
+        working-directory: desktop
+        run: npm run ${{ matrix.target }}
+        env:
+          # Unsigned builds: there is no Apple Developer ID or Windows
+          # certificate for this project, so skip signing rather than fail.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mc-dashboard-${{ matrix.artifact }}
+          path: |
+            desktop/release/*.dmg
+            desktop/release/*.exe
+          if-no-files-found: error
