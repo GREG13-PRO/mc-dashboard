@@ -129,7 +129,7 @@ export function renderUsersView(root: HTMLElement): () => void {
         ${servers
           .map(
             (s) => `
-          <div style="margin-bottom:0.6rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;">
+          <div style="margin-bottom:8px;padding:8px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
             <div style="font-weight:600;margin-bottom:0.3rem;">${s.name}</div>
             <div style="display:flex;gap:1rem;flex-wrap:wrap;">
               ${CAPABILITIES.map(

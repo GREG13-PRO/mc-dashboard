@@ -5,43 +5,26 @@
 
 import { escapeHtml } from "./escape";
 
-const FG_COLORS: Record<number, string> = {
-  30: "#5c6370",
-  31: "#e06c75",
-  32: "#98c379",
-  33: "#e5c07b",
-  34: "#61afef",
-  35: "#c678dd",
-  36: "#56b6c2",
-  37: "#d7dae0",
-  90: "#7f848e",
-  91: "#f0787f",
-  92: "#a8e2a0",
-  93: "#f0d090",
-  94: "#7cc0ff",
-  95: "#d9a6ec",
-  96: "#7fd6de",
-  97: "#ffffff",
-};
+// Console colours are emitted as CSS variables rather than fixed hex so the
+// same log is readable on both themes: the palette tuned for a dark terminal
+// (pale greens, near-white) washes out completely on a light background. The
+// two palettes live in style.css next to the rest of the tokens.
+//
+// Foreground 30-37/90-97 and background 40-47/100-107 index the same 16
+// colours, so both maps point at one set of variables.
+function ansiVar(index: number): string {
+  return `var(--ansi-${index})`;
+}
 
-const BG_COLORS: Record<number, string> = {
-  40: "#5c6370",
-  41: "#e06c75",
-  42: "#98c379",
-  43: "#e5c07b",
-  44: "#61afef",
-  45: "#c678dd",
-  46: "#56b6c2",
-  47: "#d7dae0",
-  100: "#7f848e",
-  101: "#f0787f",
-  102: "#a8e2a0",
-  103: "#f0d090",
-  104: "#7cc0ff",
-  105: "#d9a6ec",
-  106: "#7fd6de",
-  107: "#ffffff",
-};
+const FG_COLORS: Record<number, string> = Object.fromEntries([
+  ...Array.from({ length: 8 }, (_, i) => [30 + i, ansiVar(i)]),
+  ...Array.from({ length: 8 }, (_, i) => [90 + i, ansiVar(8 + i)]),
+]);
+
+const BG_COLORS: Record<number, string> = Object.fromEntries([
+  ...Array.from({ length: 8 }, (_, i) => [40 + i, ansiVar(i)]),
+  ...Array.from({ length: 8 }, (_, i) => [100 + i, ansiVar(8 + i)]),
+]);
 
 interface AnsiState {
   fg?: string;

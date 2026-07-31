@@ -5,6 +5,7 @@ import { renderServerView } from "./ServerView";
 import { renderUsersView } from "./UsersView";
 import { renderAuditView } from "./AuditView";
 import { isAdmin, setCurrentUser } from "../auth-state";
+import { getThemeChoice, setThemeChoice, nextTheme, themeIcon, themeLabel, notifyThemeChanged } from "../lib/theme";
 import type { ServerWithStatus } from "../types";
 
 function parseServerIdFromHash(): string | null {
@@ -21,12 +22,15 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     <div class="app-shell">
       <div class="sidebar">
         <div class="sidebar-header">
-          <h1>Minecraft Dashboard</h1>
-          <button class="btn" id="logout-btn">Kijelentkezés</button>
+          <h1>Dashboard</h1>
+          <div style="display:flex;gap:6px;">
+            <button class="btn" id="theme-btn" title="Megjelenés">${themeIcon(getThemeChoice())}</button>
+            <button class="btn" id="logout-btn">Kilépés</button>
+          </div>
         </div>
-        ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn">+ Új szerver</button>` : ""}
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;margin-bottom:0.6rem;">Felhasználók</button>` : ""}
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;margin-bottom:0.6rem;">Auditnapló</button>` : ""}
+        ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn" style="width:100%;">+ Új szerver</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;">Felhasználók</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">Auditnapló</button>` : ""}
         <div class="server-list" id="server-list"></div>
       </div>
       <div class="main-content" id="main-content">
@@ -34,6 +38,17 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       </div>
     </div>
   `;
+
+  const themeBtn = root.querySelector<HTMLButtonElement>("#theme-btn")!;
+  themeBtn.title = `Megjelenés: ${themeLabel(getThemeChoice())}`;
+  themeBtn.onclick = () => {
+    const choice = nextTheme(getThemeChoice());
+    setThemeChoice(choice);
+    themeBtn.textContent = themeIcon(choice);
+    themeBtn.title = `Megjelenés: ${themeLabel(choice)}`;
+    // Lets anything that picks colours in JS re-read the effective theme.
+    notifyThemeChanged();
+  };
 
   root.querySelector<HTMLButtonElement>("#logout-btn")!.onclick = async () => {
     await api.logout().catch(() => undefined);
