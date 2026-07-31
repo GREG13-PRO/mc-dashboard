@@ -7,6 +7,7 @@ import type {
   PlayerAction,
   PluginSearchResult,
   PluginSource,
+  PluginDetails,
   PluginVersionInfo,
   ResourceSample,
   ServerEntryInput,
@@ -230,6 +231,12 @@ export const api = {
       `/servers/${serverId}/plugins/search?q=${encodeURIComponent(query)}&source=${source}`
     );
     return results;
+  },
+  async getPluginDetails(serverId: string, source: PluginSource, projectId: string): Promise<PluginDetails> {
+    const { details } = await request<{ details: PluginDetails }>(
+      `/servers/${serverId}/plugins/details?source=${source}&projectId=${encodeURIComponent(projectId)}`
+    );
+    return details;
   },
   async listPluginVersions(serverId: string, source: PluginSource, projectId: string): Promise<PluginVersionInfo[]> {
     const { versions } = await request<{ versions: PluginVersionInfo[] }>(

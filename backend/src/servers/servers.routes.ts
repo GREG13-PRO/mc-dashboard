@@ -20,6 +20,7 @@ import {
   installPlugin,
   deletePlugin,
   detectPlatform,
+  getPluginDetails,
 } from "./plugin-manager";
 import { filesRouter } from "../files/fs.routes";
 import { requireAdmin, requirePermission } from "../auth/auth.middleware";
@@ -424,6 +425,24 @@ serversRouter.get("/:id/plugins/versions", requirePermission("files"), async (re
   try {
     const versions = await listPluginVersions(source, projectId, detectPlatform(entry));
     res.json({ versions });
+  } catch (err) {
+    res.status(502).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/plugins/details", requirePermission("files"), async (req, res) => {
+  const source = String(req.query.source ?? "modrinth");
+  const projectId = String(req.query.projectId ?? "");
+  if (source !== "modrinth" && source !== "hangar") {
+    res.status(400).json({ error: `Unknown plugin source: ${source}` });
+    return;
+  }
+  if (!projectId) {
+    res.status(400).json({ error: "projectId is required" });
+    return;
+  }
+  try {
+    res.json({ details: await getPluginDetails(source, projectId) });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

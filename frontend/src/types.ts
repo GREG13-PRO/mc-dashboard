@@ -192,6 +192,16 @@ export interface PluginSearchResult {
   author: string;
   downloads: number;
   pageUrl: string;
+  iconUrl: string | null;
+  categories: string[];
+}
+
+export interface PluginDetails {
+  name: string;
+  description: string;
+  body: string;
+  gallery: string[];
+  pageUrl: string;
 }
 
 export interface PluginVersionInfo {

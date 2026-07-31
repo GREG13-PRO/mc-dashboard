@@ -19,6 +19,18 @@ export interface PluginSearchResult {
   author: string;
   downloads: number;
   pageUrl: string;
+  /** Null when the project has no icon; the UI shows an initial instead. */
+  iconUrl: string | null;
+  categories: string[];
+}
+
+export interface PluginDetails {
+  name: string;
+  description: string;
+  /** Long-form project body, plain text - see stripMarkdown. */
+  body: string;
+  gallery: string[];
+  pageUrl: string;
 }
 
 export interface PluginVersionInfo {
@@ -62,6 +74,9 @@ interface ModrinthHit {
   description: string;
   author: string;
   downloads: number;
+  icon_url?: string | null;
+  display_categories?: string[];
+  categories?: string[];
 }
 
 interface HangarProject {
@@ -69,6 +84,8 @@ interface HangarProject {
   description: string;
   namespace: { owner: string; slug: string };
   stats: { downloads: number };
+  avatarUrl?: string | null;
+  category?: string;
 }
 
 export async function searchPlugins(query: string, source: PluginSource): Promise<PluginSearchResult[]> {
@@ -87,6 +104,10 @@ export async function searchPlugins(query: string, source: PluginSource): Promis
         author: h.author,
         downloads: h.downloads,
         pageUrl: `https://modrinth.com/plugin/${h.slug}`,
+        iconUrl: h.icon_url ?? null,
+        // display_categories drops the loader tags (paper/bukkit/...), which
+        // are noise on a card: every result here matches those by definition.
+        categories: h.display_categories ?? h.categories ?? [],
       }));
     }
     const data = await fetchJson<{ result: HangarProject[] }>(
@@ -100,6 +121,8 @@ export async function searchPlugins(query: string, source: PluginSource): Promis
       author: p.namespace.owner,
       downloads: p.stats?.downloads ?? 0,
       pageUrl: `https://hangar.papermc.io/${p.namespace.owner}/${p.namespace.slug}`,
+      iconUrl: p.avatarUrl ?? null,
+      categories: p.category ? [p.category] : [],
     }));
   });
 }
@@ -202,6 +225,68 @@ export async function listPluginVersions(
           datePublished: v.createdAt ?? null,
         };
       });
+  });
+}
+
+const detailsCache = createTtlCache<PluginDetails>(300_000);
+
+/**
+ * Project bodies are markdown with images, badges and HTML. The detail view
+ * shows them as plain text: rendering third-party markdown would mean either
+ * shipping a renderer or trusting embedded HTML, and neither is worth it for
+ * what is essentially a description panel.
+ */
+function stripMarkdown(input: string): string {
+  return input
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/^[#>\-*+\s]+/gm, "")
+    .replace(/[*_`~]/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+interface ModrinthProject {
+  title: string;
+  description: string;
+  body?: string;
+  icon_url?: string | null;
+  slug: string;
+  gallery?: { url: string }[];
+}
+
+interface HangarProjectDetails {
+  name: string;
+  description?: string;
+  namespace: { owner: string; slug: string };
+}
+
+export async function getPluginDetails(source: PluginSource, projectId: string): Promise<PluginDetails> {
+  return detailsCache(`${source}:${projectId}`, async () => {
+    if (source === "modrinth") {
+      const p = await fetchJson<ModrinthProject>(
+        `https://api.modrinth.com/v2/project/${encodeURIComponent(projectId)}`
+      );
+      return {
+        name: p.title,
+        description: p.description ?? "",
+        body: stripMarkdown(p.body ?? "").slice(0, 4000),
+        gallery: (p.gallery ?? []).map((g) => g.url).slice(0, 8),
+        pageUrl: `https://modrinth.com/plugin/${p.slug}`,
+      };
+    }
+    const p = await fetchJson<HangarProjectDetails>(
+      `https://hangar.papermc.io/api/v1/projects/${encodeURIComponent(projectId)}`
+    );
+    return {
+      name: p.name,
+      description: p.description ?? "",
+      body: "",
+      gallery: [],
+      pageUrl: `https://hangar.papermc.io/${p.namespace.owner}/${p.namespace.slug}`,
+    };
   });
 }
 
