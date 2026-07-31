@@ -356,3 +356,10 @@ export interface AdminXp {
   breakdown: { label: string; points: number; count: number }[];
   lastActiveAt: string | null;
 }
+
+export interface Schematic {
+  filename: string;
+  sizeBytes: number;
+  modifiedAt: string;
+  size: { x: number; y: number; z: number } | null;
+}

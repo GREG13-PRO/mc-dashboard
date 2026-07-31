@@ -24,6 +24,7 @@ type Tab =
   | "content"
   | "macros"
   | "stats"
+  | "schematics"
   | "settings";
 const ALL_TABS: Tab[] = [
   "console",
@@ -37,6 +38,7 @@ const ALL_TABS: Tab[] = [
   "content",
   "macros",
   "stats",
+  "schematics",
   "settings",
 ];
 
@@ -53,7 +55,7 @@ export function renderServerView(
   // installed, which is only known after the first load - see refreshLuckPerms.
   let luckPermsInstalled = false;
   const capabilityFor = (tab: Tab) =>
-    tab === "plugins" || tab === "content"
+    tab === "plugins" || tab === "content" || tab === "schematics"
       ? "files"
       : tab === "macros"
         ? "console"
@@ -234,6 +236,7 @@ export function renderServerView(
       content: "Csomagok",
       macros: "Makrók",
       stats: "Statisztika",
+      schematics: "Schematicek",
       settings: "Beállítások",
     }[tab];
   }
@@ -283,6 +286,8 @@ export function renderServerView(
       void renderMacros(content);
     } else if (activeTab === "stats") {
       void renderStats(content);
+    } else if (activeTab === "schematics") {
+      void renderSchematics(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -463,6 +468,173 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderSchematics(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    let data;
+    try {
+      data = await api.listSchematics(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+    const running = server?.running ?? false;
+
+    content.innerHTML = `
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        A fájlok a WorldEdit saját schematics mappájába kerülnek, tehát amit ide feltöltesz,
+        azonnal használható a játékban is — és amit a játékban mentesz, itt megjelenik.
+        ${
+          data.worldEdit
+            ? ""
+            : `<strong style="color:var(--yellow);">Ezen a szerveren nincs WorldEdit, a bepakolás nem fog működni.</strong>`
+        }
+      </p>
+
+      <div id="schem-drop" style="border:1.5px dashed var(--border-strong);border-radius:var(--radius-md);
+           padding:20px;text-align:center;color:var(--text-dim);font-size:12px;margin:16px 0;">
+        Húzd ide a .schem fájlt, vagy
+        <label style="display:inline;color:var(--accent);cursor:pointer;text-decoration:underline;">
+          válassz fájlt<input type="file" id="schem-file" accept=".schem,.schematic" style="display:none;" />
+        </label>
+      </div>
+
+      <div id="schem-list"></div>
+    `;
+
+    const listEl = content.querySelector<HTMLDivElement>("#schem-list")!;
+    listEl.innerHTML =
+      data.schematics.length === 0
+        ? `<div class="empty-state" style="padding:16px;">Még nincs schematic.</div>`
+        : data.schematics
+            .map(
+              (sc) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border);">
+        <div style="min-width:0;">
+          <div>${escapeHtml(sc.filename)}</div>
+          <div style="color:var(--text-dim);font-size:11px;">
+            ${(sc.sizeBytes / 1024).toFixed(0)} kB${
+              sc.size ? ` · ${sc.size.x}×${sc.size.y}×${sc.size.z} blokk` : ""
+            } · ${new Date(sc.modifiedAt).toLocaleDateString("hu-HU")}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-primary" data-paste="${escapeHtml(sc.filename)}" ${
+            running && data.worldEdit ? "" : "disabled"
+          }>Bepakolás</button>
+          <a class="btn" href="${api.schematicDownloadUrl(serverId, sc.filename)}">Letöltés</a>
+          <button class="btn btn-danger" data-del-schem="${escapeHtml(sc.filename)}">Törlés</button>
+        </div>
+      </div>`
+            )
+            .join("");
+
+    const upload = async (file: File) => {
+      try {
+        await api.uploadSchematic(serverId, file);
+        showToast("Feltöltve");
+        await renderSchematics(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Feltöltés sikertelen", "error");
+      }
+    };
+
+    const drop = content.querySelector<HTMLDivElement>("#schem-drop")!;
+    content.querySelector<HTMLInputElement>("#schem-file")!.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) void upload(file);
+    };
+    drop.ondragover = (e) => {
+      e.preventDefault();
+      drop.style.borderColor = "var(--accent)";
+    };
+    drop.ondragleave = () => {
+      drop.style.borderColor = "var(--border-strong)";
+    };
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      drop.style.borderColor = "var(--border-strong)";
+      const file = e.dataTransfer?.files?.[0];
+      if (file) void upload(file);
+    };
+
+    listEl.querySelectorAll<HTMLButtonElement>("[data-del-schem]").forEach((btn) => {
+      btn.onclick = async () => {
+        const filename = btn.dataset.delSchem!;
+        if (!(await confirmModal(`Törlöd? <strong>${escapeHtml(filename)}</strong>`))) return;
+        try {
+          await api.deleteSchematic(serverId, filename);
+          showToast("Törölve");
+          await renderSchematics(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+        }
+      };
+    });
+
+    listEl.querySelectorAll<HTMLButtonElement>("[data-paste]").forEach((btn) => {
+      btn.onclick = () => openPasteDialog(btn.dataset.paste!);
+    });
+
+    function openPasteDialog(filename: string) {
+      const wrap = document.createElement("div");
+      // WorldEdit is session-based, so a paste needs either a player whose
+      // session it can borrow or explicit coordinates.
+      wrap.innerHTML = `
+        <h3>Bepakolás</h3>
+        <p style="color:var(--text-dim);font-size:12px;">${escapeHtml(filename)}</p>
+        <div class="field">
+          <label for="ps-player">Játékos (az ő pozíciójába kerül)</label>
+          <input id="ps-player" placeholder="pl. Bumimaci" />
+        </div>
+        <p style="color:var(--text-dim);font-size:12px;margin:-8px 0 12px;">
+          Vagy hagyd üresen, és adj meg koordinátákat:
+        </p>
+        <div style="display:flex;gap:8px;">
+          <div class="field" style="flex:1;"><label for="ps-x">X</label><input id="ps-x" type="number" /></div>
+          <div class="field" style="flex:1;"><label for="ps-y">Y</label><input id="ps-y" type="number" /></div>
+          <div class="field" style="flex:1;"><label for="ps-z">Z</label><input id="ps-z" type="number" /></div>
+        </div>
+        <div class="field">
+          <label for="ps-world">Világ</label>
+          <input id="ps-world" value="world" />
+        </div>
+        <div class="field checkbox-row">
+          <input id="ps-air" type="checkbox" />
+          <label for="ps-air" style="margin:0">Levegő blokkok kihagyása</label>
+        </div>
+        <div id="form-error" class="error-text"></div>
+        <div class="modal-actions">
+          <button class="btn" id="ps-cancel">Mégse</button>
+          <button class="btn btn-primary" id="ps-go">Bepakolás</button>
+        </div>`;
+      const close = openModal(wrap);
+      wrap.querySelector<HTMLButtonElement>("#ps-cancel")!.onclick = () => close();
+      wrap.querySelector<HTMLButtonElement>("#ps-go")!.onclick = async (e) => {
+        const btn = e.currentTarget as HTMLButtonElement;
+        const errorEl = wrap.querySelector<HTMLDivElement>("#form-error")!;
+        btn.disabled = true;
+        try {
+          await api.pasteSchematic(serverId, filename, {
+            player: wrap.querySelector<HTMLInputElement>("#ps-player")!.value.trim() || undefined,
+            x: wrap.querySelector<HTMLInputElement>("#ps-x")!.value.trim() || undefined,
+            y: wrap.querySelector<HTMLInputElement>("#ps-y")!.value.trim() || undefined,
+            z: wrap.querySelector<HTMLInputElement>("#ps-z")!.value.trim() || undefined,
+            world: wrap.querySelector<HTMLInputElement>("#ps-world")!.value.trim() || undefined,
+            ignoreAir: wrap.querySelector<HTMLInputElement>("#ps-air")!.checked,
+          });
+          showToast("Parancsok elküldve — nézd meg a konzolt az eredményért");
+          close();
+        } catch (err) {
+          errorEl.textContent = err instanceof ApiError ? err.message : "Nem sikerült";
+          btn.disabled = false;
+        }
+      };
+    }
   }
 
   async function renderStats(content: HTMLElement) {

@@ -29,6 +29,15 @@ import {
 } from "./macros";
 import { cloneServer, CloneError } from "./clone";
 import { compareWeeks } from "./stats";
+import {
+  listSchematics,
+  saveSchematic,
+  deleteSchematic,
+  resolveSchematicPath,
+  pasteSchematic,
+  hasWorldEdit,
+  SchematicError,
+} from "./schematics";
 import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
@@ -482,6 +491,77 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
     res.json({ ok: true });
   } catch (err) {
     res.status(409).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/schematics", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ schematics: await listSchematics(entry), worldEdit: hasWorldEdit(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/schematics", requirePermission("files"), packUpload.single("file"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+  try {
+    res.status(201).json({ schematic: await saveSchematic(entry, req.file.originalname, req.file.buffer) });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/schematics/:filename/download", requirePermission("files"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.download(resolveSchematicPath(entry, req.params.filename));
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/schematics/:filename", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deleteSchematic(entry, req.params.filename);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/schematics/:filename/paste", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const commands = await pasteSchematic(entry, { filename: req.params.filename, ...(req.body ?? {}) });
+    res.json({ ok: true, commands });
+  } catch (err) {
+    res.status(err instanceof SchematicError ? 409 : 500).json({ error: (err as Error).message });
   }
 });
 

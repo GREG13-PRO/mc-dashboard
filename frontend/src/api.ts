@@ -25,6 +25,7 @@ import type {
   PluginConflict,
   PresenceEntry,
   ResourcePackStatus,
+  Schematic,
   ServerWithStatus,
   TimeMachineConfig,
   TimelineSnapshot,
@@ -288,6 +289,40 @@ export const api = {
       body: JSON.stringify({ resource, leaving }),
     });
     return present;
+  },
+
+  async listSchematics(serverId: string): Promise<{ schematics: Schematic[]; worldEdit: boolean }> {
+    return request(`/servers/${serverId}/schematics`);
+  },
+  async uploadSchematic(serverId: string, file: File): Promise<void> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/servers/${serverId}/schematics`, {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, body.error ?? res.statusText);
+    }
+  },
+  async deleteSchematic(serverId: string, filename: string): Promise<void> {
+    await request(`/servers/${serverId}/schematics/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+  schematicDownloadUrl(serverId: string, filename: string): string {
+    return `/api/servers/${serverId}/schematics/${encodeURIComponent(filename)}/download`;
+  },
+  async pasteSchematic(
+    serverId: string,
+    filename: string,
+    options: { player?: string; x?: string; y?: string; z?: string; world?: string; ignoreAir?: boolean }
+  ): Promise<string[]> {
+    const { commands } = await request<{ commands: string[] }>(
+      `/servers/${serverId}/schematics/${encodeURIComponent(filename)}/paste`,
+      { method: "POST", body: JSON.stringify(options) }
+    );
+    return commands;
   },
 
   async listPacks(
