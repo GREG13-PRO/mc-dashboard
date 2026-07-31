@@ -12,6 +12,7 @@ import { startRestartScheduler } from "./servers/restart-scheduler";
 import { startCrashMonitor } from "./servers/crash-monitor";
 import { startResourceHistory } from "./servers/resource-history";
 import { startTimeMachine } from "./servers/world-timeline";
+import { startStatsCollector } from "./servers/stats";
 import { assertScreenInstalled } from "./servers/process-manager";
 
 async function main() {
@@ -44,6 +45,7 @@ async function main() {
   startCrashMonitor();
   startResourceHistory();
   startTimeMachine();
+  startStatsCollector();
 
   httpServer.listen(env.port, () => {
     console.log(`mc-dashboard listening on http://localhost:${env.port}`);

@@ -223,11 +223,18 @@ export interface PluginDetails {
   pageUrl: string;
 }
 
+export interface CompatibilityVerdict {
+  serverVersion: string | null;
+  compatible: boolean | null;
+  message: string | null;
+}
+
 export interface PluginVersionInfo {
   id: string;
   name: string;
   gameVersions: string[];
   loaders: string[];
+  compatibility?: CompatibilityVerdict;
   filename: string | null;
   downloadUrl: string | null;
   externalUrl: string | null;
@@ -320,4 +327,21 @@ export interface PresenceEntry {
   username: string;
   resource: string;
   since: string;
+}
+
+export interface WeekSummary {
+  peak: number;
+  averageOnline: number;
+  playtimeMinutes: number;
+  upMinutes: number;
+  samples: number;
+}
+
+export interface WeekComparison {
+  thisWeek: WeekSummary;
+  lastWeek: WeekSummary;
+  peakChange: number | null;
+  averageChange: number | null;
+  playtimeChange: number | null;
+  daily: { date: string; peak: number; playtimeMinutes: number }[];
 }

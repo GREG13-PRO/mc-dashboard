@@ -27,6 +27,7 @@ import type {
   ServerWithStatus,
   TimeMachineConfig,
   TimelineSnapshot,
+  WeekComparison,
   UserInput,
   UserPublic,
 } from "./types";
@@ -230,6 +231,15 @@ export const api = {
   },
   async deleteConsoleLog(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+
+  async getWeeklyStats(serverId: string): Promise<WeekComparison> {
+    const { comparison } = await request<{ comparison: WeekComparison }>(`/servers/${serverId}/stats/weekly`);
+    return comparison;
+  },
+  async getMinecraftVersion(serverId: string): Promise<string | null> {
+    const { version } = await request<{ version: string | null }>(`/servers/${serverId}/minecraft-version`);
+    return version;
   },
 
   async listMacros(serverId: string): Promise<{ macros: Macro[]; recording: boolean }> {

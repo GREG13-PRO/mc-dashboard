@@ -1,6 +1,6 @@
 import { api, ApiError } from "../api";
 import { showToast } from "./Toast";
-import { openModal } from "./Modal";
+import { openModal, confirmModal } from "./Modal";
 import { escapeHtml } from "../lib/escape";
 import type { PluginSearchResult, PluginSource, PluginVersionInfo } from "../types";
 
@@ -223,8 +223,23 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
     try {
       const versions = versionCache.get(projectId) ?? (await api.listPluginVersions(serverId, source, projectId));
       versionCache.set(projectId, versions);
-      const version = versions.find((v) => v.downloadUrl);
+      // Prefer a build that declares the server's Minecraft version. Falling
+      // back to the newest downloadable one is fine, but not silently: the
+      // check is a heuristic on declared versions, so it asks rather than
+      // blocks.
+      const compatible = versions.find((v) => v.downloadUrl && v.compatibility?.compatible !== false);
+      const version = compatible ?? versions.find((v) => v.downloadUrl);
       if (!version) throw new ApiError(400, "Ehhez a szerverhez nincs telepíthető build.");
+      if (!compatible && version.compatibility?.message) {
+        const proceed = await confirmModal(
+          `${escapeHtml(version.compatibility.message)}<br><br>Mindenképp telepíted?`
+        );
+        if (!proceed) {
+          btn.classList.remove("installing");
+          btn.textContent = "Hozzáadás";
+          return;
+        }
+      }
       const plugin = await api.installPlugin(serverId, source, projectId, version.id);
       showToast(`Telepítve: ${plugin.filename}`);
       onInstalled();
@@ -273,7 +288,13 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
                 .map(
                   (v) => `
             <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:12px;">
-              <span>${escapeHtml(v.name)}</span>
+              <span>${escapeHtml(v.name)}${
+                v.compatibility?.compatible === false
+                  ? ` <span style="color:var(--yellow);" title="${escapeHtml(
+                      v.compatibility.message ?? ""
+                    )}">⚠</span>`
+                  : ""
+              }</span>
               <span style="color:var(--text-dim);">${
                 v.datePublished ? new Date(v.datePublished).toLocaleDateString("hu-HU") : ""
               }</span>

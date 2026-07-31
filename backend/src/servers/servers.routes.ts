@@ -28,6 +28,8 @@ import {
   MacroError,
 } from "./macros";
 import { cloneServer, CloneError } from "./clone";
+import { compareWeeks } from "./stats";
+import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
   listPacks,
@@ -483,6 +485,28 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
   }
 });
 
+serversRouter.get("/:id/stats/weekly", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ comparison: await compareWeeks(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/minecraft-version", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ version: await detectMinecraftVersion(entry) });
+});
+
 serversRouter.get("/:id/macros", requirePermission("console"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
@@ -872,7 +896,13 @@ serversRouter.get("/:id/plugins/versions", requirePermission("files"), async (re
   }
   try {
     const versions = await listPluginVersions(source, projectId, detectPlatform(entry));
-    res.json({ versions });
+    // Attached here rather than computed in the browser: the server version
+    // comes from the console log, which the client cannot read.
+    const serverVersion = await detectMinecraftVersion(entry);
+    res.json({
+      versions: versions.map((v) => ({ ...v, compatibility: checkCompatibility(serverVersion, v.gameVersions) })),
+      serverVersion,
+    });
   } catch (err) {
     res.status(502).json({ error: (err as Error).message });
   }

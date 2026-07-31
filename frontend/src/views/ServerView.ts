@@ -23,6 +23,7 @@ type Tab =
   | "performance"
   | "content"
   | "macros"
+  | "stats"
   | "settings";
 const ALL_TABS: Tab[] = [
   "console",
@@ -35,6 +36,7 @@ const ALL_TABS: Tab[] = [
   "performance",
   "content",
   "macros",
+  "stats",
   "settings",
 ];
 
@@ -55,6 +57,8 @@ export function renderServerView(
       ? "files"
       : tab === "macros"
         ? "console"
+        : tab === "stats"
+          ? "settings"
       : tab === "access"
         ? "players"
         : tab === "luckperms" || tab === "timeline" || tab === "performance"
@@ -229,6 +233,7 @@ export function renderServerView(
       performance: "Teljesítmény",
       content: "Csomagok",
       macros: "Makrók",
+      stats: "Statisztika",
       settings: "Beállítások",
     }[tab];
   }
@@ -276,6 +281,8 @@ export function renderServerView(
       void renderContent(content);
     } else if (activeTab === "macros") {
       void renderMacros(content);
+    } else if (activeTab === "stats") {
+      void renderStats(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -456,6 +463,103 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderStats(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    let c;
+    try {
+      c = await api.getWeeklyStats(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+
+    // A change is only meaningful once last week has something in it; before
+    // that the panel says so rather than showing a percentage from nothing.
+    const delta = (value: number | null) => {
+      if (value === null) return `<span style="color:var(--text-dim);">nincs viszonyítás</span>`;
+      const colour = value > 0 ? "var(--green)" : value < 0 ? "var(--red)" : "var(--text-dim)";
+      const sign = value > 0 ? "+" : "";
+      return `<span style="color:${colour};">${sign}${value}%</span>`;
+    };
+
+    const hours = (minutes: number) =>
+      minutes >= 60 ? `${(minutes / 60).toFixed(1)} óra` : `${Math.round(minutes)} perc`;
+
+    const maxPeak = Math.max(1, ...c.daily.map((d) => d.peak));
+
+    content.innerHTML = `
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        A dashboard 5 percenként mintát vesz a futó szerverek játékosszámából, és óránként
+        összesíti. A játékidő ezekből becsült játékos-perc, nem a szerver saját statisztikája.
+      </p>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin:20px 0;">
+        ${[
+          { label: "Csúcs egyidejű játékos", now: c.thisWeek.peak, before: c.lastWeek.peak, change: c.peakChange },
+          {
+            label: "Átlagos online",
+            now: c.thisWeek.averageOnline,
+            before: c.lastWeek.averageOnline,
+            change: c.averageChange,
+          },
+        ]
+          .map(
+            (m) => `
+        <div style="flex:1;min-width:190px;padding:12px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
+          <div style="color:var(--text-dim);font-size:11px;">${m.label}</div>
+          <div style="font-size:22px;font-weight:600;">${m.now}</div>
+          <div style="font-size:12px;">${delta(m.change)} <span style="color:var(--text-dim);">múlt hét: ${
+            m.before
+          }</span></div>
+        </div>`
+          )
+          .join("")}
+        <div style="flex:1;min-width:190px;padding:12px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
+          <div style="color:var(--text-dim);font-size:11px;">Becsült játékidő</div>
+          <div style="font-size:22px;font-weight:600;">${hours(c.thisWeek.playtimeMinutes)}</div>
+          <div style="font-size:12px;">${delta(c.playtimeChange)} <span style="color:var(--text-dim);">múlt hét: ${hours(
+            c.lastWeek.playtimeMinutes
+          )}</span></div>
+        </div>
+        <div style="flex:1;min-width:190px;padding:12px;border:0.5px solid var(--border);border-radius:var(--radius-md);">
+          <div style="color:var(--text-dim);font-size:11px;">Üzemidő ezen a héten</div>
+          <div style="font-size:22px;font-weight:600;">${hours(c.thisWeek.upMinutes)}</div>
+          <div style="font-size:12px;color:var(--text-dim);">múlt hét: ${hours(c.lastWeek.upMinutes)}</div>
+        </div>
+      </div>
+
+      <h4 style="margin-bottom:8px;">Napi csúcs, utolsó 14 nap</h4>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:120px;">
+        ${c.daily
+          .map(
+            (d) => `
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;"
+               title="${escapeHtml(d.date)}: ${d.peak} játékos">
+            <div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;height:${
+              (d.peak / maxPeak) * 100
+            }%;min-height:${d.peak > 0 ? 3 : 1}px;opacity:${d.peak > 0 ? 1 : 0.25};"></div>
+          </div>`
+          )
+          .join("")}
+      </div>
+      <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:11px;margin-top:4px;">
+        <span>${escapeHtml(c.daily[0]?.date ?? "")}</span>
+        <span>${escapeHtml(c.daily[c.daily.length - 1]?.date ?? "")}</span>
+      </div>
+
+      ${
+        c.thisWeek.samples === 0
+          ? `<p style="color:var(--text-dim);font-size:12px;margin-top:16px;">
+               Még nincs adat — a gyűjtés a szerver futása közben, 5 percenként történik.
+             </p>`
+          : ""
+      }
+    `;
   }
 
   async function renderMacros(content: HTMLElement) {
