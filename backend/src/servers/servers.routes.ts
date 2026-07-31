@@ -13,6 +13,7 @@ import { getCachedPlayers } from "./rcon-poller";
 import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
 import { readAccessLists, setWhitelistEnforced } from "./access-manager";
 import { listArchivedLogs, readArchivedLog, deleteArchivedLog } from "./console-archive";
+import { hasLuckPerms, createEditorSession, LuckPermsError } from "./luckperms";
 import { getResourceHistory } from "./resource-history";
 import {
   searchPlugins,
@@ -313,6 +314,31 @@ serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
     return;
   }
   res.json({ history: getResourceHistory(entry.id) });
+});
+
+// Gated on "settings": handing someone the LuckPerms editor is handing them
+// every permission on the server, which is a heavier grant than the console.
+serversRouter.get("/:id/luckperms", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ installed: hasLuckPerms(entry) });
+});
+
+serversRouter.post("/:id/luckperms/editor", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ url: await createEditorSession(entry) });
+  } catch (err) {
+    const status = err instanceof LuckPermsError ? 409 : 500;
+    res.status(status).json({ error: (err as Error).message });
+  }
 });
 
 serversRouter.get("/:id/console-logs", requirePermission("console"), async (req, res) => {

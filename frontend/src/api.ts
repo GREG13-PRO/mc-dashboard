@@ -221,6 +221,15 @@ export const api = {
     await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
   },
 
+  async getLuckPermsStatus(serverId: string): Promise<boolean> {
+    const { installed } = await request<{ installed: boolean }>(`/servers/${serverId}/luckperms`);
+    return installed;
+  },
+  async createLuckPermsEditor(serverId: string): Promise<string> {
+    const { url } = await request<{ url: string }>(`/servers/${serverId}/luckperms/editor`, { method: "POST" });
+    return url;
+  },
+
   async getAccessLists(serverId: string): Promise<AccessLists> {
     const { access } = await request<{ access: AccessLists }>(`/servers/${serverId}/access`);
     return access;

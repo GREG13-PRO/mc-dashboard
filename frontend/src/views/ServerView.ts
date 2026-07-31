@@ -12,8 +12,8 @@ import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
 
-type Tab = "console" | "files" | "plugins" | "players" | "access" | "settings";
-const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "access", "settings"];
+type Tab = "console" | "files" | "plugins" | "players" | "access" | "luckperms" | "settings";
+const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "access", "luckperms", "settings"];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
 // into the server folder, so it rides on "files" rather than adding a fifth
@@ -24,9 +24,14 @@ export function renderServerView(
   callbacks: { onDeleted: () => void; onChanged: () => void }
 ): () => void {
   const perms = permissionsFor(serverId);
-  const availableTabs = ALL_TABS.filter((tab) =>
-    perms[tab === "plugins" ? "files" : tab === "access" ? "players" : tab]
-  );
+  // The LuckPerms tab is additionally hidden unless the plugin is actually
+  // installed, which is only known after the first load - see refreshLuckPerms.
+  let luckPermsInstalled = false;
+  const capabilityFor = (tab: Tab) =>
+    tab === "plugins" ? "files" : tab === "access" ? "players" : tab === "luckperms" ? "settings" : tab;
+  const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
+  const visibleTabs = () => permittedTabs.filter((tab) => tab !== "luckperms" || luckPermsInstalled);
+  const availableTabs = permittedTabs;
   let activeTab: Tab = availableTabs[0] ?? "console";
   let server: ServerWithStatus | null = null;
   let disposed = false;
@@ -42,6 +47,9 @@ export function renderServerView(
   async function load() {
     try {
       server = await api.getServer(serverId);
+      if (permittedTabs.includes("luckperms")) {
+        luckPermsInstalled = await api.getLuckPermsStatus(serverId).catch(() => false);
+      }
       renderShell();
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${
@@ -71,7 +79,7 @@ export function renderServerView(
         }
       </div>
       <div class="tabs">
-        ${availableTabs
+        ${visibleTabs()
           .map(
             (tab) =>
               `<div class="tab ${tab === activeTab ? "active" : ""}" data-tab="${tab}">${labelFor(tab)}</div>`
@@ -170,6 +178,7 @@ export function renderServerView(
       plugins: "Bővítmények",
       players: "Játékosok",
       access: "Whitelist / Ban",
+      luckperms: "LuckPerms",
       settings: "Beállítások",
     }[tab];
   }
@@ -207,6 +216,8 @@ export function renderServerView(
       renderPlayers(content);
     } else if (activeTab === "access") {
       void renderAccess(content);
+    } else if (activeTab === "luckperms") {
+      renderLuckPerms(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -387,6 +398,48 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  function renderLuckPerms(content: HTMLElement) {
+    const running = server?.running ?? false;
+    content.innerHTML = `
+      <p style="max-width:560px;color:var(--text-dim);font-size:12px;">
+        A LuckPerms saját webes szerkesztőjét nyitja meg — ugyanaz, mint amikor a játékban
+        kiadod az <code>/lp editor</code> parancsot. A gomb megnyomásakor a szerver feltölt egy
+        pillanatképet a jogosultságokról, és egy egyszer használatos linket ad vissza.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:16px;">
+        <button class="btn btn-primary" id="lp-open" ${running ? "" : "disabled"}>Szerkesztő megnyitása</button>
+        ${running ? "" : `<span style="color:var(--text-dim);font-size:12px;">A szervernek futnia kell.</span>`}
+      </div>
+      <div id="lp-result" style="margin-top:16px;"></div>
+    `;
+
+    const resultEl = content.querySelector<HTMLDivElement>("#lp-result")!;
+    content.querySelector<HTMLButtonElement>("#lp-open")!.onclick = async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = "Link kérése…";
+      resultEl.innerHTML = "";
+      try {
+        const url = await api.createLuckPermsEditor(serverId);
+        // Opened rather than embedded: the editor sets its own headers and is
+        // meant to run on its own origin.
+        window.open(url, "_blank", "noopener,noreferrer");
+        resultEl.innerHTML = `
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">
+            Ha nem nyílt meg magától, itt a link (egyszer használatos):
+          </div>
+          <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+      } catch (err) {
+        resultEl.innerHTML = `<div class="error-text">${escapeHtml(
+          err instanceof ApiError ? err.message : "Nem sikerült megnyitni a szerkesztőt"
+        )}</div>`;
+      } finally {
+        btn.disabled = !(server?.running ?? false);
+        btn.textContent = "Szerkesztő megnyitása";
+      }
+    };
   }
 
   async function renderAccess(content: HTMLElement) {
