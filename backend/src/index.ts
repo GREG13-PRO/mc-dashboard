@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { sessionMiddleware } from "./auth/session-middleware";
 import { apiRouter } from "./routes";
+import { publicPackRouter } from "./servers/servers.routes";
 import { setupConsoleWebSocket } from "./ws/console-ws";
 import { startRconPoller } from "./servers/rcon-poller";
 import { startRestartScheduler } from "./servers/restart-scheduler";
@@ -26,6 +27,9 @@ async function main() {
   app.use(express.json({ limit: "5mb" }));
   app.use(sessionMiddleware);
   app.use("/api", apiRouter);
+  // Unauthenticated on purpose: Minecraft clients download resource packs
+  // themselves and have no dashboard session. See publicPackRouter.
+  app.use("/packs", publicPackRouter);
 
   const frontendDist = path.resolve(__dirname, "../../frontend/dist");
   app.use(express.static(frontendDist));

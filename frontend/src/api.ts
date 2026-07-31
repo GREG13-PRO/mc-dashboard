@@ -17,7 +17,10 @@ import type {
   ServerInstallType,
   JvmRecommendation,
   LagReport,
+  Pack,
+  PackKind,
   PluginConflict,
+  ResourcePackStatus,
   ServerWithStatus,
   TimeMachineConfig,
   TimelineSnapshot,
@@ -224,6 +227,49 @@ export const api = {
   },
   async deleteConsoleLog(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+
+  async listPacks(
+    serverId: string,
+    kind: PackKind
+  ): Promise<{ packs: Pack[]; status: ResourcePackStatus | null }> {
+    return request(`/servers/${serverId}/packs/${kind}`);
+  },
+  async uploadPack(serverId: string, kind: PackKind, file: File): Promise<void> {
+    const form = new FormData();
+    form.append("file", file);
+    // Multipart, so it bypasses request() the same way file uploads do.
+    const res = await fetch(`/api/servers/${serverId}/packs/${kind}`, {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, body.error ?? res.statusText);
+    }
+  },
+  async deletePack(serverId: string, kind: PackKind, filename: string): Promise<void> {
+    await request(`/servers/${serverId}/packs/${kind}/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+  async activateResourcePack(
+    serverId: string,
+    filename: string,
+    publicBaseUrl: string
+  ): Promise<{ url: string; sha1: string }> {
+    return request(`/servers/${serverId}/packs/resourcepack/${encodeURIComponent(filename)}/activate`, {
+      method: "POST",
+      body: JSON.stringify({ publicBaseUrl }),
+    });
+  },
+  async clearResourcePack(serverId: string): Promise<void> {
+    await request(`/servers/${serverId}/packs/resourcepack/clear`, { method: "POST" });
+  },
+  async setRequireResourcePack(serverId: string, required: boolean): Promise<void> {
+    await request(`/servers/${serverId}/packs/resourcepack/require`, {
+      method: "POST",
+      body: JSON.stringify({ required }),
+    });
   },
 
   async getPluginConflicts(serverId: string): Promise<PluginConflict[]> {

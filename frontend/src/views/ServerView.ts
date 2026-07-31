@@ -21,6 +21,7 @@ type Tab =
   | "luckperms"
   | "timeline"
   | "performance"
+  | "content"
   | "settings";
 const ALL_TABS: Tab[] = [
   "console",
@@ -31,6 +32,7 @@ const ALL_TABS: Tab[] = [
   "luckperms",
   "timeline",
   "performance",
+  "content",
   "settings",
 ];
 
@@ -47,7 +49,7 @@ export function renderServerView(
   // installed, which is only known after the first load - see refreshLuckPerms.
   let luckPermsInstalled = false;
   const capabilityFor = (tab: Tab) =>
-    tab === "plugins"
+    tab === "plugins" || tab === "content"
       ? "files"
       : tab === "access"
         ? "players"
@@ -206,6 +208,7 @@ export function renderServerView(
       luckperms: "LuckPerms",
       timeline: "Time Machine",
       performance: "Teljesítmény",
+      content: "Csomagok",
       settings: "Beállítások",
     }[tab];
   }
@@ -249,6 +252,8 @@ export function renderServerView(
       void renderTimeline(content);
     } else if (activeTab === "performance") {
       void renderPerformance(content);
+    } else if (activeTab === "content") {
+      void renderContent(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -429,6 +434,164 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderContent(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    let rp;
+    let dp;
+    try {
+      [rp, dp] = await Promise.all([api.listPacks(serverId, "resourcepack"), api.listPacks(serverId, "datapack")]);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+
+    // The client downloads the pack itself, so the URL has to be reachable
+    // from the players' machines - the dashboard cannot know its own public
+    // address, so it is offered as a prefilled guess.
+    const suggestedBase = `${location.protocol}//${location.host}/packs/${serverId}`;
+
+    const packRows = (packs: typeof rp.packs, kind: "resourcepack" | "datapack") =>
+      packs.length === 0
+        ? `<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">Nincs feltöltve.</div>`
+        : packs
+            .map(
+              (p) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border);">
+        <div style="min-width:0;">
+          <div>${escapeHtml(p.filename)}${
+            p.active ? ` <span class="pb-badge" style="color:var(--green);">aktív</span>` : ""
+          }</div>
+          <div style="color:var(--text-dim);font-size:11px;">
+            ${(p.sizeBytes / 1024 / 1024).toFixed(1)} MB · SHA-1 ${escapeHtml(p.sha1.slice(0, 12))}…
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          ${
+            kind === "resourcepack"
+              ? `<button class="btn" data-activate="${escapeHtml(p.filename)}">Kiosztás</button>`
+              : ""
+          }
+          <button class="btn btn-danger" data-del-pack="${kind}|${escapeHtml(p.filename)}">Törlés</button>
+        </div>
+      </div>`
+            )
+            .join("");
+
+    content.innerHTML = `
+      <h4 style="margin-bottom:4px;">Resource pack</h4>
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        A resource packet nem a szerver küldi el: csak egy linket és egy SHA-1 ellenőrzőösszeget
+        ad a kliensnek, ami maga tölti le. A „Kiosztás” ezt írja be a server.properties-be —
+        a címnek a <strong>játékosok gépéről</strong> kell elérhetőnek lennie.
+      </p>
+
+      <div class="field" style="max-width:520px;">
+        <label for="pack-base">Nyilvános alapcím</label>
+        <input id="pack-base" value="${escapeHtml(suggestedBase)}" />
+      </div>
+
+      <div class="field checkbox-row">
+        <input id="pack-required" type="checkbox" ${rp.status?.required ? "checked" : ""} />
+        <label for="pack-required" style="margin:0">Kötelező (aki nem fogadja el, nem tud belépni)</label>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;">
+        <input type="file" id="rp-file" accept=".zip" style="max-width:280px;" />
+        <button class="btn btn-primary" id="rp-upload">Feltöltés</button>
+        ${rp.status?.url ? `<button class="btn" id="rp-clear">Kiosztás visszavonása</button>` : ""}
+      </div>
+      ${
+        rp.status?.url
+          ? `<div style="color:var(--text-dim);font-size:11px;margin-bottom:8px;">Jelenlegi: ${escapeHtml(
+              rp.status.url
+            )}</div>`
+          : ""
+      }
+      <div>${packRows(rp.packs, "resourcepack")}</div>
+
+      <h4 style="margin:28px 0 4px;">Datapackek</h4>
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        A datapackek a világ <code>datapacks</code> mappájába kerülnek, és a szerver maga tölti be
+        őket — újraindítás vagy <code>/datapack enable</code> után lépnek életbe.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;">
+        <input type="file" id="dp-file" accept=".zip" style="max-width:280px;" />
+        <button class="btn btn-primary" id="dp-upload">Feltöltés</button>
+      </div>
+      <div>${packRows(dp.packs, "datapack")}</div>
+    `;
+
+    const upload = async (inputId: string, kind: "resourcepack" | "datapack") => {
+      const input = content.querySelector<HTMLInputElement>(`#${inputId}`)!;
+      const file = input.files?.[0];
+      if (!file) {
+        showToast("Válassz egy .zip fájlt", "error");
+        return;
+      }
+      try {
+        await api.uploadPack(serverId, kind, file);
+        showToast("Feltöltve");
+        await renderContent(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Feltöltés sikertelen", "error");
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#rp-upload")!.onclick = () => void upload("rp-file", "resourcepack");
+    content.querySelector<HTMLButtonElement>("#dp-upload")!.onclick = () => void upload("dp-file", "datapack");
+
+    content.querySelector<HTMLInputElement>("#pack-required")!.onchange = async (e) => {
+      const el = e.target as HTMLInputElement;
+      try {
+        await api.setRequireResourcePack(serverId, el.checked);
+        showToast(el.checked ? "Kötelezővé téve" : "Már nem kötelező");
+      } catch (err) {
+        el.checked = !el.checked;
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#rp-clear")?.addEventListener("click", async () => {
+      try {
+        await api.clearResourcePack(serverId);
+        showToast("Kiosztás visszavonva");
+        await renderContent(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+      }
+    });
+
+    content.querySelectorAll<HTMLButtonElement>("[data-activate]").forEach((btn) => {
+      btn.onclick = async () => {
+        const base = content.querySelector<HTMLInputElement>("#pack-base")!.value.trim();
+        try {
+          const { sha1 } = await api.activateResourcePack(serverId, btn.dataset.activate!, base);
+          showToast(`Kiosztva (SHA-1 ${sha1.slice(0, 8)}…)`);
+          await renderContent(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        }
+      };
+    });
+
+    content.querySelectorAll<HTMLButtonElement>("[data-del-pack]").forEach((btn) => {
+      btn.onclick = async () => {
+        const [kind, filename] = btn.dataset.delPack!.split("|");
+        if (!(await confirmModal(`Törlöd ezt a csomagot? <strong>${escapeHtml(filename)}</strong>`))) return;
+        try {
+          await api.deletePack(serverId, kind as "resourcepack" | "datapack", filename);
+          showToast("Törölve");
+          await renderContent(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+        }
+      };
+    });
   }
 
   async function renderPerformance(content: HTMLElement) {

@@ -284,3 +284,20 @@ export interface JvmRecommendation {
   script: string;
   notes: string[];
 }
+
+export type PackKind = "resourcepack" | "datapack";
+
+export interface Pack {
+  kind: PackKind;
+  filename: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  sha1: string;
+  active: boolean;
+}
+
+export interface ResourcePackStatus {
+  url: string | null;
+  sha1: string | null;
+  required: boolean;
+}

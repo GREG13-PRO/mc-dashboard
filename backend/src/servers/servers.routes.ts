@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
+import multer from "multer";
 import { serverRegistry, toPublicEntry } from "./registry";
 import {
   startServer,
@@ -16,6 +17,18 @@ import { listArchivedLogs, readArchivedLog, deleteArchivedLog } from "./console-
 import { hasLuckPerms, createEditorSession, LuckPermsError } from "./luckperms";
 import { runWorldAction, WORLD_ACTIONS, WorldControlError } from "./world-control";
 import { detectConflicts, diagnoseLag, recommendJvmFlags, applyJvmScript } from "./performance";
+import {
+  listPacks,
+  savePack,
+  deletePack,
+  resolvePackPath,
+  activateResourcePack,
+  clearResourcePack,
+  setRequireResourcePack,
+  resourcePackStatus,
+  ContentError,
+  type PackKind,
+} from "./content-manager";
 import {
   takeSnapshot,
   listSnapshots,
@@ -328,6 +341,136 @@ serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
 
 // Gated on "settings": handing someone the LuckPerms editor is handing them
 // every permission on the server, which is a heavier grant than the console.
+// Resource packs can be large; the same 500MB ceiling as the file manager.
+const packUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
+
+function packKind(value: unknown): PackKind {
+  if (value !== "resourcepack" && value !== "datapack") {
+    throw new ContentError(`Unknown pack kind: ${String(value)}`);
+  }
+  return value;
+}
+
+serversRouter.get("/:id/packs/:kind", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const kind = packKind(req.params.kind);
+    res.json({
+      packs: await listPacks(entry, kind),
+      status: kind === "resourcepack" ? resourcePackStatus(entry) : null,
+    });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post(
+  "/:id/packs/:kind",
+  requirePermission("files"),
+  packUpload.single("file"),
+  async (req, res) => {
+    const entry = serverRegistry.get(req.params.id);
+    if (!entry) {
+      res.status(404).json({ error: "Server not found" });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    try {
+      const pack = await savePack(entry, packKind(req.params.kind), req.file.originalname, req.file.buffer);
+      res.status(201).json({ pack });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  }
+);
+
+serversRouter.delete("/:id/packs/:kind/:filename", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deletePack(entry, packKind(req.params.kind), req.params.filename);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// Clients fetch resource packs themselves, so this endpoint is what the URL in
+// server.properties points at. It is intentionally outside the auth-gated API:
+// a joining player has no dashboard session. The path is sandboxed and only
+// .zip files under the pack folder can be reached.
+export const publicPackRouter = Router();
+
+publicPackRouter.get("/:serverId/:filename", (req, res) => {
+  const entry = serverRegistry.get(req.params.serverId);
+  if (!entry) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  try {
+    const file = resolvePackPath(entry, "resourcepack", req.params.filename);
+    if (!/\.zip$/i.test(file)) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.sendFile(file);
+  } catch {
+    res.status(404).json({ error: "Not found" });
+  }
+});
+
+serversRouter.post("/:id/packs/resourcepack/:filename/activate", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const base = String(req.body?.publicBaseUrl ?? "").trim();
+  if (!/^https?:\/\/.+/.test(base)) {
+    res.status(400).json({ error: "Adj meg egy elérhető alapcímet (pl. http://a-szerver-ip:3000/packs/<id>)." });
+    return;
+  }
+  try {
+    res.json(await activateResourcePack(entry, req.params.filename, base));
+  } catch (err) {
+    res.status(err instanceof ContentError ? 409 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/packs/resourcepack/clear", requirePermission("files"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  clearResourcePack(entry);
+  res.json({ ok: true });
+});
+
+serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    setRequireResourcePack(entry, Boolean(req.body?.required));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(409).json({ error: (err as Error).message });
+  }
+});
+
 serversRouter.get("/:id/performance/conflicts", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
