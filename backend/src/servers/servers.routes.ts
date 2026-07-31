@@ -14,6 +14,8 @@ import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPa
 import { readAccessLists, setWhitelistEnforced } from "./access-manager";
 import { listArchivedLogs, readArchivedLog, deleteArchivedLog } from "./console-archive";
 import { hasLuckPerms, createEditorSession, LuckPermsError } from "./luckperms";
+import { runWorldAction, WORLD_ACTIONS, WorldControlError } from "./world-control";
+import { detectConflicts, diagnoseLag, recommendJvmFlags, applyJvmScript } from "./performance";
 import {
   takeSnapshot,
   listSnapshots,
@@ -326,6 +328,80 @@ serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
 
 // Gated on "settings": handing someone the LuckPerms editor is handing them
 // every permission on the server, which is a heavier grant than the console.
+serversRouter.get("/:id/performance/conflicts", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ conflicts: await detectConflicts(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/performance/lag", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ report: await diagnoseLag(entry) });
+  } catch (err) {
+    res.status(409).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/performance/jvm", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const heap = req.query.heapMb ? Number(req.query.heapMb) : undefined;
+  try {
+    res.json({ recommendation: await recommendJvmFlags(entry, heap) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/performance/jvm", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await applyJvmScript(entry, String(req.body?.script ?? ""));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(409).json({ error: (err as Error).message });
+  }
+});
+
+// Time and weather ride on the "players" capability: they are live moderation
+// of a running world, the same kind of act as healing or kicking someone.
+serversRouter.post("/:id/world/:action", requirePermission("players"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (!WORLD_ACTIONS.includes(req.params.action)) {
+    res.status(400).json({ error: `Unknown action, expected one of: ${WORLD_ACTIONS.join(", ")}` });
+    return;
+  }
+  try {
+    await runWorldAction(entry, req.params.action);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err instanceof WorldControlError ? 409 : 500).json({ error: (err as Error).message });
+  }
+});
+
 serversRouter.get("/:id/timeline", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {

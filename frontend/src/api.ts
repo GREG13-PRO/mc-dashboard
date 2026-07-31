@@ -15,6 +15,9 @@ import type {
   ServerInstallInput,
   ServerTypeOption,
   ServerInstallType,
+  JvmRecommendation,
+  LagReport,
+  PluginConflict,
   ServerWithStatus,
   TimeMachineConfig,
   TimelineSnapshot,
@@ -221,6 +224,32 @@ export const api = {
   },
   async deleteConsoleLog(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+
+  async getPluginConflicts(serverId: string): Promise<PluginConflict[]> {
+    const { conflicts } = await request<{ conflicts: PluginConflict[] }>(
+      `/servers/${serverId}/performance/conflicts`
+    );
+    return conflicts;
+  },
+  async diagnoseLag(serverId: string): Promise<LagReport> {
+    const { report } = await request<{ report: LagReport }>(`/servers/${serverId}/performance/lag`, {
+      method: "POST",
+    });
+    return report;
+  },
+  async getJvmRecommendation(serverId: string, heapMb?: number): Promise<JvmRecommendation> {
+    const { recommendation } = await request<{ recommendation: JvmRecommendation }>(
+      `/servers/${serverId}/performance/jvm${heapMb ? `?heapMb=${heapMb}` : ""}`
+    );
+    return recommendation;
+  },
+  async applyJvmScript(serverId: string, script: string): Promise<void> {
+    await request(`/servers/${serverId}/performance/jvm`, { method: "POST", body: JSON.stringify({ script }) });
+  },
+
+  async worldAction(serverId: string, action: string): Promise<void> {
+    await request(`/servers/${serverId}/world/${action}`, { method: "POST" });
   },
 
   async getTimeline(

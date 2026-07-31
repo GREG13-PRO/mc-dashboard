@@ -262,3 +262,25 @@ export interface ArchivedLog {
   endedAt: string;
   sizeBytes: number;
 }
+
+export interface PluginConflict {
+  severity: "conflict" | "warning";
+  plugins: string[];
+  message: string;
+}
+
+export interface LagReport {
+  generatedAt: string;
+  raw: string;
+  tps: string | null;
+  findings: string[];
+}
+
+export interface JvmRecommendation {
+  hostMemoryMb: number;
+  currentScript: string;
+  recommendedHeapMb: number;
+  flags: string[];
+  script: string;
+  notes: string[];
+}

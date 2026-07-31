@@ -12,8 +12,27 @@ import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
 
-type Tab = "console" | "files" | "plugins" | "players" | "access" | "luckperms" | "timeline" | "settings";
-const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "access", "luckperms", "timeline", "settings"];
+type Tab =
+  | "console"
+  | "files"
+  | "plugins"
+  | "players"
+  | "access"
+  | "luckperms"
+  | "timeline"
+  | "performance"
+  | "settings";
+const ALL_TABS: Tab[] = [
+  "console",
+  "files",
+  "plugins",
+  "players",
+  "access",
+  "luckperms",
+  "timeline",
+  "performance",
+  "settings",
+];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
 // into the server folder, so it rides on "files" rather than adding a fifth
@@ -32,7 +51,7 @@ export function renderServerView(
       ? "files"
       : tab === "access"
         ? "players"
-        : tab === "luckperms" || tab === "timeline"
+        : tab === "luckperms" || tab === "timeline" || tab === "performance"
           ? "settings"
           : tab;
   const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
@@ -186,6 +205,7 @@ export function renderServerView(
       access: "Whitelist / Ban",
       luckperms: "LuckPerms",
       timeline: "Time Machine",
+      performance: "Teljesítmény",
       settings: "Beállítások",
     }[tab];
   }
@@ -227,6 +247,8 @@ export function renderServerView(
       renderLuckPerms(content);
     } else if (activeTab === "timeline") {
       void renderTimeline(content);
+    } else if (activeTab === "performance") {
+      void renderPerformance(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -407,6 +429,113 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderPerformance(content: HTMLElement) {
+    const running = server?.running ?? false;
+    content.innerHTML = `
+      <h4 style="margin-bottom:8px;">Bővítmény-ütközések</h4>
+      <div id="perf-conflicts"><div style="color:var(--text-dim);font-size:12px;">Ellenőrzés…</div></div>
+
+      <h4 style="margin:24px 0 8px;">Lag doctor</h4>
+      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        Lefuttatja a diagnosztikai parancsokat, és összeszedi, mi tűnik fel. Pontos okhoz
+        (melyik entity vagy chunk) a Spark plugin kell — ezt a dashboard nem tudja kiváltani.
+      </p>
+      <button class="btn" id="perf-lag" ${running ? "" : "disabled"}>Diagnosztika futtatása</button>
+      ${running ? "" : `<span style="color:var(--text-dim);font-size:12px;margin-left:8px;">Futnia kell a szervernek.</span>`}
+      <div id="perf-lag-out" style="margin-top:12px;"></div>
+
+      <h4 style="margin:24px 0 8px;">JVM paraméterek</h4>
+      <div id="perf-jvm"><div style="color:var(--text-dim);font-size:12px;">Betöltés…</div></div>
+    `;
+
+    void (async () => {
+      const box = content.querySelector<HTMLDivElement>("#perf-conflicts")!;
+      try {
+        const conflicts = await api.getPluginConflicts(serverId);
+        box.innerHTML =
+          conflicts.length === 0
+            ? `<div style="color:var(--green);font-size:12px;">Nem találtam ismert ütközést.</div>`
+            : conflicts
+                .map(
+                  (c) => `
+          <div style="padding:8px 0;border-bottom:0.5px solid var(--border);">
+            <div style="color:${c.severity === "conflict" ? "var(--red)" : "var(--yellow)"};font-size:13px;">
+              ${c.severity === "conflict" ? "Ütközés" : "Figyelmeztetés"}: ${escapeHtml(c.plugins.join(" + "))}
+            </div>
+            <div style="color:var(--text-dim);font-size:12px;">${escapeHtml(c.message)}</div>
+          </div>`
+                )
+                .join("");
+      } catch (err) {
+        box.innerHTML = `<div class="error-text">${escapeHtml(
+          err instanceof ApiError ? err.message : "Nem sikerült ellenőrizni"
+        )}</div>`;
+      }
+    })();
+
+    content.querySelector<HTMLButtonElement>("#perf-lag")!.onclick = async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const out = content.querySelector<HTMLDivElement>("#perf-lag-out")!;
+      btn.disabled = true;
+      btn.textContent = "Fut…";
+      out.innerHTML = "";
+      try {
+        const report = await api.diagnoseLag(serverId);
+        out.innerHTML = `
+          ${report.tps ? `<div style="font-size:14px;font-weight:600;">TPS: ${escapeHtml(report.tps)}</div>` : ""}
+          <ul style="margin:8px 0;padding-left:18px;color:var(--text-dim);font-size:12px;">
+            ${report.findings.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}
+          </ul>`;
+      } catch (err) {
+        out.innerHTML = `<div class="error-text">${escapeHtml(
+          err instanceof ApiError ? err.message : "Nem sikerült"
+        )}</div>`;
+      } finally {
+        btn.disabled = !(server?.running ?? false);
+        btn.textContent = "Diagnosztika futtatása";
+      }
+    };
+
+    void (async () => {
+      const box = content.querySelector<HTMLDivElement>("#perf-jvm")!;
+      try {
+        const rec = await api.getJvmRecommendation(serverId);
+        box.innerHTML = `
+          <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px;">
+            A gépben ${(rec.hostMemoryMb / 1024).toFixed(1)} GB RAM van.
+            Ajánlott heap: <strong>${(rec.recommendedHeapMb / 1024).toFixed(1)} GB</strong>.
+          </div>
+          <ul style="margin:0 0 12px;padding-left:18px;color:var(--text-dim);font-size:12px;">
+            ${rec.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}
+          </ul>
+          <label>Jelenlegi start script</label>
+          <pre class="pb-body" style="max-height:90px;">${escapeHtml(rec.currentScript.trim())}</pre>
+          <label style="margin-top:12px;">Ajánlott start script</label>
+          <pre class="pb-body" style="max-height:150px;">${escapeHtml(rec.script.trim())}</pre>
+          <button class="btn btn-primary" id="perf-apply" style="margin-top:8px;" ${
+            running ? "disabled title='Állítsd le előbb a szervert'" : ""
+          }>Alkalmazás a start scriptre</button>
+          <div style="color:var(--text-dim);font-size:11px;margin-top:6px;">
+            A régi script .bak kiterjesztéssel megmarad.
+          </div>`;
+
+        box.querySelector<HTMLButtonElement>("#perf-apply")?.addEventListener("click", async () => {
+          if (!(await confirmModal("Felülírod a start scriptet az ajánlott paraméterekkel?"))) return;
+          try {
+            await api.applyJvmScript(serverId, rec.script);
+            showToast("Start script frissítve");
+          } catch (err) {
+            showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+          }
+        });
+      } catch (err) {
+        box.innerHTML = `<div class="error-text">${escapeHtml(
+          err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+        )}</div>`;
+      }
+    })();
   }
 
   async function renderTimeline(content: HTMLElement) {
@@ -867,8 +996,31 @@ export function renderServerView(
           <p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.5rem;">Frissítve: ${new Date(players.fetchedAt).toLocaleTimeString()}</p>
         `;
 
+    // Time and weather sit with the player tools: both are live moderation of
+    // a running world.
+    const worldButtons = [
+      { action: "day", label: "Nappal" },
+      { action: "night", label: "Éjszaka" },
+      { action: "clear", label: "Napos idő" },
+      { action: "rain", label: "Eső" },
+      { action: "thunder", label: "Vihar" },
+      { action: "freeze_time", label: "Idő megállítása" },
+      { action: "resume_time", label: "Idő indítása" },
+    ];
+
     content.innerHTML = `
       ${listSection}
+      <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);">
+        <label>Világ gyorsvezérlés</label>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="world-buttons">
+          ${worldButtons
+            .map(
+              (b) =>
+                `<button class="btn" data-world="${b.action}" ${running ? "" : "disabled"}>${b.label}</button>`
+            )
+            .join("")}
+        </div>
+      </div>
       <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);">
         <label for="manual-player-name">Gyorsparancs játékosnévvel</label>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
@@ -878,6 +1030,17 @@ export function renderServerView(
         ${running ? "" : `<p style="color:var(--text-dim);font-size:0.8rem;margin-top:0.4rem;">A szervernek futnia kell a parancsok küldéséhez.</p>`}
       </div>
     `;
+
+    content.querySelectorAll<HTMLButtonElement>("[data-world]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await api.worldAction(serverId, btn.dataset.world!);
+          showToast(`${btn.textContent} elküldve`);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Művelet sikertelen", "error");
+        }
+      };
+    });
 
     content.querySelectorAll<HTMLButtonElement>("[data-chip-action]").forEach((btn) => {
       btn.disabled = !running;
