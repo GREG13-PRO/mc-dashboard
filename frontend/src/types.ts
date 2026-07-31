@@ -345,3 +345,14 @@ export interface WeekComparison {
   playtimeChange: number | null;
   daily: { date: string; peak: number; playtimeMinutes: number }[];
 }
+
+export interface AdminXp {
+  username: string;
+  points: number;
+  level: number;
+  progress: number;
+  nextLevelAt: number;
+  actions: number;
+  breakdown: { label: string; points: number; count: number }[];
+  lastActiveAt: string | null;
+}

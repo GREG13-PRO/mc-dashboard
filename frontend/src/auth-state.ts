@@ -10,6 +10,11 @@ export function getCurrentUser(): UserPublic | null {
   return currentUser;
 }
 
+/** Used to highlight the signed-in user's own row in the scoreboard. */
+export function currentUsername(): string | null {
+  return currentUser?.username ?? null;
+}
+
 export function isAdmin(): boolean {
   return Boolean(currentUser?.isAdmin);
 }

@@ -5,6 +5,7 @@ import { openAddServerModal } from "./AddServerModal";
 import { renderServerView } from "./ServerView";
 import { renderUsersView } from "./UsersView";
 import { renderAuditView } from "./AuditView";
+import { renderXpView } from "./XpView";
 import { isAdmin, setCurrentUser } from "../auth-state";
 import { getThemeChoice, setThemeChoice, nextTheme, themeIcon, themeLabel, notifyThemeChanged } from "../lib/theme";
 import {
@@ -40,6 +41,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn" style="width:100%;">+ Új szerver</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;">Felhasználók</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">Auditnapló</button>` : ""}
+        <button class="btn users-nav-btn" id="xp-nav-btn" style="width:100%;">Admin szintek</button>
         <div class="server-list" id="server-list" role="list"></div>
       </nav>
       <main class="main-content" id="main-content" tabindex="-1">
@@ -107,6 +109,9 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   root.querySelector<HTMLButtonElement>("#audit-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/audit";
   });
+  root.querySelector<HTMLButtonElement>("#xp-nav-btn")?.addEventListener("click", () => {
+    location.hash = "#/xp";
+  });
 
   async function refreshList() {
     try {
@@ -167,6 +172,12 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     disposeServerView = null;
 
     const mainContent = root.querySelector<HTMLDivElement>("#main-content")!;
+
+    if (location.hash === "#/xp") {
+      disposeServerView = renderXpView(mainContent);
+      renderList();
+      return;
+    }
 
     if (location.hash === "#/audit") {
       if (!isAdmin()) {

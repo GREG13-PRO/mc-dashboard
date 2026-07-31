@@ -4,7 +4,7 @@ import { usersRouter } from "../auth/users.routes";
 import { requireAuth, requireAdmin } from "../auth/auth.middleware";
 import { serversRouter } from "../servers/servers.routes";
 import { installRouter } from "../servers/install.routes";
-import { auditRouter } from "../audit/audit.routes";
+import { auditRouter, xpRouter } from "../audit/audit.routes";
 import { auditMiddleware } from "../audit/audit.middleware";
 
 export const apiRouter = Router();
@@ -18,3 +18,4 @@ apiRouter.use("/users", requireAuth, requireAdmin, usersRouter);
 apiRouter.use("/servers", requireAuth, serversRouter);
 apiRouter.use("/install-server", requireAuth, installRouter);
 apiRouter.use("/audit", requireAuth, requireAdmin, auditRouter);
+apiRouter.use("/admin-xp", requireAuth, xpRouter);

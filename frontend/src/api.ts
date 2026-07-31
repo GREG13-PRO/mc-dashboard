@@ -1,5 +1,6 @@
 import type {
   AccessLists,
+  AdminXp,
   ArchivedLog,
   AuditRecord,
   BackupInfo,
@@ -209,6 +210,9 @@ export const api = {
     return server;
   },
 
+  async getAdminXp(): Promise<{ leaderboard: AdminXp[]; rules: { label: string; points: number }[] }> {
+    return request("/admin-xp");
+  },
   async listAudit(limit = 200): Promise<AuditRecord[]> {
     const { entries } = await request<{ entries: AuditRecord[] }>(`/audit?limit=${limit}`);
     return entries;
