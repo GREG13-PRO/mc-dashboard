@@ -1,11 +1,18 @@
 import { api, ApiError } from "../api";
 import { showToast } from "../components/Toast";
+import { openModal } from "../components/Modal";
 import { openAddServerModal } from "./AddServerModal";
 import { renderServerView } from "./ServerView";
 import { renderUsersView } from "./UsersView";
 import { renderAuditView } from "./AuditView";
 import { isAdmin, setCurrentUser } from "../auth-state";
 import { getThemeChoice, setThemeChoice, nextTheme, themeIcon, themeLabel, notifyThemeChanged } from "../lib/theme";
+import {
+  getTextSize,
+  setTextSize,
+  getHighContrast,
+  setHighContrast,
+} from "../lib/display";
 import type { ServerWithStatus } from "../types";
 
 function parseServerIdFromHash(): string | null {
@@ -19,23 +26,25 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   let disposeServerView: (() => void) | null = null;
 
   root.innerHTML = `
+    <a href="#main-content" class="skip-link">Ugrás a tartalomhoz</a>
     <div class="app-shell">
-      <div class="sidebar">
+      <nav class="sidebar" aria-label="Szerverek">
         <div class="sidebar-header">
           <h1>Dashboard</h1>
           <div style="display:flex;gap:6px;">
             <button class="btn" id="theme-btn" title="Megjelenés">${themeIcon(getThemeChoice())}</button>
+            <button class="btn" id="a11y-btn" title="Megjelenítési beállítások" aria-label="Megjelenítési beállítások">A</button>
             <button class="btn" id="logout-btn">Kilépés</button>
           </div>
         </div>
         ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn" style="width:100%;">+ Új szerver</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;">Felhasználók</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">Auditnapló</button>` : ""}
-        <div class="server-list" id="server-list"></div>
-      </div>
-      <div class="main-content" id="main-content">
+        <div class="server-list" id="server-list" role="list"></div>
+      </nav>
+      <main class="main-content" id="main-content" tabindex="-1">
         <div class="empty-state">Válassz egy szervert a bal oldalon.</div>
-      </div>
+      </main>
     </div>
   `;
 
@@ -48,6 +57,39 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     themeBtn.title = `Megjelenés: ${themeLabel(choice)}`;
     // Lets anything that picks colours in JS re-read the effective theme.
     notifyThemeChanged();
+  };
+
+  root.querySelector<HTMLButtonElement>("#a11y-btn")!.onclick = () => {
+    const wrap = document.createElement("div");
+    const draw = () => {
+      wrap.innerHTML = `
+        <h3>Megjelenítés</h3>
+        <div class="field">
+          <label for="a11y-size">Szövegméret</label>
+          <select id="a11y-size">
+            <option value="normal" ${getTextSize() === "normal" ? "selected" : ""}>Normál</option>
+            <option value="large" ${getTextSize() === "large" ? "selected" : ""}>Nagy</option>
+            <option value="xlarge" ${getTextSize() === "xlarge" ? "selected" : ""}>Extra nagy</option>
+          </select>
+        </div>
+        <div class="field checkbox-row">
+          <input id="a11y-contrast" type="checkbox" ${getHighContrast() ? "checked" : ""} />
+          <label for="a11y-contrast" style="margin:0">Nagy kontrasztú mód</label>
+        </div>
+        <p style="color:var(--text-dim);font-size:12px;">
+          Tab-bal léptethetsz, Escape-pel zárhatsz ablakot, a szerverlistán a nyilak lépnek.
+        </p>
+        <div class="modal-actions"><button class="btn" id="a11y-close">Bezárás</button></div>`;
+      wrap.querySelector<HTMLSelectElement>("#a11y-size")!.onchange = (e) => {
+        setTextSize((e.target as HTMLSelectElement).value as ReturnType<typeof getTextSize>);
+      };
+      wrap.querySelector<HTMLInputElement>("#a11y-contrast")!.onchange = (e) => {
+        setHighContrast((e.target as HTMLInputElement).checked);
+      };
+      wrap.querySelector<HTMLButtonElement>("#a11y-close")!.onclick = () => close();
+    };
+    const close = openModal(wrap);
+    draw();
   };
 
   root.querySelector<HTMLButtonElement>("#logout-btn")!.onclick = async () => {
@@ -87,7 +129,8 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     listEl.innerHTML = servers
       .map(
         (s) => `
-      <div class="server-card ${s.id === selectedId ? "active" : ""}" data-id="${s.id}">
+      <div class="server-card ${s.id === selectedId ? "active" : ""}" data-id="${s.id}"
+           role="listitem" tabindex="0" aria-current="${s.id === selectedId ? "true" : "false"}">
         <div class="server-card-top">
           <span class="server-name"><span class="status-dot ${s.running ? "running" : "stopped"}"></span>${s.name}</span>
         </div>
@@ -98,9 +141,23 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       )
       .join("");
 
-    listEl.querySelectorAll<HTMLDivElement>(".server-card").forEach((card) => {
-      card.onclick = () => {
+    const cards = [...listEl.querySelectorAll<HTMLDivElement>(".server-card")];
+    cards.forEach((card, index) => {
+      const open = () => {
         location.hash = `#/server/${encodeURIComponent(card.dataset.id!)}`;
+      };
+      card.onclick = open;
+      // A list you can only reach with a mouse is a list some people cannot
+      // reach at all: arrows move, Enter/Space opens.
+      card.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const next = cards[index + (e.key === "ArrowDown" ? 1 : -1)];
+          next?.focus();
+        }
       };
     });
   }

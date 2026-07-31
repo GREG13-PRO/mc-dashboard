@@ -109,11 +109,13 @@ export function renderServerView(
             : ""
         }
       </div>
-      <div class="tabs">
+      <div class="tabs" role="tablist">
         ${visibleTabs()
           .map(
             (tab) =>
-              `<div class="tab ${tab === activeTab ? "active" : ""}" data-tab="${tab}">${labelFor(tab)}</div>`
+              `<div class="tab ${tab === activeTab ? "active" : ""}" data-tab="${tab}" role="tab"
+                    tabindex="${tab === activeTab ? "0" : "-1"}"
+                    aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
           )
           .join("")}
       </div>
@@ -121,12 +123,25 @@ export function renderServerView(
       <div class="tab-content" id="tab-content"></div>
     `;
 
-    root.querySelectorAll<HTMLDivElement>(".tab").forEach((tabEl) => {
-      tabEl.onclick = () => {
+    const tabEls = [...root.querySelectorAll<HTMLDivElement>(".tab")];
+    tabEls.forEach((tabEl, index) => {
+      const select = () => {
         if (tabEl.dataset.tab === activeTab) return;
         teardownConsole();
         activeTab = tabEl.dataset.tab as Tab;
         renderShell();
+      };
+      tabEl.onclick = select;
+      // Standard tablist keyboard behaviour: arrows move, Enter/Space selects.
+      tabEl.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          select();
+        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          const step = e.key === "ArrowRight" ? 1 : -1;
+          tabEls[(index + step + tabEls.length) % tabEls.length]?.focus();
+        }
       };
     });
 

@@ -37,7 +37,13 @@ export function openFileEditor(serverId: string, filePath: string, initialConten
     parent: body,
   });
 
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") close();
+  };
+  document.addEventListener("keydown", onKeydown, true);
+
   const close = () => {
+    document.removeEventListener("keydown", onKeydown, true);
     view.destroy();
     overlay.remove();
   };
