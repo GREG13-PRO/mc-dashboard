@@ -104,11 +104,32 @@ export interface UserInput {
   permissions?: Record<string, Partial<ServerPermissions>>;
 }
 
-export type ServerInstallType = "paper" | "vanilla" | "fabric" | "bungeecord";
+export type ServerInstallType =
+  | "paper"
+  | "purpur"
+  | "vanilla"
+  | "fabric"
+  | "quilt"
+  | "forge"
+  | "neoforge"
+  | "bungeecord"
+  | "velocity";
 
 export interface ServerTypeOption {
   id: ServerInstallType;
   label: string;
+  // Proxies (BungeeCord/Velocity) have no server.properties, so the Minecraft
+  // world settings are hidden for them.
+  kind: "server" | "proxy";
+}
+
+export interface ServerInstallSettings {
+  memoryMb?: number;
+  port?: number;
+  motd?: string;
+  difficulty?: string;
+  gamemode?: string;
+  maxPlayers?: number;
 }
 
 export interface ServerInstallInput {
@@ -116,4 +137,5 @@ export interface ServerInstallInput {
   folder: string;
   type: ServerInstallType;
   version: string;
+  settings?: ServerInstallSettings;
 }

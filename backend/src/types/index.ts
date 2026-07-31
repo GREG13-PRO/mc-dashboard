@@ -88,11 +88,30 @@ export interface UserInput {
   permissions?: Record<string, Partial<ServerPermissions>>;
 }
 
-export type ServerInstallType = "paper" | "vanilla" | "fabric" | "bungeecord";
+export type ServerInstallType =
+  | "paper"
+  | "purpur"
+  | "vanilla"
+  | "fabric"
+  | "quilt"
+  | "forge"
+  | "neoforge"
+  | "bungeecord"
+  | "velocity";
+
+export interface ServerInstallSettings {
+  memoryMb?: number;
+  port?: number;
+  motd?: string;
+  difficulty?: string;
+  gamemode?: string;
+  maxPlayers?: number;
+}
 
 export interface ServerInstallInput {
   name: string;
   folder: string;
   type: ServerInstallType;
   version: string;
+  settings?: ServerInstallSettings;
 }

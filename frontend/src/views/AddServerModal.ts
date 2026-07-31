@@ -1,7 +1,7 @@
 import { api, ApiError } from "../api";
 import { openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
-import type { ServerEntry, ServerEntryInput, ServerInstallType } from "../types";
+import type { ServerEntry, ServerEntryInput, ServerInstallSettings, ServerInstallType } from "../types";
 
 export function openAddServerModal(onCreated: () => void, existing?: ServerEntry) {
   const form = document.createElement("div");
@@ -21,6 +21,50 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       <label for="f-install-version">Verzió</label>
       <select id="f-install-version"><option value="">Betöltés...</option></select>
     </div>
+    <div id="install-settings" style="display:none">
+      <div class="field">
+        <label for="f-memory">Memória</label>
+        <select id="f-memory">
+          <option value="1024">1 GB</option>
+          <option value="2048">2 GB</option>
+          <option value="4096" selected>4 GB</option>
+          <option value="6144">6 GB</option>
+          <option value="8192">8 GB</option>
+        </select>
+      </div>
+      <div id="install-mc-settings">
+        <div class="field">
+          <label for="f-port">Port</label>
+          <input id="f-port" type="number" value="25565" />
+        </div>
+        <div class="field">
+          <label for="f-motd">MOTD (a szerverlistában megjelenő szöveg)</label>
+          <input id="f-motd" placeholder="Egy Minecraft szerver" />
+        </div>
+        <div class="field">
+          <label for="f-difficulty">Nehézség</label>
+          <select id="f-difficulty">
+            <option value="peaceful">Békés</option>
+            <option value="easy">Könnyű</option>
+            <option value="normal" selected>Normál</option>
+            <option value="hard">Nehéz</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-gamemode">Játékmód</label>
+          <select id="f-gamemode">
+            <option value="survival" selected>Survival</option>
+            <option value="creative">Creative</option>
+            <option value="adventure">Adventure</option>
+            <option value="spectator">Spectator</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-max-players">Max játékosszám</label>
+          <input id="f-max-players" type="number" value="20" />
+        </div>
+      </div>
+    </div>
     `
     }
     <div class="field">
@@ -29,7 +73,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     </div>
     <div class="field">
       <label for="f-folder">Mappa (abszolút útvonal a szerveren)</label>
-      <input id="f-folder" placeholder="/home/mc/servers/survival" value="${existing?.folder ?? ""}" />
+      <input id="f-folder" placeholder="/home/minecraft/Documents/Server/survival" value="${existing?.folder ?? ""}" />
     </div>
     <div class="field" id="start-script-field">
       <label for="f-start">Start script (a mappán belül)</label>
@@ -79,9 +123,14 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
   const startScriptField = form.querySelector<HTMLDivElement>("#start-script-field")!;
   const stopCommandField = form.querySelector<HTMLDivElement>("#stop-command-field")!;
 
+  const installSettings = form.querySelector<HTMLDivElement>("#install-settings");
+  const mcSettings = form.querySelector<HTMLDivElement>("#install-mc-settings");
+  const typeKinds = new Map<string, "server" | "proxy">();
+
   if (installTypeSelect) {
     api.listServerTypes().then((types) => {
       for (const t of types) {
+        typeKinds.set(t.id, t.kind);
         const opt = document.createElement("option");
         opt.value = t.id;
         opt.textContent = t.label;
@@ -93,6 +142,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       const type = installTypeSelect.value;
       if (type === "manual") {
         installVersionField!.style.display = "none";
+        installSettings!.style.display = "none";
         startScriptField.style.display = "";
         stopCommandField.style.display = "";
         return;
@@ -100,6 +150,8 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       startScriptField.style.display = "none";
       stopCommandField.style.display = "none";
       installVersionField!.style.display = "";
+      installSettings!.style.display = "";
+      mcSettings!.style.display = typeKinds.get(type) === "proxy" ? "none" : "";
       installVersionSelect!.innerHTML = `<option value="">Verziók betöltése...</option>`;
       api
         .listServerVersions(type as ServerInstallType)
@@ -137,12 +189,25 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
         return;
       }
 
+      const settings: ServerInstallSettings = {
+        memoryMb: Number(form.querySelector<HTMLSelectElement>("#f-memory")!.value),
+      };
+      if (typeKinds.get(installType) !== "proxy") {
+        settings.port = Number(form.querySelector<HTMLInputElement>("#f-port")!.value);
+        settings.motd = form.querySelector<HTMLInputElement>("#f-motd")!.value.trim();
+        settings.difficulty = form.querySelector<HTMLSelectElement>("#f-difficulty")!.value;
+        settings.gamemode = form.querySelector<HTMLSelectElement>("#f-gamemode")!.value;
+        settings.maxPlayers = Number(form.querySelector<HTMLInputElement>("#f-max-players")!.value);
+      }
+
       const saveBtn = form.querySelector<HTMLButtonElement>("#save-btn")!;
       const originalLabel = saveBtn.textContent;
       saveBtn.disabled = true;
-      saveBtn.textContent = "Telepítés...";
+      // Forge/NeoForge/Quilt run a real installer that pulls dependencies, so
+      // this can legitimately take a couple of minutes.
+      saveBtn.textContent = "Telepítés… (eltarthat pár percig)";
       try {
-        await api.installServer({ name, folder, type: installType as ServerInstallType, version });
+        await api.installServer({ name, folder, type: installType as ServerInstallType, version, settings });
         showToast("Szerver telepítve");
         close();
         onCreated();

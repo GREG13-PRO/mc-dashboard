@@ -2,79 +2,144 @@ import https from "node:https";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import type { ServerInstallType } from "../types";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { writeProperties } from "./properties";
+import type { ServerInstallSettings, ServerInstallType } from "../types";
 
-function fetchJson<T>(url: string): Promise<T> {
+const execFileAsync = promisify(execFile);
+
+function fetchText(url: string, redirectsLeft = 5): Promise<string> {
   return new Promise((resolve, reject) => {
     https
       .get(url, { headers: { "User-Agent": "mc-dashboard" } }, (res) => {
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          fetchJson<T>(res.headers.location).then(resolve, reject);
+          if (redirectsLeft === 0) {
+            reject(new Error(`Too many redirects fetching ${url}`));
+            return;
+          }
+          res.resume();
+          fetchText(new URL(res.headers.location, url).toString(), redirectsLeft - 1).then(resolve, reject);
           return;
         }
         if (res.statusCode !== 200) {
+          res.resume();
           reject(new Error(`HTTP ${res.statusCode} fetching ${url}`));
           return;
         }
         let data = "";
         res.on("data", (c) => (data += c));
-        res.on("end", () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            reject(new Error(`Invalid JSON from ${url}`));
-          }
-        });
+        res.on("end", () => resolve(data));
       })
       .on("error", reject);
   });
 }
 
-function downloadFile(url: string, dest: string): Promise<void> {
+async function fetchJson<T>(url: string): Promise<T> {
+  const body = await fetchText(url);
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new Error(`Invalid JSON from ${url}`);
+  }
+}
+
+function downloadFile(url: string, dest: string, redirectsLeft = 5): Promise<void> {
   return new Promise((resolve, reject) => {
     https
       .get(url, { headers: { "User-Agent": "mc-dashboard" } }, (res) => {
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          downloadFile(res.headers.location, dest).then(resolve, reject);
+          if (redirectsLeft === 0) {
+            reject(new Error(`Too many redirects downloading ${url}`));
+            return;
+          }
+          res.resume();
+          downloadFile(new URL(res.headers.location, url).toString(), dest, redirectsLeft - 1).then(resolve, reject);
           return;
         }
         if (res.statusCode !== 200) {
+          res.resume();
           reject(new Error(`Download failed: HTTP ${res.statusCode} for ${url}`));
           return;
         }
         const file = fs.createWriteStream(dest);
         res.pipe(file);
         file.on("finish", () => file.close(() => resolve()));
-        file.on("error", reject);
+        // A half-written jar is worse than none - a later start would fail with
+        // a confusing "invalid or corrupt jarfile" instead of a download error.
+        file.on("error", (err) => {
+          fs.rm(dest, { force: true }, () => reject(err));
+        });
       })
       .on("error", reject);
   });
 }
 
-export const SERVER_TYPES: { id: ServerInstallType; label: string }[] = [
-  { id: "paper", label: "Paper" },
-  { id: "vanilla", label: "Vanilla" },
-  { id: "fabric", label: "Fabric" },
-  { id: "bungeecord", label: "BungeeCord" },
+export type ServerTypeKind = "server" | "proxy";
+
+export const SERVER_TYPES: { id: ServerInstallType; label: string; kind: ServerTypeKind }[] = [
+  { id: "paper", label: "Paper", kind: "server" },
+  { id: "purpur", label: "Purpur", kind: "server" },
+  { id: "vanilla", label: "Vanilla", kind: "server" },
+  { id: "fabric", label: "Fabric", kind: "server" },
+  { id: "quilt", label: "Quilt", kind: "server" },
+  { id: "forge", label: "Forge", kind: "server" },
+  { id: "neoforge", label: "NeoForge", kind: "server" },
+  { id: "bungeecord", label: "BungeeCord", kind: "proxy" },
+  { id: "velocity", label: "Velocity", kind: "proxy" },
 ];
 
-// Pre-release/candidate builds are filtered out - the dropdown should only
-// offer versions someone would actually want to run a real server on.
-const PRERELEASE_RE = /-(rc|pre)/i;
+export function kindOf(type: ServerInstallType): ServerTypeKind {
+  return SERVER_TYPES.find((t) => t.id === type)?.kind ?? "server";
+}
+
+// Pre-release/candidate/snapshot builds are filtered out - the dropdown should
+// only offer versions someone would actually want to run a real server on.
+const PRERELEASE_RE = /-(rc|pre|snapshot|beta|alpha)/i;
+
+function compareVersionsDesc(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const diff = (pb[i] ?? 0) - (pa[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+/** Paper and Velocity are both published through PaperMC's "fill" v3 API. */
+async function listPaperMcVersions(project: string): Promise<string[]> {
+  const data = await fetchJson<{ versions: Record<string, string[]> }>(
+    `https://fill.papermc.io/v3/projects/${project}`
+  );
+  const all: string[] = [];
+  for (const group of Object.values(data.versions)) {
+    for (const v of group) {
+      if (!PRERELEASE_RE.test(v)) all.push(v);
+    }
+  }
+  return all;
+}
+
+async function paperMcDownloadUrl(project: string, version: string): Promise<string> {
+  const build = await fetchJson<{ downloads: Record<string, { name: string; url: string }> }>(
+    `https://fill.papermc.io/v3/projects/${project}/versions/${encodeURIComponent(version)}/builds/latest`
+  );
+  const download = build.downloads["server:default"];
+  if (!download) throw new Error(`No server download available for ${project} ${version}`);
+  return download.url;
+}
 
 export async function listVersions(type: ServerInstallType): Promise<string[]> {
   switch (type) {
-    case "paper": {
-      const data = await fetchJson<{ versions: Record<string, string[]> }>(
-        "https://fill.papermc.io/v3/projects/paper"
-      );
-      const all: string[] = [];
-      for (const group of Object.values(data.versions)) {
-        for (const v of group) {
-          if (!PRERELEASE_RE.test(v)) all.push(v);
-        }
-      }
-      return all;
+    case "paper":
+      return listPaperMcVersions("paper");
+    case "velocity":
+      return listPaperMcVersions("velocity");
+    case "purpur": {
+      const data = await fetchJson<{ versions: string[] }>("https://api.purpurmc.org/v2/purpur");
+      // Purpur lists oldest-first; every other type here comes back newest-first.
+      return [...data.versions].reverse().filter((v) => !PRERELEASE_RE.test(v));
     }
     case "vanilla": {
       const data = await fetchJson<{ versions: { id: string; type: string }[] }>(
@@ -88,6 +153,36 @@ export async function listVersions(type: ServerInstallType): Promise<string[]> {
       );
       return data.filter((v) => v.stable).map((v) => v.version);
     }
+    case "quilt": {
+      const data = await fetchJson<{ version: string; stable: boolean }[]>(
+        "https://meta.quiltmc.org/v3/versions/game"
+      );
+      return data.filter((v) => v.stable).map((v) => v.version);
+    }
+    case "forge": {
+      // promotions_slim maps "<mcVersion>-recommended"/"-latest" to a Forge
+      // build number; the Minecraft versions are the keys' prefixes.
+      const data = await fetchJson<{ promos: Record<string, string> }>(
+        "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
+      );
+      const seen = new Set<string>();
+      for (const key of Object.keys(data.promos)) {
+        const mc = key.replace(/-(recommended|latest)$/, "");
+        if (mc !== key) seen.add(mc);
+      }
+      return [...seen].reverse();
+    }
+    case "neoforge": {
+      // NeoForge publishes only a Maven metadata XML. Its own version numbers
+      // encode the Minecraft version they target, so they're offered directly
+      // rather than guessed back into a Minecraft version.
+      const xml = await fetchText("https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml");
+      const versions = [...xml.matchAll(/<version>([^<]+)<\/version>/g)].map((m) => m[1]);
+      // Maven lists these in publish order, which interleaves branches
+      // (21.1.x alongside 26.1.x) - sort numerically so the dropdown reads
+      // newest-first like every other type here.
+      return versions.filter((v) => !PRERELEASE_RE.test(v)).sort(compareVersionsDesc);
+    }
     case "bungeecord":
       return ["latest"];
     default:
@@ -100,34 +195,122 @@ export interface InstallResult {
   stopCommand: string;
 }
 
+const DIFFICULTIES = new Set(["peaceful", "easy", "normal", "hard"]);
+const GAMEMODES = new Set(["survival", "creative", "adventure", "spectator"]);
+
+// server.properties is a line-based key=value format, so a newline in a value
+// would silently split it into a broken second line.
+function sanitizePropertyValue(value: string): string {
+  return value
+    .split("")
+    .map((ch) => {
+      const code = ch.charCodeAt(0);
+      return code < 32 || code === 127 ? " " : ch;
+    })
+    .join("")
+    .trim();
+}
+
+function normalizeSettings(settings: ServerInstallSettings | undefined): Required<
+  Pick<ServerInstallSettings, "memoryMb">
+> &
+  ServerInstallSettings {
+  const s = settings ?? {};
+  const memoryMb = s.memoryMb ?? 4096;
+  if (!Number.isInteger(memoryMb) || memoryMb < 512 || memoryMb > 65536) {
+    throw new Error(`Invalid memory size: ${memoryMb} MB (expected 512-65536)`);
+  }
+  if (s.port !== undefined && (!Number.isInteger(s.port) || s.port < 1 || s.port > 65535)) {
+    throw new Error(`Invalid port: ${s.port}`);
+  }
+  if (s.maxPlayers !== undefined && (!Number.isInteger(s.maxPlayers) || s.maxPlayers < 1 || s.maxPlayers > 1000)) {
+    throw new Error(`Invalid max players: ${s.maxPlayers}`);
+  }
+  if (s.difficulty !== undefined && !DIFFICULTIES.has(s.difficulty)) {
+    throw new Error(`Invalid difficulty: ${s.difficulty}`);
+  }
+  if (s.gamemode !== undefined && !GAMEMODES.has(s.gamemode)) {
+    throw new Error(`Invalid gamemode: ${s.gamemode}`);
+  }
+  return { ...s, memoryMb };
+}
+
+function applyServerProperties(folder: string, settings: ServerInstallSettings): void {
+  const values: Record<string, string> = {};
+  if (settings.port !== undefined) values["server-port"] = String(settings.port);
+  if (settings.maxPlayers !== undefined) values["max-players"] = String(settings.maxPlayers);
+  if (settings.difficulty !== undefined) values["difficulty"] = settings.difficulty;
+  if (settings.gamemode !== undefined) values["gamemode"] = settings.gamemode;
+  if (settings.motd !== undefined && settings.motd.trim()) {
+    values["motd"] = sanitizePropertyValue(settings.motd);
+  }
+  if (Object.keys(values).length === 0) return;
+  writeProperties(path.join(folder, "server.properties"), values);
+}
+
+function startScript(jarName: string, memoryMb: number, nogui: boolean): string {
+  return `java -Xmx${memoryMb}M -jar ${jarName}${nogui ? " -nogui" : ""}\n`;
+}
+
 /**
- * Downloads and sets up a fresh server of the given type/version into
- * `folder` (created if missing), from official sources only - the whole
- * point of this feature is to never repeat "download a plugin/jar from a
- * random site" (see the security incident this project already had).
+ * Runs a downloaded installer jar (Forge/NeoForge/Quilt don't publish a ready
+ * server jar - they ship an installer that fetches libraries and generates the
+ * launch scripts locally). Generous timeout: these pull tens of MB of
+ * dependencies and routinely take over a minute on a small VM.
  */
+async function runInstaller(folder: string, args: string[]): Promise<void> {
+  await execFileAsync("java", args, { cwd: folder, timeout: 15 * 60_000, maxBuffer: 32 * 1024 * 1024 });
+}
+
 export async function installServer(input: {
   folder: string;
   type: ServerInstallType;
   version: string;
+  settings?: ServerInstallSettings;
 }): Promise<InstallResult> {
   const { folder, type, version } = input;
+  const settings = normalizeSettings(input.settings);
   await fsp.mkdir(folder, { recursive: true });
 
+  const isProxy = kindOf(type) === "proxy";
+  if (!isProxy) {
+    await fsp.writeFile(path.join(folder, "eula.txt"), "eula=true\n");
+  }
+
+  const result = await installJarAndScript(folder, type, version, settings.memoryMb);
+
+  if (!isProxy) {
+    applyServerProperties(folder, settings);
+  }
+  return result;
+}
+
+async function installJarAndScript(
+  folder: string,
+  type: ServerInstallType,
+  version: string,
+  memoryMb: number
+): Promise<InstallResult> {
   switch (type) {
-    case "paper": {
-      const versions = await listVersions("paper");
-      if (!versions.includes(version)) {
-        throw new Error(`Unknown Paper version: ${version}`);
-      }
-      const build = await fetchJson<{ downloads: Record<string, { name: string; url: string }> }>(
-        `https://fill.papermc.io/v3/projects/paper/versions/${encodeURIComponent(version)}/builds/latest`
+    case "paper":
+    case "velocity": {
+      const project = type === "paper" ? "paper" : "velocity";
+      const versions = await listVersions(type);
+      if (!versions.includes(version)) throw new Error(`Unknown ${project} version: ${version}`);
+      const jar = type === "paper" ? "server.jar" : "velocity.jar";
+      await downloadFile(await paperMcDownloadUrl(project, version), path.join(folder, jar));
+      await fsp.writeFile(path.join(folder, "start.sh"), startScript(jar, memoryMb, type === "paper"));
+      // Velocity's console shutdown command is "shutdown", not BungeeCord's "end".
+      return { startScript: "start.sh", stopCommand: type === "paper" ? "stop" : "shutdown" };
+    }
+    case "purpur": {
+      const versions = await listVersions("purpur");
+      if (!versions.includes(version)) throw new Error(`Unknown Purpur version: ${version}`);
+      await downloadFile(
+        `https://api.purpurmc.org/v2/purpur/${encodeURIComponent(version)}/latest/download`,
+        path.join(folder, "server.jar")
       );
-      const download = build.downloads["server:default"];
-      if (!download) throw new Error(`No server download available for Paper ${version}`);
-      await downloadFile(download.url, path.join(folder, "server.jar"));
-      await fsp.writeFile(path.join(folder, "eula.txt"), "eula=true\n");
-      await fsp.writeFile(path.join(folder, "start.sh"), "java -Xmx4G -jar server.jar -nogui\n");
+      await fsp.writeFile(path.join(folder, "start.sh"), startScript("server.jar", memoryMb, true));
       return { startScript: "start.sh", stopCommand: "stop" };
     }
     case "vanilla": {
@@ -141,21 +324,16 @@ export async function installServer(input: {
         throw new Error(`Vanilla ${version} has no server download (too old?)`);
       }
       await downloadFile(versionMeta.downloads.server.url, path.join(folder, "server.jar"));
-      await fsp.writeFile(path.join(folder, "eula.txt"), "eula=true\n");
-      await fsp.writeFile(path.join(folder, "start.sh"), "java -Xmx4G -jar server.jar -nogui\n");
+      await fsp.writeFile(path.join(folder, "start.sh"), startScript("server.jar", memoryMb, true));
       return { startScript: "start.sh", stopCommand: "stop" };
     }
     case "fabric": {
       const gameVersions = await listVersions("fabric");
-      if (!gameVersions.includes(version)) {
-        throw new Error(`Unknown Fabric game version: ${version}`);
-      }
+      if (!gameVersions.includes(version)) throw new Error(`Unknown Fabric game version: ${version}`);
       const loaders = await fetchJson<{ loader: { version: string } }[]>(
         `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(version)}`
       );
       if (loaders.length === 0) throw new Error(`No Fabric loader available for ${version}`);
-      const loaderVersion = loaders[0].loader.version;
-
       const installers = await fetchJson<{ version: string; stable: boolean }[]>(
         "https://meta.fabricmc.net/v2/versions/installer"
       );
@@ -163,22 +341,105 @@ export async function installServer(input: {
       if (!installer) throw new Error("No Fabric installer version available");
 
       const url = `https://meta.fabricmc.net/v2/versions/loader/${encodeURIComponent(version)}/${encodeURIComponent(
-        loaderVersion
+        loaders[0].loader.version
       )}/${encodeURIComponent(installer.version)}/server/jar`;
       await downloadFile(url, path.join(folder, "server.jar"));
-      await fsp.writeFile(path.join(folder, "eula.txt"), "eula=true\n");
-      await fsp.writeFile(path.join(folder, "start.sh"), "java -Xmx4G -jar server.jar -nogui\n");
+      await fsp.writeFile(path.join(folder, "start.sh"), startScript("server.jar", memoryMb, true));
       return { startScript: "start.sh", stopCommand: "stop" };
+    }
+    case "quilt": {
+      const gameVersions = await listVersions("quilt");
+      if (!gameVersions.includes(version)) throw new Error(`Unknown Quilt game version: ${version}`);
+      const installers = await fetchJson<{ version: string; url: string }[]>(
+        "https://meta.quiltmc.org/v3/versions/installer"
+      );
+      if (installers.length === 0) throw new Error("No Quilt installer available");
+      const installerJar = path.join(folder, "quilt-installer.jar");
+      await downloadFile(installers[0].url, installerJar);
+      await runInstaller(folder, [
+        "-jar",
+        "quilt-installer.jar",
+        "install",
+        "server",
+        version,
+        "--download-server",
+        "--install-dir=.",
+      ]);
+      await fsp.rm(installerJar, { force: true });
+      const launch = await firstExisting(folder, ["quilt-server-launch.jar"]);
+      await fsp.writeFile(path.join(folder, "start.sh"), startScript(launch, memoryMb, true));
+      return { startScript: "start.sh", stopCommand: "stop" };
+    }
+    case "forge": {
+      const promos = await fetchJson<{ promos: Record<string, string> }>(
+        "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json"
+      );
+      const forgeVersion = promos.promos[`${version}-recommended`] ?? promos.promos[`${version}-latest`];
+      if (!forgeVersion) throw new Error(`No Forge build available for Minecraft ${version}`);
+      const full = `${version}-${forgeVersion}`;
+      const installerJar = path.join(folder, "forge-installer.jar");
+      await downloadFile(
+        `https://maven.minecraftforge.net/net/minecraftforge/forge/${full}/forge-${full}-installer.jar`,
+        installerJar
+      );
+      await runInstaller(folder, ["-jar", "forge-installer.jar", "--installServer"]);
+      await fsp.rm(installerJar, { force: true });
+      await fsp.rm(path.join(folder, "forge-installer.jar.log"), { force: true });
+      return finishModLoaderInstall(folder, memoryMb);
+    }
+    case "neoforge": {
+      const installerJar = path.join(folder, "neoforge-installer.jar");
+      await downloadFile(
+        `https://maven.neoforged.net/releases/net/neoforged/neoforge/${encodeURIComponent(
+          version
+        )}/neoforge-${encodeURIComponent(version)}-installer.jar`,
+        installerJar
+      );
+      await runInstaller(folder, ["-jar", "neoforge-installer.jar", "--installServer"]);
+      await fsp.rm(installerJar, { force: true });
+      await fsp.rm(path.join(folder, "neoforge-installer.jar.log"), { force: true });
+      return finishModLoaderInstall(folder, memoryMb);
     }
     case "bungeecord": {
       await downloadFile(
         "https://ci.md-5.net/job/BungeeCord/lastSuccessfulBuild/artifact/bootstrap/target/BungeeCord.jar",
         path.join(folder, "BungeeCord.jar")
       );
-      await fsp.writeFile(path.join(folder, "start.sh"), "java -Xmx2G -jar BungeeCord.jar\n");
+      await fsp.writeFile(path.join(folder, "start.sh"), startScript("BungeeCord.jar", memoryMb, false));
       return { startScript: "start.sh", stopCommand: "end" };
     }
     default:
       throw new Error(`Unknown server type: ${type}`);
   }
+}
+
+async function firstExisting(folder: string, candidates: string[]): Promise<string> {
+  for (const name of candidates) {
+    if (fs.existsSync(path.join(folder, name))) return name;
+  }
+  throw new Error(`Installer finished but produced none of: ${candidates.join(", ")}`);
+}
+
+/**
+ * Forge and NeoForge installers generate their own launcher rather than a
+ * runnable jar. Modern versions (MC 1.17+) write a `run.sh` plus a
+ * `user_jvm_args.txt` holding the heap flags; older ones leave a plain
+ * universal jar behind. Which one appeared is detected rather than assumed,
+ * since it depends on the Minecraft version being installed.
+ */
+async function finishModLoaderInstall(folder: string, memoryMb: number): Promise<InstallResult> {
+  if (fs.existsSync(path.join(folder, "run.sh"))) {
+    await fsp.writeFile(path.join(folder, "user_jvm_args.txt"), `-Xmx${memoryMb}M\n`);
+    // run.sh forwards its arguments to the JVM launcher, and `nogui` is what
+    // suppresses the Swing server GUI on a headless box.
+    await fsp.writeFile(path.join(folder, "start.sh"), "bash run.sh nogui\n");
+    return { startScript: "start.sh", stopCommand: "stop" };
+  }
+  const entries = await fsp.readdir(folder);
+  const jar = entries.find((f) => /^(forge|neoforge).*\.jar$/i.test(f) && !/installer/i.test(f));
+  if (!jar) {
+    throw new Error("Installer finished but produced neither run.sh nor a Forge/NeoForge server jar");
+  }
+  await fsp.writeFile(path.join(folder, "start.sh"), startScript(jar, memoryMb, true));
+  return { startScript: "start.sh", stopCommand: "stop" };
 }

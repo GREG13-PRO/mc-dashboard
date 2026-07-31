@@ -1,16 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { upsertProperty } from "./properties";
 import type { ServerEntry } from "../types";
-
-function upsertProperty(lines: string[], key: string, value: string): string[] {
-  const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
-  const line = `${key}=${value}`;
-  if (idx >= 0) {
-    lines[idx] = line;
-    return lines;
-  }
-  return [...lines, line];
-}
 
 /**
  * Keeps a server's own server.properties in sync with the dashboard's RCON

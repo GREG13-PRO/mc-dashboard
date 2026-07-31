@@ -1,19 +1,13 @@
 import path from "node:path";
 import { Router } from "express";
 import { SERVER_TYPES, listVersions, installServer } from "./server-installer";
-import { serverRegistry } from "./registry";
+import { serverRegistry, toPublicEntry } from "./registry";
 import { requireAdmin } from "../auth/auth.middleware";
 import type { ServerInstallType } from "../types";
 
 export const installRouter = Router();
 
 const VALID_TYPES = new Set(SERVER_TYPES.map((t) => t.id));
-
-function toPublicEntry(entry: ReturnType<typeof serverRegistry.get>) {
-  if (!entry) return entry;
-  const { rcon, ...rest } = entry;
-  return { ...rest, rcon: { enabled: rcon.enabled, host: rcon.host, port: rcon.port } };
-}
 
 installRouter.get("/types", (_req, res) => {
   res.json({ types: SERVER_TYPES });
@@ -34,7 +28,7 @@ installRouter.get("/types/:type/versions", async (req, res) => {
 });
 
 installRouter.post("/", requireAdmin, async (req, res) => {
-  const { name, folder, type, version } = req.body ?? {};
+  const { name, folder, type, version, settings } = req.body ?? {};
   if (!name || !folder || !type) {
     res.status(400).json({ error: "name, folder and type are required" });
     return;
@@ -49,10 +43,14 @@ installRouter.post("/", requireAdmin, async (req, res) => {
       folder: resolvedFolder,
       type,
       version: version ?? "latest",
+      settings,
     });
     const entry = serverRegistry.create({ name, folder: resolvedFolder, startScript, stopCommand });
     res.status(201).json({ server: toPublicEntry(entry) });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    const message = (err as NodeJS.ErrnoException).code === "EACCES"
+      ? `Nincs jogosultság ide írni: ${folder}. A dashboard a "minecraft" felhasználóként fut, ezért olyan mappát adj meg, amit az elér (pl. /home/minecraft/Documents/Server/...).`
+      : (err as Error).message;
+    res.status(500).json({ error: message });
   }
 });

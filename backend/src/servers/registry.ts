@@ -6,6 +6,18 @@ import { assertFileInsideRoot } from "../files/safe-path";
 import { syncRconToServerProperties } from "./rcon-sync";
 import type { ScheduledRestartConfig, ServerEntry, ServerEntryInput } from "../types";
 
+/**
+ * Strips the RCON password before an entry is sent to a client. Shared by
+ * every route that returns a server, so a new secret added to ServerEntry
+ * only has to be stripped in one place.
+ */
+export function toPublicEntry(entry: ServerEntry): Omit<ServerEntry, "rcon"> & {
+  rcon: { enabled: boolean; host: string; port: number };
+} {
+  const { rcon, ...rest } = entry;
+  return { ...rest, rcon: { enabled: rcon.enabled, host: rcon.host, port: rcon.port } };
+}
+
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 function normalizeScheduledRestart(

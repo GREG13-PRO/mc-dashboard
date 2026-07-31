@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { serverRegistry } from "./registry";
+import { serverRegistry, toPublicEntry } from "./registry";
 import {
   startServer,
   stopServer,
@@ -50,13 +50,6 @@ const PLAYER_ACTION_COMMANDS: Record<string, (name: string) => string> = {
   starve: (name) => `data merge entity ${name} {foodLevel:0}`,
   kick: (name) => `kick ${name}`,
 };
-
-function toPublicEntry(entry: ReturnType<typeof serverRegistry.get>) {
-  if (!entry) return entry;
-  // Never send the RCON password back to the client.
-  const { rcon, ...rest } = entry;
-  return { ...rest, rcon: { enabled: rcon.enabled, host: rcon.host, port: rcon.port } };
-}
 
 serversRouter.get("/", async (req, res) => {
   const entries = serverRegistry.list().filter((entry) => hasAnyPermission(req, entry.id));
