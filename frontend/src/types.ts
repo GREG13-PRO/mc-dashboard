@@ -74,15 +74,41 @@ export interface BackupInfo {
   createdAt: string;
 }
 
-export type PlayerAction = "kill" | "heal" | "feed" | "starve" | "kick";
+export type PlayerAction =
+  | "kill"
+  | "heal"
+  | "feed"
+  | "starve"
+  | "kick"
+  | "ban"
+  | "pardon"
+  | "whitelist_add"
+  | "whitelist_remove";
 
+// Only the in-game moderation verbs; ban/whitelist live in their own tab so
+// this row of buttons stays short next to every online player.
 export const PLAYER_ACTIONS: { action: PlayerAction; label: string }[] = [
   { action: "kill", label: "Ölés" },
   { action: "heal", label: "Gyógyítás" },
   { action: "feed", label: "Etetés" },
   { action: "starve", label: "Éheztetés" },
   { action: "kick", label: "Kirúgás" },
+  { action: "ban", label: "Kitiltás" },
 ];
+
+export interface AccessEntry {
+  name: string;
+  uuid: string | null;
+  reason: string | null;
+  created: string | null;
+}
+
+export interface AccessLists {
+  whitelist: AccessEntry[];
+  bannedPlayers: AccessEntry[];
+  bannedIps: AccessEntry[];
+  whitelistEnforced: boolean;
+}
 
 export interface FileEntryInfo {
   name: string;

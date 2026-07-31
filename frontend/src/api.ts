@@ -1,4 +1,5 @@
 import type {
+  AccessLists,
   BackupInfo,
   FileEntryInfo,
   InstalledPlugin,
@@ -190,6 +191,20 @@ export const api = {
       body: JSON.stringify(input),
     });
     return server;
+  },
+
+  async getAccessLists(serverId: string): Promise<AccessLists> {
+    const { access } = await request<{ access: AccessLists }>(`/servers/${serverId}/access`);
+    return access;
+  },
+  async setWhitelistMode(serverId: string, enabled: boolean): Promise<void> {
+    await request(`/servers/${serverId}/access/whitelist-mode`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+    });
+  },
+  async ipAction(serverId: string, ip: string, action: "ban" | "pardon"): Promise<void> {
+    await request(`/servers/${serverId}/access/ip`, { method: "POST", body: JSON.stringify({ ip, action }) });
   },
 
   async listPlugins(serverId: string, checkUpdates = false): Promise<InstalledPlugin[]> {

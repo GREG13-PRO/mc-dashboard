@@ -10,8 +10,8 @@ import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
 
-type Tab = "console" | "files" | "plugins" | "players" | "settings";
-const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "settings"];
+type Tab = "console" | "files" | "plugins" | "players" | "access" | "settings";
+const ALL_TABS: Tab[] = ["console", "files", "plugins", "players", "access", "settings"];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
 // into the server folder, so it rides on "files" rather than adding a fifth
@@ -22,7 +22,9 @@ export function renderServerView(
   callbacks: { onDeleted: () => void; onChanged: () => void }
 ): () => void {
   const perms = permissionsFor(serverId);
-  const availableTabs = ALL_TABS.filter((tab) => perms[tab === "plugins" ? "files" : tab]);
+  const availableTabs = ALL_TABS.filter((tab) =>
+    perms[tab === "plugins" ? "files" : tab === "access" ? "players" : tab]
+  );
   let activeTab: Tab = availableTabs[0] ?? "console";
   let server: ServerWithStatus | null = null;
   let disposed = false;
@@ -113,6 +115,7 @@ export function renderServerView(
       files: "Fájlok",
       plugins: "Bővítmények",
       players: "Játékosok",
+      access: "Whitelist / Ban",
       settings: "Beállítások",
     }[tab];
   }
@@ -146,6 +149,8 @@ export function renderServerView(
       void renderPlugins(content);
     } else if (activeTab === "players") {
       renderPlayers(content);
+    } else if (activeTab === "access") {
+      void renderAccess(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -225,6 +230,137 @@ export function renderServerView(
     socket = null;
     terminal?.dispose();
     terminal = null;
+  }
+
+  async function renderAccess(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:1rem;">Betöltés…</div>`;
+    let access;
+    try {
+      access = await api.getAccessLists(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:1rem;">${escapeHtml(
+        err instanceof ApiError ? err.message : "A listák betöltése sikertelen"
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+    const running = server?.running ?? false;
+
+    // The lists are read from the server's own json files, so they show even
+    // while it is stopped; changing them goes through console commands, which
+    // do need it running.
+    const listHtml = (entries: typeof access.whitelist, removeAction: string, emptyText: string) =>
+      entries.length === 0
+        ? `<div style="color:var(--text-dim);font-size:0.85rem;padding:0.4rem 0;">${emptyText}</div>`
+        : entries
+            .map(
+              (e) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+          <div style="min-width:0;">
+            <div>${escapeHtml(e.name)}</div>
+            ${
+              e.reason || e.created
+                ? `<div style="color:var(--text-dim);font-size:0.78rem;">${escapeHtml(
+                    [e.reason, e.created ? new Date(e.created).toLocaleDateString("hu-HU") : null]
+                      .filter(Boolean)
+                      .join(" · ")
+                  )}</div>`
+                : ""
+            }
+          </div>
+          <button class="btn" data-remove="${removeAction}" data-name="${escapeHtml(e.name)}" ${
+            running ? "" : "disabled title='A szervernek futnia kell'"
+          }>Eltávolítás</button>
+        </div>`
+            )
+            .join("");
+
+    content.innerHTML = `
+      <div class="field checkbox-row">
+        <input id="wl-mode" type="checkbox" ${access.whitelistEnforced ? "checked" : ""} />
+        <label for="wl-mode" style="margin:0">Whitelist bekapcsolva (csak a listán szereplők léphetnek be)</label>
+      </div>
+
+      <h4 style="margin:1.2rem 0 0.4rem;">Whitelist (${access.whitelist.length})</h4>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">
+        <input id="wl-name" placeholder="Játékosnév" style="max-width:200px;" ${running ? "" : "disabled"} />
+        <button class="btn btn-primary" id="wl-add" ${running ? "" : "disabled"}>Hozzáadás</button>
+      </div>
+      <div id="wl-list">${listHtml(access.whitelist, "whitelist_remove", "A whitelist üres.")}</div>
+
+      <h4 style="margin:1.5rem 0 0.4rem;">Kitiltott játékosok (${access.bannedPlayers.length})</h4>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">
+        <input id="ban-name" placeholder="Játékosnév" style="max-width:200px;" ${running ? "" : "disabled"} />
+        <button class="btn btn-danger" id="ban-add" ${running ? "" : "disabled"}>Kitiltás</button>
+      </div>
+      <div id="ban-list">${listHtml(access.bannedPlayers, "pardon", "Senki nincs kitiltva.")}</div>
+
+      <h4 style="margin:1.5rem 0 0.4rem;">Kitiltott IP-címek (${access.bannedIps.length})</h4>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;flex-wrap:wrap;">
+        <input id="ip-value" placeholder="pl. 192.168.1.10" style="max-width:200px;" ${running ? "" : "disabled"} />
+        <button class="btn btn-danger" id="ip-add" ${running ? "" : "disabled"}>IP kitiltása</button>
+      </div>
+      <div id="ip-list">${listHtml(access.bannedIps, "pardon_ip", "Nincs kitiltott IP.")}</div>
+
+      ${
+        running
+          ? ""
+          : `<p style="color:var(--text-dim);font-size:0.8rem;margin-top:1rem;">A listák szerkesztéséhez futnia kell a szervernek (a whitelist kapcsoló állóban is működik).</p>`
+      }
+    `;
+
+    content.querySelector<HTMLInputElement>("#wl-mode")!.onchange = async (e) => {
+      const el = e.target as HTMLInputElement;
+      try {
+        await api.setWhitelistMode(serverId, el.checked);
+        showToast(el.checked ? "Whitelist bekapcsolva" : "Whitelist kikapcsolva");
+      } catch (err) {
+        el.checked = !el.checked;
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült állítani", "error");
+      }
+    };
+
+    const run = async (fn: () => Promise<void>, okMessage: string) => {
+      try {
+        await fn();
+        showToast(okMessage);
+        // Minecraft writes the json files a moment after the command lands.
+        await new Promise((r) => setTimeout(r, 700));
+        await renderAccess(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Művelet sikertelen", "error");
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#wl-add")!.onclick = () => {
+      const name = content.querySelector<HTMLInputElement>("#wl-name")!.value.trim();
+      if (!name) return;
+      void run(() => api.playerAction(serverId, name, "whitelist_add"), `${name} felkerült a whitelistre`);
+    };
+    content.querySelector<HTMLButtonElement>("#ban-add")!.onclick = async () => {
+      const name = content.querySelector<HTMLInputElement>("#ban-name")!.value.trim();
+      if (!name) return;
+      if (!(await confirmModal(`Biztosan kitiltod: <strong>${escapeHtml(name)}</strong>?`))) return;
+      void run(() => api.playerAction(serverId, name, "ban"), `${name} kitiltva`);
+    };
+    content.querySelector<HTMLButtonElement>("#ip-add")!.onclick = async () => {
+      const ip = content.querySelector<HTMLInputElement>("#ip-value")!.value.trim();
+      if (!ip) return;
+      if (!(await confirmModal(`Biztosan kitiltod ezt az IP-t: <strong>${escapeHtml(ip)}</strong>?`))) return;
+      void run(() => api.ipAction(serverId, ip, "ban"), `${ip} kitiltva`);
+    };
+
+    content.querySelectorAll<HTMLButtonElement>("[data-remove]").forEach((btn) => {
+      btn.onclick = () => {
+        const name = btn.dataset.name!;
+        const kind = btn.dataset.remove!;
+        if (kind === "pardon_ip") {
+          void run(() => api.ipAction(serverId, name, "pardon"), `${name} feloldva`);
+        } else {
+          void run(() => api.playerAction(serverId, name, kind as PlayerAction), `${name} eltávolítva`);
+        }
+      };
+    });
   }
 
   async function renderPlugins(content: HTMLElement) {

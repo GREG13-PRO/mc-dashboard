@@ -11,6 +11,7 @@ import {
 } from "./process-manager";
 import { getCachedPlayers } from "./rcon-poller";
 import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
+import { readAccessLists, setWhitelistEnforced } from "./access-manager";
 import {
   searchPlugins,
   listPluginVersions,
@@ -57,7 +58,15 @@ const PLAYER_ACTION_COMMANDS: Record<string, (name: string) => string> = {
   feed: (name) => `data merge entity ${name} {foodLevel:20}`,
   starve: (name) => `data merge entity ${name} {foodLevel:0}`,
   kick: (name) => `kick ${name}`,
+  ban: (name) => `ban ${name}`,
+  pardon: (name) => `pardon ${name}`,
+  whitelist_add: (name) => `whitelist add ${name}`,
+  whitelist_remove: (name) => `whitelist remove ${name}`,
 };
+
+// An IP is not a player name, so it gets its own allowlist rather than being
+// squeezed through PLAYER_NAME_RE. IPv4 only - that is all `ban-ip` accepts.
+const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 
 serversRouter.get("/", async (req, res) => {
   const entries = serverRegistry.list().filter((entry) => hasAnyPermission(req, entry.id));
@@ -285,6 +294,67 @@ serversRouter.post("/:id/players/:name/action", requirePermission("players"), as
   }
   try {
     await sendCommand(entry, buildCommand(req.params.name));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/access", requirePermission("players"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ access: await readAccessLists(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Toggling the whitelist writes server.properties so it also holds while the
+// server is stopped, and additionally tells a running server so it takes
+// effect without a restart.
+serversRouter.post("/:id/access/whitelist-mode", requirePermission("players"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const enabled = Boolean(req.body?.enabled);
+  try {
+    setWhitelistEnforced(entry, enabled);
+    if (await isServerRunning(entry)) {
+      await sendCommand(entry, `whitelist ${enabled ? "on" : "off"}`);
+    }
+    res.json({ ok: true, enabled });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/access/ip", requirePermission("players"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const { ip, action } = req.body ?? {};
+  if (typeof ip !== "string" || !IPV4_RE.test(ip)) {
+    res.status(400).json({ error: "Invalid IP address" });
+    return;
+  }
+  if (action !== "ban" && action !== "pardon") {
+    res.status(400).json({ error: "action must be ban or pardon" });
+    return;
+  }
+  if (!(await isServerRunning(entry))) {
+    res.status(409).json({ error: "Az IP-tiltáshoz futnia kell a szervernek." });
+    return;
+  }
+  try {
+    await sendCommand(entry, action === "ban" ? `ban-ip ${ip}` : `pardon-ip ${ip}`);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
