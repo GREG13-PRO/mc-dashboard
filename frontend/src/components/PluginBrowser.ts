@@ -9,7 +9,7 @@ const SOURCE_LABELS: Record<PluginSource, string> = {
   hangar: "Hangar (PaperMC)",
 };
 
-type SortKey = "downloads" | "name";
+type SortKey = "relevance" | "downloads" | "name";
 
 function formatDownloads(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(".0", "")}M`;
@@ -31,10 +31,14 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
 
   let results: PluginSearchResult[] = [];
   let source: PluginSource = "modrinth";
-  let sort: SortKey = "downloads";
+  // Relevance is what the registry ranked; re-sorting by downloads on a
+  // keyword search buries the plugin actually being looked for.
+  let sort: SortKey = "relevance";
   let category: string | null = null;
   // Cached per project so reopening a card does not re-hit the registry.
   const versionCache = new Map<string, PluginVersionInfo[]>();
+  // Bumped on every search so badge lookups from a previous grid stop writing.
+  let badgeToken = 0;
 
   panel.innerHTML = `
     <div class="file-editor-header">
@@ -49,6 +53,7 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
         </select>
         <input class="pb-search" id="pb-query" placeholder="pl. LuckPerms, WorldEdit, EssentialsX" />
         <select id="pb-sort" style="max-width:150px;">
+          <option value="relevance">Találati sorrend</option>
           <option value="downloads">Népszerűség</option>
           <option value="name">Név szerint</option>
         </select>
@@ -128,6 +133,7 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
 
   function visibleResults(): PluginSearchResult[] {
     const filtered = category ? results.filter((r) => r.categories.includes(category!)) : results;
+    if (sort === "relevance") return filtered;
     return [...filtered].sort((a, b) =>
       sort === "name" ? a.name.localeCompare(b.name, "hu") : b.downloads - a.downloads
     );
@@ -179,21 +185,35 @@ export function openPluginBrowser(serverId: string, onInstalled: () => void): ()
     void fillCompatBadges(shown);
   }
 
-  /** Version lookups are one request per project, so they run after the grid
-   * is already on screen rather than blocking it. */
+  /**
+   * Version lookups are one request per project, so they run after the grid is
+   * already on screen rather than blocking it. Every card is filled, a few at a
+   * time - doing only the first handful left the rest showing a placeholder
+   * that never resolved.
+   */
   async function fillCompatBadges(shown: PluginSearchResult[]) {
-    for (const r of shown.slice(0, 12)) {
-      const badge = resultsEl.querySelector<HTMLElement>(`[data-compat="${CSS.escape(r.id)}"]`);
-      if (!badge) continue;
-      try {
-        const versions = versionCache.get(r.id) ?? (await api.listPluginVersions(serverId, source, r.id));
-        versionCache.set(r.id, versions);
-        const label = compatLabel(versions);
-        badge.textContent = label ?? "nincs build";
-      } catch {
-        badge.textContent = "—";
+    const queue = [...shown];
+    const token = ++badgeToken;
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        // A new search invalidates in-flight lookups for the old grid.
+        if (token !== badgeToken) return;
+        const r = queue.shift()!;
+        const badge = resultsEl.querySelector<HTMLElement>(`[data-compat="${CSS.escape(r.id)}"]`);
+        if (!badge) continue;
+        try {
+          const versions = versionCache.get(r.id) ?? (await api.listPluginVersions(serverId, source, r.id));
+          versionCache.set(r.id, versions);
+          if (token !== badgeToken) return;
+          badge.textContent = compatLabel(versions) ?? "nincs build";
+        } catch {
+          badge.textContent = "—";
+        }
       }
-    }
+    };
+
+    await Promise.all([worker(), worker(), worker(), worker()]);
   }
 
   /** Unchanged install path: newest compatible version, same endpoint. */

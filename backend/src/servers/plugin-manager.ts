@@ -92,6 +92,29 @@ interface HangarProject {
  * An empty query returns the most-downloaded plugins rather than nothing, so
  * the browser has something to show the moment it opens.
  */
+// Modrinth returns loader tags mixed in with real categories. They are useless
+// as filters here - every result already matches the target platform by
+// construction - and they crowded out the actual categories in the chip row.
+const LOADER_TAGS = new Set([
+  "paper",
+  "bukkit",
+  "spigot",
+  "folia",
+  "purpur",
+  "velocity",
+  "bungeecord",
+  "waterfall",
+  "sponge",
+  "fabric",
+  "forge",
+  "neoforge",
+  "quilt",
+]);
+
+function stripLoaderTags(categories: string[]): string[] {
+  return categories.filter((c) => !LOADER_TAGS.has(c.toLowerCase()));
+}
+
 export async function searchPlugins(query: string, source: PluginSource): Promise<PluginSearchResult[]> {
   const q = query.trim();
   return searchCache(`${source}:${q}`, async () => {
@@ -111,9 +134,7 @@ export async function searchPlugins(query: string, source: PluginSource): Promis
         downloads: h.downloads,
         pageUrl: `https://modrinth.com/plugin/${h.slug}`,
         iconUrl: h.icon_url ?? null,
-        // display_categories drops the loader tags (paper/bukkit/...), which
-        // are noise on a card: every result here matches those by definition.
-        categories: h.display_categories ?? h.categories ?? [],
+        categories: stripLoaderTags(h.display_categories ?? h.categories ?? []),
       }));
     }
     const data = await fetchJson<{ result: HangarProject[] }>(
