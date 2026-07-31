@@ -8,6 +8,7 @@ import { serverRegistry } from "../servers/registry";
 import { subscribeConsole } from "../servers/console-stream";
 import { isServerRunning, sendCommand } from "../servers/process-manager";
 import { recordAudit } from "../audit/audit-log";
+import { recordCommand } from "../servers/macros";
 import type { ServerEntry, UserRecord } from "../types";
 
 const CONSOLE_PATH_RE = /^\/ws\/console\/([^/]+)$/;
@@ -80,6 +81,8 @@ function handleConnection(ws: WebSocket, entry: ServerEntry, user: UserRecord): 
               ok = false;
               send(ws, { type: "error", message: (err as Error).message });
             });
+            // Feeds the macro recorder when one is running for this server.
+            recordCommand(entry, line);
             recordAudit({
               actor: user.username,
               actorId: user.id,

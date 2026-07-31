@@ -301,3 +301,23 @@ export interface ResourcePackStatus {
   sha1: string | null;
   required: boolean;
 }
+
+export interface MacroStep {
+  command: string;
+  delayMs: number;
+}
+
+export interface Macro {
+  id: string;
+  name: string;
+  description: string;
+  steps: MacroStep[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PresenceEntry {
+  username: string;
+  resource: string;
+  since: string;
+}

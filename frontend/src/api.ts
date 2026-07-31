@@ -17,9 +17,12 @@ import type {
   ServerInstallType,
   JvmRecommendation,
   LagReport,
+  Macro,
+  MacroStep,
   Pack,
   PackKind,
   PluginConflict,
+  PresenceEntry,
   ResourcePackStatus,
   ServerWithStatus,
   TimeMachineConfig,
@@ -227,6 +230,50 @@ export const api = {
   },
   async deleteConsoleLog(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/console-logs/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+
+  async listMacros(serverId: string): Promise<{ macros: Macro[]; recording: boolean }> {
+    return request(`/servers/${serverId}/macros`);
+  },
+  async saveMacro(
+    serverId: string,
+    input: { id?: string; name: string; description?: string; steps: MacroStep[] }
+  ): Promise<Macro> {
+    const { macro } = await request<{ macro: Macro }>(`/servers/${serverId}/macros`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return macro;
+  },
+  async deleteMacro(serverId: string, macroId: string): Promise<void> {
+    await request(`/servers/${serverId}/macros/${macroId}`, { method: "DELETE" });
+  },
+  async runMacro(serverId: string, macroId: string): Promise<{ executed: number; skipped: string[] }> {
+    const { result } = await request<{ result: { executed: number; skipped: string[] } }>(
+      `/servers/${serverId}/macros/${macroId}/run`,
+      { method: "POST" }
+    );
+    return result;
+  },
+  async setMacroRecording(
+    serverId: string,
+    state: "start" | "stop"
+  ): Promise<{ recording: boolean; steps?: MacroStep[] }> {
+    return request(`/servers/${serverId}/macros/record/${state}`, { method: "POST" });
+  },
+  async cloneServer(serverId: string, name: string): Promise<ServerWithStatus> {
+    const { server } = await request<{ server: ServerWithStatus }>(`/servers/${serverId}/clone`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+    return server;
+  },
+  async announcePresence(serverId: string, resource: string, leaving = false): Promise<PresenceEntry[]> {
+    const { present } = await request<{ present: PresenceEntry[] }>(`/servers/${serverId}/presence`, {
+      method: "POST",
+      body: JSON.stringify({ resource, leaving }),
+    });
+    return present;
   },
 
   async listPacks(

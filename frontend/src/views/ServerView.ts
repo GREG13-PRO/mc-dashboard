@@ -10,7 +10,7 @@ import { escapeHtml } from "../lib/escape";
 import { ansiLineToHtml } from "../lib/ansi";
 import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
-import { PLAYER_ACTIONS, type PlayerAction, type ServerWithStatus } from "../types";
+import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatus } from "../types";
 
 type Tab =
   | "console"
@@ -22,6 +22,7 @@ type Tab =
   | "timeline"
   | "performance"
   | "content"
+  | "macros"
   | "settings";
 const ALL_TABS: Tab[] = [
   "console",
@@ -33,6 +34,7 @@ const ALL_TABS: Tab[] = [
   "timeline",
   "performance",
   "content",
+  "macros",
   "settings",
 ];
 
@@ -51,6 +53,8 @@ export function renderServerView(
   const capabilityFor = (tab: Tab) =>
     tab === "plugins" || tab === "content"
       ? "files"
+      : tab === "macros"
+        ? "console"
       : tab === "access"
         ? "players"
         : tab === "luckperms" || tab === "timeline" || tab === "performance"
@@ -209,6 +213,7 @@ export function renderServerView(
       timeline: "Time Machine",
       performance: "Teljesítmény",
       content: "Csomagok",
+      macros: "Makrók",
       settings: "Beállítások",
     }[tab];
   }
@@ -254,6 +259,8 @@ export function renderServerView(
       void renderPerformance(content);
     } else if (activeTab === "content") {
       void renderContent(content);
+    } else if (activeTab === "macros") {
+      void renderMacros(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -434,6 +441,219 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderMacros(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">Betöltés…</div>`;
+    let data;
+    try {
+      data = await api.listMacros(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : "Nem sikerült betölteni"
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+    const running = server?.running ?? false;
+
+    content.innerHTML = `
+      <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">
+        A makró parancsok sorozata, egy gombra kötve. A felvétel közben a konzolba írt
+        parancsok automatikusan lépésekké válnak, a köztük eltelt idő pedig várakozássá.
+      </p>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        <button class="btn ${data.recording ? "btn-danger" : ""}" id="mac-record">
+          ${data.recording ? "Felvétel leállítása" : "Felvétel indítása"}
+        </button>
+        <button class="btn btn-primary" id="mac-new">+ Új makró</button>
+      </div>
+
+      <div id="mac-list"></div>
+    `;
+
+    const list = content.querySelector<HTMLDivElement>("#mac-list")!;
+    list.innerHTML =
+      data.macros.length === 0
+        ? `<div class="empty-state" style="padding:16px;">Még nincs makró.</div>`
+        : data.macros
+            .map(
+              (m) => `
+      <div style="padding:10px 0;border-bottom:0.5px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="min-width:0;">
+            <div style="font-weight:600;">${escapeHtml(m.name)}</div>
+            <div style="color:var(--text-dim);font-size:12px;">
+              ${m.steps.length} lépés${m.description ? ` · ${escapeHtml(m.description)}` : ""}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-primary" data-run="${m.id}" ${running ? "" : "disabled"}>Futtatás</button>
+            <button class="btn" data-edit-macro="${m.id}">Szerkesztés</button>
+            <button class="btn btn-danger" data-del-macro="${m.id}">Törlés</button>
+          </div>
+        </div>
+        <div style="color:var(--text-dim);font-size:11px;font-family:'SF Mono',ui-monospace,monospace;margin-top:6px;">
+          ${m.steps.slice(0, 4).map((st) => escapeHtml(st.command)).join(" → ")}${
+            m.steps.length > 4 ? " → …" : ""
+          }
+        </div>
+      </div>`
+            )
+            .join("");
+
+    content.querySelector<HTMLButtonElement>("#mac-record")!.onclick = async () => {
+      try {
+        if (data.recording) {
+          const res = await api.setMacroRecording(serverId, "stop");
+          const steps = res.steps ?? [];
+          if (steps.length === 0) {
+            showToast("Nem rögzült parancs.");
+            await renderMacros(content);
+            return;
+          }
+          openMacroEditor(null, steps);
+        } else {
+          await api.setMacroRecording(serverId, "start");
+          showToast("Felvétel elindult — írj parancsokat a konzolba.");
+          await renderMacros(content);
+        }
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+      }
+    };
+
+    content.querySelector<HTMLButtonElement>("#mac-new")!.onclick = () =>
+      openMacroEditor(null, [{ command: "", delayMs: 0 }]);
+
+    list.querySelectorAll<HTMLButtonElement>("[data-run]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          const r = await api.runMacro(serverId, btn.dataset.run!);
+          showToast(
+            r.skipped.length > 0
+              ? `${r.executed} parancs lefutott, ${r.skipped.length} kihagyva`
+              : `${r.executed} parancs lefutott`
+          );
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Nem sikerült", "error");
+        }
+      };
+    });
+
+    list.querySelectorAll<HTMLButtonElement>("[data-edit-macro]").forEach((btn) => {
+      btn.onclick = () => {
+        const macro = data!.macros.find((m) => m.id === btn.dataset.editMacro);
+        if (macro) openMacroEditor(macro, macro.steps);
+      };
+    });
+
+    list.querySelectorAll<HTMLButtonElement>("[data-del-macro]").forEach((btn) => {
+      btn.onclick = async () => {
+        if (!(await confirmModal("Törlöd ezt a makrót?"))) return;
+        try {
+          await api.deleteMacro(serverId, btn.dataset.delMacro!);
+          showToast("Törölve");
+          await renderMacros(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : "Törlés sikertelen", "error");
+        }
+      };
+    });
+
+    function openMacroEditor(macro: { id: string; name: string; description: string } | null, steps: MacroStep[]) {
+      const wrap = document.createElement("div");
+      let working: MacroStep[] = steps.map((s) => ({ ...s }));
+
+      const draw = () => {
+        wrap.innerHTML = `
+          <h3>${macro ? "Makró szerkesztése" : "Új makró"}</h3>
+          <div class="field">
+            <label for="mac-name">Név</label>
+            <input id="mac-name" value="${escapeHtml(macro?.name ?? "")}" placeholder="pl. Esemény indítás" />
+          </div>
+          <div class="field">
+            <label for="mac-desc">Leírás</label>
+            <input id="mac-desc" value="${escapeHtml(macro?.description ?? "")}" />
+          </div>
+          <label>Lépések</label>
+          <div id="mac-steps">
+            ${working
+              .map(
+                (st, i) => `
+              <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+                <span style="color:var(--text-dim);font-size:11px;width:16px;">${i + 1}</span>
+                <input data-cmd="${i}" value="${escapeHtml(st.command)}" placeholder="parancs" style="flex:1;" />
+                <input data-delay="${i}" type="number" min="0" max="30000" value="${st.delayMs}"
+                       title="Várakozás utána (ms)" style="width:96px;" />
+                <button class="btn btn-danger" data-rm="${i}">✕</button>
+              </div>`
+              )
+              .join("")}
+          </div>
+          <button class="btn" id="mac-add-step" style="margin-top:4px;">+ Lépés</button>
+          <div id="form-error" class="error-text"></div>
+          <div class="modal-actions">
+            <button class="btn" id="mac-cancel">Mégse</button>
+            <button class="btn btn-primary" id="mac-save">Mentés</button>
+          </div>`;
+
+        const sync = () => {
+          wrap.querySelectorAll<HTMLInputElement>("[data-cmd]").forEach((el) => {
+            working[Number(el.dataset.cmd)].command = el.value;
+          });
+          wrap.querySelectorAll<HTMLInputElement>("[data-delay]").forEach((el) => {
+            working[Number(el.dataset.delay)].delayMs = Number(el.value) || 0;
+          });
+        };
+
+        wrap.querySelector<HTMLButtonElement>("#mac-add-step")!.onclick = () => {
+          sync();
+          working.push({ command: "", delayMs: 0 });
+          draw();
+        };
+        wrap.querySelectorAll<HTMLButtonElement>("[data-rm]").forEach((btn) => {
+          btn.onclick = () => {
+            sync();
+            working.splice(Number(btn.dataset.rm), 1);
+            if (working.length === 0) working.push({ command: "", delayMs: 0 });
+            draw();
+          };
+        });
+        wrap.querySelector<HTMLButtonElement>("#mac-cancel")!.onclick = () => close();
+        wrap.querySelector<HTMLButtonElement>("#mac-save")!.onclick = async () => {
+          sync();
+          const errorEl = wrap.querySelector<HTMLDivElement>("#form-error")!;
+          const name = wrap.querySelector<HTMLInputElement>("#mac-name")!.value.trim();
+          if (!name) {
+            errorEl.textContent = "Adj nevet a makrónak.";
+            return;
+          }
+          const cleaned = working.filter((st) => st.command.trim());
+          if (cleaned.length === 0) {
+            errorEl.textContent = "Legalább egy parancs kell.";
+            return;
+          }
+          try {
+            await api.saveMacro(serverId, {
+              id: macro?.id,
+              name,
+              description: wrap.querySelector<HTMLInputElement>("#mac-desc")!.value.trim(),
+              steps: cleaned,
+            });
+            showToast("Makró mentve");
+            close();
+            await renderMacros(content);
+          } catch (err) {
+            errorEl.textContent = err instanceof ApiError ? err.message : "Mentés sikertelen";
+          }
+        };
+      };
+
+      const close = openModal(wrap);
+      draw();
+    }
   }
 
   async function renderContent(content: HTMLElement) {

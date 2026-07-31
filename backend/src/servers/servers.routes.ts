@@ -18,6 +18,18 @@ import { hasLuckPerms, createEditorSession, LuckPermsError } from "./luckperms";
 import { runWorldAction, WORLD_ACTIONS, WorldControlError } from "./world-control";
 import { detectConflicts, diagnoseLag, recommendJvmFlags, applyJvmScript } from "./performance";
 import {
+  listMacros,
+  saveMacro,
+  deleteMacro,
+  runMacro,
+  startRecording,
+  stopRecording,
+  isRecording,
+  MacroError,
+} from "./macros";
+import { cloneServer, CloneError } from "./clone";
+import { announce, release, listFor } from "./presence";
+import {
   listPacks,
   savePack,
   deletePack,
@@ -469,6 +481,90 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
   } catch (err) {
     res.status(409).json({ error: (err as Error).message });
   }
+});
+
+serversRouter.get("/:id/macros", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ macros: await listMacros(entry), recording: isRecording(entry) });
+});
+
+serversRouter.post("/:id/macros", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.status(201).json({ macro: await saveMacro(entry, req.body ?? {}) });
+  } catch (err) {
+    res.status(err instanceof MacroError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/macros/:macroId", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  await deleteMacro(entry, req.params.macroId);
+  res.json({ ok: true });
+});
+
+serversRouter.post("/:id/macros/:macroId/run", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ result: await runMacro(entry, req.params.macroId) });
+  } catch (err) {
+    res.status(err instanceof MacroError ? 409 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/macros/record/:state", requirePermission("console"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (req.params.state === "start") {
+    startRecording(entry);
+    res.json({ ok: true, recording: true });
+    return;
+  }
+  res.json({ ok: true, recording: false, steps: stopRecording(entry) });
+});
+
+serversRouter.post("/:id/clone", requireAdmin, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const name = String(req.body?.name ?? "").trim() || `${entry.name} teszt`;
+  try {
+    res.status(201).json({ server: toPublicEntry(await cloneServer(entry, name)) });
+  } catch (err) {
+    res.status(err instanceof CloneError ? 409 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/presence", requireAnyPermission, (req, res) => {
+  res.json({ present: listFor(req.params.id, req.user!.id) });
+});
+
+serversRouter.post("/:id/presence", requireAnyPermission, (req, res) => {
+  const resource = String(req.body?.resource ?? "").slice(0, 200);
+  if (req.body?.leaving) release(req.user!.id, req.params.id, resource);
+  else if (resource) announce(req.user!.id, req.user!.username, req.params.id, resource);
+  res.json({ present: listFor(req.params.id, req.user!.id) });
 });
 
 serversRouter.get("/:id/performance/conflicts", requirePermission("settings"), async (req, res) => {
