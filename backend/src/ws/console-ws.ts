@@ -7,7 +7,8 @@ import { userStore } from "../auth/user-store";
 import { serverRegistry } from "../servers/registry";
 import { subscribeConsole } from "../servers/console-stream";
 import { isServerRunning, sendCommand } from "../servers/process-manager";
-import type { ServerEntry } from "../types";
+import { recordAudit } from "../audit/audit-log";
+import type { ServerEntry, UserRecord } from "../types";
 
 const CONSOLE_PATH_RE = /^\/ws\/console\/([^/]+)$/;
 
@@ -35,7 +36,10 @@ function send(ws: WebSocket, payload: Record<string, unknown>): void {
   }
 }
 
-function handleConnection(ws: WebSocket, entry: ServerEntry): void {
+// The authenticated user is threaded in purely so console commands can be
+// attributed in the audit log: these never touch Express, so the generic
+// audit middleware cannot see them.
+function handleConnection(ws: WebSocket, entry: ServerEntry, user: UserRecord): void {
   let statusTimer: NodeJS.Timeout | null = null;
   let lastRunning: boolean | null = null;
 
@@ -71,9 +75,21 @@ function handleConnection(ws: WebSocket, entry: ServerEntry): void {
         case "input": {
           if (typeof msg.data === "string") {
             const line = msg.data.replace(/\r?\n$/, "");
-            await sendCommand(entry, line).catch((err) =>
-              send(ws, { type: "error", message: (err as Error).message })
-            );
+            let ok = true;
+            await sendCommand(entry, line).catch((err) => {
+              ok = false;
+              send(ws, { type: "error", message: (err as Error).message });
+            });
+            recordAudit({
+              actor: user.username,
+              actorId: user.id,
+              action: "Konzolparancs",
+              serverId: entry.id,
+              serverName: entry.name,
+              detail: line,
+              ip: null,
+              ok,
+            });
           }
           break;
         }
@@ -129,7 +145,7 @@ export function setupConsoleWebSocket(httpServer: HttpServer): void {
       }
 
       wss.handleUpgrade(req, socket, head, (ws) => {
-        handleConnection(ws, entry);
+        handleConnection(ws, entry, user);
       });
     })();
   });

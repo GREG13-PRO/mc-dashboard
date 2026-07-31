@@ -1,5 +1,6 @@
 import type {
   AccessLists,
+  AuditRecord,
   BackupInfo,
   FileEntryInfo,
   InstalledPlugin,
@@ -192,6 +193,11 @@ export const api = {
       body: JSON.stringify(input),
     });
     return server;
+  },
+
+  async listAudit(limit = 200): Promise<AuditRecord[]> {
+    const { entries } = await request<{ entries: AuditRecord[] }>(`/audit?limit=${limit}`);
+    return entries;
   },
 
   async getResourceHistory(serverId: string): Promise<ResourceSample[]> {

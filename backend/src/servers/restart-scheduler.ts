@@ -1,5 +1,6 @@
 import { serverRegistry } from "./registry";
 import { isServerRunning, restartServer } from "./process-manager";
+import { recordAudit, SYSTEM_ACTOR } from "../audit/audit-log";
 
 const CHECK_INTERVAL_MS = 30_000;
 
@@ -27,9 +28,21 @@ async function checkAll(): Promise<void> {
 
     if (await isServerRunning(entry)) {
       console.log(`[restart-scheduler] Restarting "${entry.name}" (scheduled ${hhmm})`);
-      await restartServer(entry).catch((err) =>
-        console.error(`[restart-scheduler] Failed to restart "${entry.name}":`, err)
-      );
+      let ok = true;
+      await restartServer(entry).catch((err) => {
+        ok = false;
+        console.error(`[restart-scheduler] Failed to restart "${entry.name}":`, err);
+      });
+      recordAudit({
+        actor: SYSTEM_ACTOR,
+        actorId: null,
+        action: "Ütemezett újraindítás",
+        serverId: entry.id,
+        serverName: entry.name,
+        detail: hhmm,
+        ip: null,
+        ok,
+      });
     }
   }
 }

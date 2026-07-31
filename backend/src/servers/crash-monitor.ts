@@ -1,5 +1,6 @@
 import { serverRegistry } from "./registry";
 import { listScreenSessionNames, startServer, isIntentionallyStopped } from "./process-manager";
+import { recordAudit, SYSTEM_ACTOR } from "../audit/audit-log";
 
 const CHECK_INTERVAL_MS = 20_000;
 
@@ -72,6 +73,16 @@ async function checkAll(): Promise<void> {
         `[crash-monitor] "${entry.name}" crashed ${entryState.attempts.length} times in ` +
           `${ATTEMPT_WINDOW_MS / 60_000} minutes - giving up, start it manually once the cause is fixed.`
       );
+      recordAudit({
+        actor: SYSTEM_ACTOR,
+        actorId: null,
+        action: "Összeomlás utáni újraindítás feladva",
+        serverId: entry.id,
+        serverName: entry.name,
+        detail: `${entryState.attempts.length} próbálkozás után`,
+        ip: null,
+        ok: false,
+      });
       continue;
     }
 
@@ -81,8 +92,20 @@ async function checkAll(): Promise<void> {
       `[crash-monitor] "${entry.name}" is down unexpectedly - restarting ` +
         `(attempt ${entryState.attempts.length}/${entry.crashRestart.maxAttempts})`
     );
-    await startServer(entry).catch((err) =>
-      console.error(`[crash-monitor] Failed to restart "${entry.name}":`, err)
-    );
+    let ok = true;
+    await startServer(entry).catch((err) => {
+      ok = false;
+      console.error(`[crash-monitor] Failed to restart "${entry.name}":`, err);
+    });
+    recordAudit({
+      actor: SYSTEM_ACTOR,
+      actorId: null,
+      action: "Újraindítás összeomlás után",
+      serverId: entry.id,
+      serverName: entry.name,
+      detail: `${entryState.attempts.length}/${entry.crashRestart.maxAttempts}. próbálkozás`,
+      ip: null,
+      ok,
+    });
   }
 }

@@ -215,3 +215,15 @@ export interface InstalledPlugin {
   latestVersion: string | null;
   updateAvailable: boolean;
 }
+
+export interface AuditRecord {
+  at: string;
+  actor: string;
+  actorId: string | null;
+  action: string;
+  serverId: string | null;
+  serverName: string | null;
+  detail: string | null;
+  ip: string | null;
+  ok: boolean;
+}

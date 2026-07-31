@@ -3,6 +3,7 @@ import { showToast } from "../components/Toast";
 import { openAddServerModal } from "./AddServerModal";
 import { renderServerView } from "./ServerView";
 import { renderUsersView } from "./UsersView";
+import { renderAuditView } from "./AuditView";
 import { isAdmin, setCurrentUser } from "../auth-state";
 import type { ServerWithStatus } from "../types";
 
@@ -25,6 +26,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         </div>
         ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn">+ Új szerver</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;margin-bottom:0.6rem;">Felhasználók</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;margin-bottom:0.6rem;">Auditnapló</button>` : ""}
         <div class="server-list" id="server-list"></div>
       </div>
       <div class="main-content" id="main-content">
@@ -43,6 +45,10 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   });
   root.querySelector<HTMLButtonElement>("#users-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/users";
+  });
+  // Optional chaining because the button is only emitted for admins.
+  root.querySelector<HTMLButtonElement>("#audit-nav-btn")?.addEventListener("click", () => {
+    location.hash = "#/audit";
   });
 
   async function refreshList() {
@@ -89,6 +95,16 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     disposeServerView = null;
 
     const mainContent = root.querySelector<HTMLDivElement>("#main-content")!;
+
+    if (location.hash === "#/audit") {
+      if (!isAdmin()) {
+        location.hash = "";
+        return;
+      }
+      disposeServerView = renderAuditView(mainContent);
+      renderList();
+      return;
+    }
 
     if (location.hash === "#/users") {
       if (!isAdmin()) {
