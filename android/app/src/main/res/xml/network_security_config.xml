@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The dashboard runs on a machine on the local network over plain HTTP; there
+  is no certificate for a LAN address. Android blocks cleartext by default
+  since API 28, so without this the app would fail to load anything at all.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

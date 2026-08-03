@@ -1,4 +1,4 @@
-name: Desktop release
+name: App release
 
 # Builds the installers on a tag. The Windows one needs a Windows runner:
 # electron-builder can cross-build it from macOS only through wine, and a
@@ -52,11 +52,61 @@ jobs:
             desktop/release/*.exe
           if-no-files-found: error
 
+
+  # The APK is built on a Linux runner because that is the one with the Android
+  # SDK already installed; nothing about the build is platform-specific.
+  android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Generate the Gradle wrapper
+        working-directory: android
+        # Pinned here rather than committing a wrapper jar: a binary in the
+        # repository is exactly the kind of thing nobody reviews, and this
+        # project has been burned once by an unreviewed jar.
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Restore the signing key
+        working-directory: android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+
+      - name: Build the APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/android/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Name the APK after the tag
+        working-directory: android
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk \
+            "out/mc-dashboard-${GITHUB_REF_NAME:-dev}.apk"
+          rm -f release.jks
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mc-dashboard-apk
+          path: android/out/*.apk
+          if-no-files-found: error
+
   # Workflow artifacts expire and are only reachable from the run page while
   # signed in. A release gives every tag a permanent page with the installers
   # attached, which is what anyone actually wants to download.
   release:
-    needs: build
+    needs: [build, android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -70,6 +120,6 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.{dmg,exe}
+          files: artifacts/**/*.{dmg,exe,apk}
           generate_release_notes: true
           fail_on_unmatched_files: true

@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'hu.mcdashboard.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "hu.mcdashboard.app"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "2.20.0"
+    }
+
+    // Signed with a key held as a repository secret rather than one committed
+    // here or the per-machine debug key: Android refuses to install an update
+    // signed by a different key, so the key has to be the same for every build
+    // or every release would need an uninstall first.
+    signingConfigs {
+        release {
+            def store = System.getenv("ANDROID_KEYSTORE_FILE")
+            if (store != null) {
+                storeFile file(store)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig System.getenv("ANDROID_KEYSTORE_FILE") ? signingConfigs.release : null
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// No libraries: the app is a WebView and two plain Activities, and every
+// dependency is one more thing that can break a build nobody can run locally.
+dependencies {
+}

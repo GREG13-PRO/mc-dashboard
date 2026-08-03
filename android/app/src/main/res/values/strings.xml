@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MC Dashboard</string>
+    <string name="setup_title">Kapcsolódás</string>
+    <string name="setup_hint">Annak a gépnek a címe, amelyiken a dashboard fut.</string>
+    <string name="host_hint">Cím vagy IP</string>
+    <string name="port_hint">Port</string>
+    <string name="connect">Kapcsolódás</string>
+    <string name="host_required">Add meg a szerver címét.</string>
+    <string name="cannot_reach_server">A dashboard nem érhető el ezen a címen.</string>
+    <string name="retry">Újra</string>
+    <string name="change_server">Szerver módosítása</string>
+    <string name="quit">Kilépés</string>
+    <string name="download_started">Letöltés elindult</string>
+    <string name="download_failed">A letöltés nem indult el</string>
+    <string name="cannot_open_link">Nem sikerült megnyitni a hivatkozást</string>
+</resources>
