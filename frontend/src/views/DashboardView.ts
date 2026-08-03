@@ -10,6 +10,7 @@ import { renderXpView } from "./XpView";
 import { renderAppDistView } from "./AppDistView";
 import { renderLabView } from "./LabView";
 import { renderWebhooksView } from "./WebhooksView";
+import { renderAdminHubView } from "./AdminHubView";
 import { isAdmin, setCurrentUser } from "../auth-state";
 import { getThemeChoice, setThemeChoice, nextTheme, themeIcon, themeLabel, notifyThemeChanged } from "../lib/theme";
 import {
@@ -45,12 +46,8 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
           </div>
         </div>
         ${isAdmin() ? `<button class="btn btn-primary add-server-btn" id="add-server-btn" style="width:100%;">${t("plus_uj_szerver")}</button>` : ""}
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;">${t("felhasznalok")}</button>` : ""}
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">${t("auditnaplo")}</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="admin-nav-btn" style="width:100%;">${t("kezeles")}</button>` : ""}
         <button class="btn users-nav-btn" id="xp-nav-btn" style="width:100%;">${t("admin_szintek")}</button>
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="appdist-nav-btn" style="width:100%;">${t("alkalmazasok")}</button>` : ""}
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="lab-nav-btn" style="width:100%;">${t("plugin_labor")}</button>` : ""}
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="wh-nav-btn" style="width:100%;">${t("webhookok")}</button>` : ""}
         <div class="server-list" id="server-list" role="list"></div>
       </nav>
       <main class="main-content" id="main-content" tabindex="-1">
@@ -149,21 +146,9 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   root.querySelector<HTMLButtonElement>("#add-server-btn")?.addEventListener("click", () => {
     openAddServerModal(() => void refreshList());
   });
-  root.querySelector<HTMLButtonElement>("#users-nav-btn")?.addEventListener("click", () => {
-    location.hash = "#/users";
-  });
   // Optional chaining because the button is only emitted for admins.
-  root.querySelector<HTMLButtonElement>("#audit-nav-btn")?.addEventListener("click", () => {
-    location.hash = "#/audit";
-  });
-  root.querySelector<HTMLButtonElement>("#appdist-nav-btn")?.addEventListener("click", () => {
-    location.hash = "#/app";
-  });
-  root.querySelector<HTMLButtonElement>("#lab-nav-btn")?.addEventListener("click", () => {
-    location.hash = "#/lab";
-  });
-  root.querySelector<HTMLButtonElement>("#wh-nav-btn")?.addEventListener("click", () => {
-    location.hash = "#/webhooks";
+  root.querySelector<HTMLButtonElement>("#admin-nav-btn")?.addEventListener("click", () => {
+    location.hash = "#/admin";
   });
   root.querySelector<HTMLButtonElement>("#xp-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/xp";
@@ -228,6 +213,16 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     disposeServerView = null;
 
     const mainContent = root.querySelector<HTMLDivElement>("#main-content")!;
+
+    if (location.hash === "#/admin") {
+      if (!isAdmin()) {
+        location.hash = "";
+        return;
+      }
+      disposeServerView = renderAdminHubView(mainContent);
+      renderList();
+      return;
+    }
 
     if (location.hash === "#/webhooks") {
       if (!isAdmin()) {

@@ -32,6 +32,32 @@ type Tab =
   | "worlds"
   | "security"
   | "settings";
+/**
+ * The tabs, grouped.
+ *
+ * Sixteen of them in one scrolling strip meant the last few were only
+ * reachable by dragging, and even the visible ones were a wall of unrelated
+ * words. Grouping costs one extra row and makes the row you are not using
+ * disappear. Groups of one show no second row at all, so Console and Security
+ * stay a single click.
+ */
+const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
+  { id: "console", label: () => t("konzol"), tabs: ["console"] },
+  { id: "players", label: () => t("jatekosok"), tabs: ["players", "access", "luckperms"] },
+  {
+    id: "content",
+    label: () => t("tartalom"),
+    tabs: ["files", "plugins", "schematics", "content", "worlds", "map"],
+  },
+  {
+    id: "maintenance",
+    label: () => t("karbantartas"),
+    tabs: ["timeline", "performance", "macros", "stats"],
+  },
+  { id: "security", label: () => t("biztonsag"), tabs: ["security"] },
+  { id: "settings", label: () => t("beallitasok"), tabs: ["settings"] },
+];
+
 const ALL_TABS: Tab[] = [
   "console",
   "files",
@@ -79,6 +105,17 @@ export function renderServerView(
           : tab;
   const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
   const visibleTabs = () => permittedTabs.filter((tab) => tab !== "luckperms" || luckPermsInstalled);
+
+  /** Groups that still have something in them after permissions are applied. */
+  const groupsWithTabs = (): [(typeof TAB_GROUPS)[number], Tab[]][] => {
+    const visible = visibleTabs();
+    return TAB_GROUPS.map(
+      (group) => [group, group.tabs.filter((tab) => visible.includes(tab))] as const
+    ).filter(([, tabs]) => tabs.length > 0) as [(typeof TAB_GROUPS)[number], Tab[]][];
+  };
+
+  const currentGroupTabs = (): Tab[] =>
+    groupsWithTabs().find(([, tabs]) => tabs.includes(activeTab))?.[1] ?? [];
   const availableTabs = permittedTabs;
   let activeTab: Tab = availableTabs[0] ?? "console";
   let server: ServerWithStatus | null = null;
@@ -128,49 +165,76 @@ export function renderServerView(
         }
       </div>
       <div class="tabs" role="tablist">
-        ${visibleTabs()
-          .map(
-            (tab) =>
-              `<div class="tab ${tab === activeTab ? "active" : ""}" data-tab="${tab}" role="tab"
-                    tabindex="${tab === activeTab ? "0" : "-1"}"
-                    aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
-          )
+        ${groupsWithTabs()
+          .map(([group, tabs]) => {
+            const active = tabs.includes(activeTab);
+            return `<div class="tab ${active ? "active" : ""}" data-group="${group.id}" role="tab"
+                    tabindex="${active ? "0" : "-1"}"
+                    aria-selected="${active}">${group.label()}</div>`;
+          })
           .join("")}
       </div>
+      ${
+        currentGroupTabs().length > 1
+          ? `<div class="subtabs" role="tablist">
+              ${currentGroupTabs()
+                .map(
+                  (tab) =>
+                    `<div class="subtab ${tab === activeTab ? "active" : ""}" data-tab="${tab}"
+                          role="tab" tabindex="${tab === activeTab ? "0" : "-1"}"
+                          aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
       <div id="resource-charts"></div>
       <div class="tab-content" id="tab-content"></div>
     `;
 
-    const tabEls = [...root.querySelectorAll<HTMLDivElement>(".tab")];
-    // The strip scrolls horizontally now that there are a dozen-plus tabs, and
-    // re-rendering resets it to the left - which would hide the very tab that
-    // was just clicked.
-    tabEls
-      .find((el) => el.dataset.tab === activeTab)
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-    tabEls.forEach((tabEl, index) => {
-      const select = () => {
-        if (tabEl.dataset.tab === activeTab) return;
-        teardownConsole();
-        // Leaving the map tab has to stop its player poll and drop its pointer
-        // listeners; doing it here rather than in the click handler covers the
-        // keyboard path too, and skips the case where the active tab is
-        // re-selected and nothing is rebuilt.
-        mapHandle?.destroy();
-        mapHandle = null;
-        activeTab = tabEl.dataset.tab as Tab;
-        renderShell();
+    /** Switching away has to stop whatever the old tab left running. */
+    const goTo = (tab: Tab) => {
+      if (tab === activeTab) return;
+      teardownConsole();
+      mapHandle?.destroy();
+      mapHandle = null;
+      activeTab = tab;
+      renderShell();
+    };
+
+    const groupEls = [...root.querySelectorAll<HTMLDivElement>(".tab[data-group]")];
+    groupEls.forEach((groupEl, index) => {
+      // Picking a group lands on its first tab; the sub-row then shows where
+      // else that group can go.
+      const open = () => {
+        const group = groupsWithTabs().find(([g]) => g.id === groupEl.dataset.group);
+        if (group && !group[1].includes(activeTab)) goTo(group[1][0]);
       };
-      tabEl.onclick = select;
-      // Standard tablist keyboard behaviour: arrows move, Enter/Space selects.
-      tabEl.onkeydown = (e) => {
+      groupEl.onclick = open;
+      groupEl.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          const step = e.key === "ArrowRight" ? 1 : -1;
+          groupEls[(index + step + groupEls.length) % groupEls.length]?.focus();
+        }
+      };
+    });
+
+    const subEls = [...root.querySelectorAll<HTMLDivElement>(".subtab")];
+    subEls.forEach((subEl, index) => {
+      const select = () => goTo(subEl.dataset.tab as Tab);
+      subEl.onclick = select;
+      subEl.onkeydown = (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           select();
         } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
           e.preventDefault();
           const step = e.key === "ArrowRight" ? 1 : -1;
-          tabEls[(index + step + tabEls.length) % tabEls.length]?.focus();
+          subEls[(index + step + subEls.length) % subEls.length]?.focus();
         }
       };
     });

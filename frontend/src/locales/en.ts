@@ -442,4 +442,13 @@ export const en = {
   masolt_pluginok: "copied jars",
   visszaallitott_vilag: "Restored world",
   vilag_nem_volt_a_csomagban: "The bundle contained no world.",
+  kezeles: "Manage",
+  tartalom: "Content",
+  karbantartas: "Maintenance",
+  hub_felhasznalok: "Accounts and per-server permissions",
+  hub_audit: "Who did what, and when",
+  hub_xp: "Admin activity levels",
+  hub_alkalmazasok: "Publish the desktop, phone and plugin builds",
+  hub_labor: "Write, compile and deploy a plugin",
+  hub_webhookok: "Event notifications and their delivery",
 };

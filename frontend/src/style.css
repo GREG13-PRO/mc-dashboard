@@ -1876,3 +1876,81 @@ table.file-table tr.file-row:hover {
 .lab-output-error {
   color: var(--red);
 }
+
+/* ------------------------------------------------- grouped tabs & admin hub */
+
+/* The second row of a grouped tab strip: quieter than the group row above it,
+   so the eye reads the group first and the destination second. */
+.subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 6px var(--gap-xl);
+  border-bottom: 0.5px solid var(--border);
+  background: var(--bg-inset);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.subtab {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+.subtab:hover {
+  color: var(--text);
+}
+
+.subtab.active {
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.subtab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--gap-md);
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.hub-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.hub-card span {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 760px) {
+  .subtabs {
+    padding-left: var(--gap-md);
+    padding-right: var(--gap-md);
+  }
+}

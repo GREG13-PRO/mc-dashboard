@@ -444,4 +444,13 @@ export const hu: typeof en = {
   masolt_pluginok: "másolt jar",
   visszaallitott_vilag: "Visszaállított világ",
   vilag_nem_volt_a_csomagban: "A csomagban nem volt világ.",
+  kezeles: "Kezelés",
+  tartalom: "Tartalom",
+  karbantartas: "Karbantartás",
+  hub_felhasznalok: "Fiókok és szerverenkénti jogosultságok",
+  hub_audit: "Ki mit csinált és mikor",
+  hub_xp: "Admin-aktivitási szintek",
+  hub_alkalmazasok: "Az asztali, telefonos és plugin buildek közzététele",
+  hub_labor: "Plugin írása, fordítása, telepítése",
+  hub_webhookok: "Esemény-értesítések és a kézbesítésük",
 };
