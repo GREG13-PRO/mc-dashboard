@@ -10,6 +10,15 @@ on:
       - "v*"
   workflow_dispatch:
 
+# Each build job attaches its own output straight to the release. The previous
+# shape parked every installer in artifact storage so a separate job could
+# download them again - about 280 MB per release, which filled the account's
+# artifact quota and then failed every build with "Artifact storage quota has
+# been hit". The round trip bought nothing: the files were already on a runner
+# that can talk to the releases API.
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -44,13 +53,14 @@ jobs:
           # certificate for this project, so skip signing rather than fail.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          name: mc-dashboard-${{ matrix.artifact }}
-          path: |
+          files: |
             desktop/release/*.dmg
             desktop/release/*.exe
-          if-no-files-found: error
+          fail_on_unmatched_files: true
 
 
   # The APK is built on a Linux runner because that is the one with the Android
@@ -98,11 +108,12 @@ jobs:
             "out/mc-dashboard-${GITHUB_REF_NAME:-dev}.apk"
           rm -f release.jks
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
         with:
-          name: mc-dashboard-apk
-          path: android/out/*.apk
-          if-no-files-found: error
+          files: android/out/*.apk
+          fail_on_unmatched_files: true
 
 
   # The anti-cheat plugin. Built on the same runner family as the APK; the only
@@ -128,30 +139,9 @@ jobs:
           GUARD_VERSION: ${{ github.ref_name }}
         run: ./gradlew --no-daemon build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mcdash-guard
-          path: plugin/build/libs/McDashGuard-*.jar
-          if-no-files-found: error
-
-  # Workflow artifacts expire and are only reachable from the run page while
-  # signed in. A release gives every tag a permanent page with the installers
-  # attached, which is what anyone actually wants to download.
-  release:
-    needs: [build, android, plugin]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Publish release
+      - name: Publish to the release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.{dmg,exe,apk,jar}
-          generate_release_notes: true
+          files: plugin/build/libs/McDashGuard-*.jar
           fail_on_unmatched_files: true
