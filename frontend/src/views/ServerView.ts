@@ -28,6 +28,7 @@ type Tab =
   | "stats"
   | "schematics"
   | "map"
+  | "worlds"
   | "security"
   | "settings";
 const ALL_TABS: Tab[] = [
@@ -44,6 +45,7 @@ const ALL_TABS: Tab[] = [
   "stats",
   "schematics",
   "map",
+  "worlds",
   "security",
   "settings",
 ];
@@ -63,7 +65,7 @@ export function renderServerView(
   const capabilityFor = (tab: Tab) =>
     tab === "plugins" || tab === "content" || tab === "schematics"
       ? "files"
-      : tab === "map" || tab === "security"
+      : tab === "map" || tab === "security" || tab === "worlds"
         ? "settings"
       : tab === "macros"
         ? "console"
@@ -260,6 +262,7 @@ export function renderServerView(
       schematics: t("schematicek"),
       map: t("terkep"),
       security: t("biztonsag"),
+      worlds: t("vilagok"),
       settings: t("beallitasok"),
     }[tab];
   }
@@ -315,6 +318,8 @@ export function renderServerView(
       void renderMap(content);
     } else if (activeTab === "security") {
       void renderSecurity(content);
+    } else if (activeTab === "worlds") {
+      void renderWorlds(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -493,6 +498,142 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderWorlds(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
+    let data;
+    try {
+      data = await api.listWorlds(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+
+    const rows = data.worlds
+      .map(
+        (w) => `
+        <div class="finding ${w.active ? "finding-info" : ""}">
+          <div class="finding-head">
+            <span class="finding-badge ${w.active ? "finding-info-badge" : ""}">${
+              w.active ? t("aktiv") : "—"
+            }</span>
+            <strong>${escapeHtml(w.name)}</strong>
+          </div>
+          <p class="finding-detail">
+            ${(w.sizeBytes / 1024 / 1024).toFixed(1)} MB
+            ${w.seed ? ` · seed ${escapeHtml(w.seed)}` : ""}
+            ${w.hasNether ? " · Nether" : ""}${w.hasEnd ? " · End" : ""}
+            ${w.lastPlayed ? ` · ${new Date(w.lastPlayed).toLocaleString()}` : ""}
+          </p>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            ${
+              w.active
+                ? ""
+                : `<button class="btn" data-activate="${escapeHtml(w.name)}" ${
+                    data.running ? "disabled" : ""
+                  }>${t("aktivalas")}</button>
+                   <button class="btn btn-danger" data-delete-world="${escapeHtml(w.name)}" ${
+                     data.running ? "disabled" : ""
+                   }>${t("torles")}</button>`
+            }
+          </div>
+        </div>`
+      )
+      .join("");
+
+    content.innerHTML = `
+      <div class="section" style="padding:16px;">
+        ${
+          data.running
+            ? `<p class="finding-detail">${t("vilag_szerver_fut")}</p>`
+            : `<p class="finding-detail">${t("vilag_magyarazat")}</p>`
+        }
+        ${data.worlds.length === 0 ? `<div class="empty-state">${t("nincs_vilag")}</div>` : rows}
+
+        <h3 style="margin:20px 0 8px;font-size:13px;">${t("uj_vilag")}</h3>
+        <div class="field">
+          <label for="w-name">${t("nev")}</label>
+          <input id="w-name" type="text" placeholder="world2" ${data.running ? "disabled" : ""} />
+        </div>
+        <div class="field">
+          <label for="w-seed">Seed</label>
+          <input id="w-seed" type="text" placeholder="${t("seed_placeholder")}" ${
+            data.running ? "disabled" : ""
+          } />
+        </div>
+        <div class="field">
+          <label for="w-type">${t("vilagtipus")}</label>
+          <select id="w-type" ${data.running ? "disabled" : ""}>
+            ${data.types
+              .map(
+                (ty) =>
+                  // Preselects whatever the server is set to, which only
+                  // matches now that the reader undoes Java's escaping.
+                  `<option value="${escapeHtml(ty)}" ${
+                    ty === data.settings.type ? "selected" : ""
+                  }>${escapeHtml(ty.replace("minecraft:", ""))}</option>`
+              )
+              .join("")}
+          </select>
+        </div>
+        <div class="field checkbox-row">
+          <input id="w-structures" type="checkbox" checked ${data.running ? "disabled" : ""} />
+          <label for="w-structures" style="margin:0">${t("epitmenyek_generalasa")}</label>
+        </div>
+        <button class="btn btn-primary" id="w-create" ${data.running ? "disabled" : ""}>${t(
+          "vilag_letrehozasa"
+        )}</button>
+      </div>
+    `;
+
+    content.querySelectorAll<HTMLButtonElement>("[data-activate]").forEach((button) => {
+      button.onclick = async () => {
+        try {
+          await api.activateWorld(serverId, button.dataset.activate!);
+          void renderWorlds(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+        }
+      };
+    });
+
+    content.querySelectorAll<HTMLButtonElement>("[data-delete-world]").forEach((button) => {
+      button.onclick = async () => {
+        const name = button.dataset.deleteWorld!;
+        if (!(await confirmModal(t("biztosan_torlod_a_vilagot").replace("%s", escapeHtml(name)))))
+          return;
+        try {
+          await api.deleteWorld(serverId, name);
+          void renderWorlds(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+        }
+      };
+    });
+
+    content.querySelector<HTMLButtonElement>("#w-create")?.addEventListener("click", async () => {
+      const name = content.querySelector<HTMLInputElement>("#w-name")!.value.trim();
+      if (!name) {
+        showToast(t("adj_meg_nevet"), "error");
+        return;
+      }
+      try {
+        await api.createWorld(serverId, {
+          name,
+          seed: content.querySelector<HTMLInputElement>("#w-seed")!.value.trim(),
+          type: content.querySelector<HTMLSelectElement>("#w-type")!.value,
+          generateStructures: content.querySelector<HTMLInputElement>("#w-structures")!.checked,
+        });
+        showToast(t("vilag_beallitva"));
+        void renderWorlds(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+      }
+    });
   }
 
   async function renderSecurity(content: HTMLElement) {

@@ -425,3 +425,34 @@ export interface GithubSyncStatus {
   latest?: { tag: string; version: string; assets: { name: string; sizeBytes: number }[] };
   error?: string;
 }
+
+export interface WorldSummary {
+  name: string;
+  active: boolean;
+  sizeBytes: number;
+  seed: string | null;
+  lastPlayed: string | null;
+  hasNether: boolean;
+  hasEnd: boolean;
+}
+
+export interface WorldSettings {
+  levelName: string;
+  seed: string;
+  type: string;
+  generateStructures: boolean;
+}
+
+export interface WorldsResponse {
+  worlds: WorldSummary[];
+  settings: WorldSettings;
+  types: string[];
+  running: boolean;
+}
+
+export interface CreateWorldInput {
+  name: string;
+  seed?: string;
+  type?: string;
+  generateStructures?: boolean;
+}

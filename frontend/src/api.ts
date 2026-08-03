@@ -25,6 +25,8 @@ import type {
   SecurityReport,
   PublishedBuild,
   GithubSyncStatus,
+  WorldsResponse,
+  CreateWorldInput,
   MacroStep,
   Pack,
   PackKind,
@@ -333,6 +335,21 @@ export const api = {
       method: "POST",
     });
     return builds;
+  },
+
+  async listWorlds(serverId: string): Promise<WorldsResponse> {
+    return request(`/servers/${serverId}/worlds`);
+  },
+  async createWorld(serverId: string, input: CreateWorldInput): Promise<void> {
+    await request(`/servers/${serverId}/worlds`, { method: "POST", body: JSON.stringify(input) });
+  },
+  async activateWorld(serverId: string, name: string): Promise<void> {
+    await request(`/servers/${serverId}/worlds/${encodeURIComponent(name)}/activate`, {
+      method: "POST",
+    });
+  },
+  async deleteWorld(serverId: string, name: string): Promise<void> {
+    await request(`/servers/${serverId}/worlds/${encodeURIComponent(name)}`, { method: "DELETE" });
   },
 
   async getSecurityReport(serverId: string): Promise<SecurityReport> {

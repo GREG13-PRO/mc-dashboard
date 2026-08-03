@@ -3,6 +3,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { listBackups } from "./backup-manager";
+import { readProperties } from "./properties";
 import { readPluginManifest } from "./plugin-manager";
 import type { ServerEntry } from "../types";
 
@@ -35,18 +36,6 @@ export interface SecurityReport {
   /** Set when the log could not be read, so an empty login section is not
    *  mistaken for "nothing suspicious". */
   loginsChecked: boolean;
-}
-
-function readProperties(file: string): Record<string, string> {
-  if (!fs.existsSync(file)) return {};
-  const out: Record<string, string> = {};
-  for (const line of fs.readFileSync(file, "utf-8").split("\n")) {
-    if (!line || line.startsWith("#")) continue;
-    const at = line.indexOf("=");
-    if (at < 0) continue;
-    out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
-  }
-  return out;
 }
 
 /**

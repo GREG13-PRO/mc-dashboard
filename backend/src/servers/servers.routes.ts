@@ -41,6 +41,15 @@ import {
 import { playerPositions } from "./map-players";
 import { securityReport } from "./security";
 import {
+  listWorlds,
+  worldSettings,
+  createWorld,
+  activateWorld,
+  deleteWorld,
+  WORLD_TYPES,
+  WorldError,
+} from "./worlds";
+import {
   listSchematics,
   saveSchematic,
   deleteSchematic,
@@ -506,6 +515,62 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
 });
 
 const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/worlds", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({
+    worlds: await listWorlds(entry),
+    settings: worldSettings(entry),
+    types: WORLD_TYPES,
+    running: await isServerRunning(entry),
+  });
+});
+
+serversRouter.post("/:id/worlds", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await createWorld(entry, req.body ?? {});
+    res.status(201).json({ worlds: await listWorlds(entry), settings: worldSettings(entry) });
+  } catch (err) {
+    res.status(err instanceof WorldError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/worlds/:name/activate", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await activateWorld(entry, req.params.name);
+    res.json({ worlds: await listWorlds(entry), settings: worldSettings(entry) });
+  } catch (err) {
+    res.status(err instanceof WorldError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/worlds/:name", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await deleteWorld(entry, req.params.name);
+    res.json({ worlds: await listWorlds(entry), settings: worldSettings(entry) });
+  } catch (err) {
+    res.status(err instanceof WorldError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
 
 serversRouter.get("/:id/security", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);

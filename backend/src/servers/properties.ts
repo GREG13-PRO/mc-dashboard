@@ -6,6 +6,36 @@ import fs from "node:fs";
  * every startup, so anything we write has to survive being read back and
  * re-serialized - plain `key=value` lines with no quoting is what it expects.
  */
+/**
+ * Undoes Java's .properties escaping.
+ *
+ * Minecraft writes this file with `java.util.Properties`, which escapes colons
+ * and equals signs in values - so `level-type` comes back as
+ * `minecraft\:normal` and compares equal to nothing. Writing them unescaped is
+ * fine, because only the first separator on a line is significant.
+ */
+function unescapeValue(value: string): string {
+  return value.replace(/\\(.)/g, (_, ch: string) => {
+    if (ch === "n") return "\n";
+    if (ch === "r") return "\r";
+    if (ch === "t") return "\t";
+    return ch;
+  });
+}
+
+/** Parses a server.properties file into a plain map; missing file yields {}. */
+export function readProperties(propsPath: string): Record<string, string> {
+  if (!fs.existsSync(propsPath)) return {};
+  const out: Record<string, string> = {};
+  for (const line of fs.readFileSync(propsPath, "utf-8").split("\n")) {
+    if (!line || line.startsWith("#") || line.startsWith("!")) continue;
+    const at = line.indexOf("=");
+    if (at < 0) continue;
+    out[line.slice(0, at).trim()] = unescapeValue(line.slice(at + 1).trim());
+  }
+  return out;
+}
+
 export function upsertProperty(lines: string[], key: string, value: string): string[] {
   const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
   const line = `${key}=${value}`;

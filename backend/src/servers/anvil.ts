@@ -355,6 +355,41 @@ export async function readSpawn(levelDat: string): Promise<{ x: number; z: numbe
   }
 }
 
+export interface WorldInfo {
+  /** Null when the world has not been generated yet. */
+  seed: string | null;
+  lastPlayed: string | null;
+}
+
+/**
+ * Seed and last-played time out of level.dat.
+ *
+ * The seed moved in 1.16: it used to sit at Data.RandomSeed and now lives under
+ * Data.WorldGenSettings.seed, so both are checked. It is returned as a string
+ * because a Minecraft seed is a 64-bit value and JSON numbers are not.
+ */
+export async function readWorldInfo(levelDat: string): Promise<WorldInfo | null> {
+  try {
+    const raw = await fsp.readFile(levelDat);
+    const nbt = new NbtReader(raw[0] === 0x1f ? zlib.gunzipSync(raw) : raw).read();
+    const data = nbt.Data as { [key: string]: NbtValue } | undefined;
+    if (!data) return null;
+
+    const settings = data.WorldGenSettings as { [key: string]: NbtValue } | undefined;
+    const seed = settings?.seed ?? data.RandomSeed;
+    const lastPlayed = data.LastPlayed;
+    return {
+      seed: typeof seed === "bigint" ? seed.toString() : null,
+      lastPlayed:
+        typeof lastPlayed === "bigint" && lastPlayed > 0n
+          ? new Date(Number(lastPlayed)).toISOString()
+          : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function listRegions(regionDir: string): Promise<{ x: number; z: number }[]> {
   if (!fs.existsSync(regionDir)) return [];
   const out: { x: number; z: number }[] = [];
