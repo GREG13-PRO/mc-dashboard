@@ -12,7 +12,7 @@ import { escapeHtml } from "../lib/escape";
 import { ansiLineToHtml } from "../lib/ansi";
 import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
-import type { ConfigSnapshot } from "../types";
+import type { ConfigSnapshot, NetworkReport } from "../types";
 import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatus } from "../types";
 
 type Tab =
@@ -861,6 +861,15 @@ export function renderServerView(
       )
       .join("");
 
+    let network: NetworkReport | null = null;
+    try {
+      network = await api.getNetworkReport(serverId);
+    } catch {
+      // The network view is extra detail; a failure there must not take the
+      // whole security tab with it.
+    }
+    if (disposed) return;
+
     content.innerHTML = `
       <div class="section" style="padding:16px;">
         <div class="security-summary">
@@ -886,7 +895,64 @@ export function renderServerView(
             : `<p class="finding-detail">${t("nincs_log_ellenorzes")}</p>`
         }
         <p class="finding-detail">${t("biztonsag_hatokor")}</p>
+
+        ${network ? renderNetwork(network) : ""}
       </div>
+    `;
+  }
+
+  function renderNetwork(network: NetworkReport): string {
+    const latest = network.history[network.history.length - 1];
+    const peak = network.history.reduce((max, s) => Math.max(max, s.total), 0);
+    const busiest = network.ips.ips.filter((ip) => ip.players.length > 1).slice(0, 8);
+
+    return `
+      <h3 style="margin:24px 0 4px;font-size:13px;">${t("halozat")}</h3>
+      <p class="finding-advice" style="margin:0 0 10px;">${t("halozat_leiras")}</p>
+      <p class="finding-detail">
+        ${t("jelenlegi_kapcsolatok")}: <strong>${latest?.total ?? 0}</strong>
+        (${latest?.distinctIps ?? 0} ${t("kulonbozo_cim")}) ·
+        ${t("csucs_egy_oraban")}: <strong>${peak}</strong>
+      </p>
+      ${
+        network.alerts.length === 0
+          ? `<p class="finding-advice">${t("nincs_halozati_riasztas")}</p>`
+          : network.alerts
+              .slice(0, 6)
+              .map(
+                (a) => `<div class="finding finding-warning">
+                  <div class="finding-head">
+                    <span class="finding-badge">${new Date(a.at).toLocaleTimeString()}</span>
+                    <strong>${escapeHtml(a.message)}</strong>
+                  </div>
+                </div>`
+              )
+              .join("")
+      }
+
+      <h3 style="margin:20px 0 4px;font-size:13px;">${t("ip_elemzes")}</h3>
+      <p class="finding-advice" style="margin:0 0 10px;">
+        ${network.ips.logsRead} ${t("logfajl_alapjan")}. ${t("vpn_korlat")}
+      </p>
+      ${
+        busiest.length === 0
+          ? `<p class="finding-advice">${t("nincs_tobbfiokos_cim")}</p>`
+          : busiest
+              .map(
+                (ip) => `<div class="finding">
+                  <div class="finding-head">
+                    <span class="finding-badge">${ip.players.length}</span>
+                    <strong>${escapeHtml(ip.ip)}</strong>
+                  </div>
+                  <p class="finding-detail">${ip.players
+                    .map(
+                      (p) => `${escapeHtml(p.player)} (${p.logins}×, ${escapeHtml(p.last)})`
+                    )
+                    .join(" · ")}</p>
+                </div>`
+              )
+              .join("")
+      }
     `;
   }
 

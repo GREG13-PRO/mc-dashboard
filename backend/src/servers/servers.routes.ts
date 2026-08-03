@@ -40,6 +40,8 @@ import {
 } from "./map-service";
 import { playerPositions } from "./map-players";
 import { securityReport } from "./security";
+import { connectionHistory, connectionAlerts } from "./connection-monitor";
+import { analyseIps } from "./ip-analysis";
 import {
   listWorlds,
   worldSettings,
@@ -525,6 +527,19 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
 });
 
 const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/network", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({
+    history: connectionHistory(entry.id),
+    alerts: connectionAlerts(entry.id),
+    ips: await analyseIps(entry),
+  });
+});
 
 serversRouter.get("/:id/config-history", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);

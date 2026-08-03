@@ -30,6 +30,7 @@ import type {
   DnaImportReport,
   ConfigSnapshot,
   FileDiff,
+  NetworkReport,
   MacroStep,
   Pack,
   PackKind,
@@ -397,6 +398,10 @@ export const api = {
   },
   async deleteWorld(serverId: string, name: string): Promise<void> {
     await request(`/servers/${serverId}/worlds/${encodeURIComponent(name)}`, { method: "DELETE" });
+  },
+
+  async getNetworkReport(serverId: string): Promise<NetworkReport> {
+    return request(`/servers/${serverId}/network`);
   },
 
   async getSecurityReport(serverId: string): Promise<SecurityReport> {

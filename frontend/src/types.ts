@@ -490,3 +490,44 @@ export interface FileDiff {
   onlyInCurrent: boolean;
   changed: boolean;
 }
+
+export interface ConnectionSample {
+  at: string;
+  total: number;
+  distinctIps: number;
+  top: { ip: string; count: number }[];
+}
+
+export interface ConnectionAlert {
+  at: string;
+  serverId: string;
+  kind: "per-ip" | "total";
+  ip: string | null;
+  count: number;
+  message: string;
+}
+
+export interface IpSighting {
+  player: string;
+  first: string;
+  last: string;
+  logins: number;
+}
+
+export interface IpSummary {
+  ip: string;
+  logins: number;
+  players: IpSighting[];
+  first: string;
+  last: string;
+}
+
+export interface NetworkReport {
+  history: ConnectionSample[];
+  alerts: ConnectionAlert[];
+  ips: {
+    logsRead: number;
+    ips: IpSummary[];
+    players: { player: string; ips: string[]; logins: number }[];
+  };
+}

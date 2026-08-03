@@ -11,6 +11,7 @@ import { startRconPoller } from "./servers/rcon-poller";
 import { startRestartScheduler } from "./servers/restart-scheduler";
 import { startCrashMonitor } from "./servers/crash-monitor";
 import { startResourceHistory } from "./servers/resource-history";
+import { startConnectionMonitor } from "./servers/connection-monitor";
 import { startTimeMachine } from "./servers/world-timeline";
 import { startStatsCollector } from "./servers/stats";
 import { assertScreenInstalled } from "./servers/process-manager";
@@ -44,6 +45,7 @@ async function main() {
   startRestartScheduler();
   startCrashMonitor();
   startResourceHistory();
+  startConnectionMonitor();
   startTimeMachine();
   startStatsCollector();
 
