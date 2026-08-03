@@ -12,6 +12,7 @@ import { startRestartScheduler } from "./servers/restart-scheduler";
 import { startCrashMonitor } from "./servers/crash-monitor";
 import { startResourceHistory } from "./servers/resource-history";
 import { startConnectionMonitor } from "./servers/connection-monitor";
+import { startReleaseWatcher } from "./app-dist/github-sync";
 import { startTimeMachine } from "./servers/world-timeline";
 import { startStatsCollector } from "./servers/stats";
 import { assertScreenInstalled } from "./servers/process-manager";
@@ -46,6 +47,7 @@ async function main() {
   startCrashMonitor();
   startResourceHistory();
   startConnectionMonitor();
+  void startReleaseWatcher();
   startTimeMachine();
   startStatsCollector();
 

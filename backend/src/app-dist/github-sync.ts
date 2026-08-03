@@ -3,7 +3,7 @@ import fsp from "node:fs/promises";
 import https from "node:https";
 import path from "node:path";
 import { env } from "../config/env";
-import { identify, saveBuild, type PublishedBuild } from "./app-dist";
+import { identify, saveBuild, publishedFor, compareVersions, type PublishedBuild } from "./app-dist";
 
 /**
  * Pulls the release artefacts from GitHub so they do not have to be downloaded
@@ -160,4 +160,103 @@ export async function syncLatestRelease(): Promise<PublishedBuild[]> {
     published.push(await saveBuild(asset.name, data));
   }
   return published;
+}
+
+/**
+ * Checks GitHub on a timer and publishes anything newer.
+ *
+ * This is the piece that makes every app find updates on its own. The apps
+ * cannot check GitHub themselves: the repository is private, so an
+ * unauthenticated request for its latest release gets a 404, and a token
+ * shipped inside an app is a token everyone holding that app has. So the
+ * dashboard - which can hold a token safely, on one machine the admin
+ * controls - does the looking, and the apps ask the dashboard.
+ *
+ * Nothing is installed by this. It only makes the newer build available; every
+ * app still shows its own "there is an update" prompt and waits to be told.
+ */
+
+export interface WatcherState {
+  enabled: boolean;
+  lastCheckedAt: string | null;
+  lastResult: string | null;
+  publishedVersion: string | null;
+}
+
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+const state: WatcherState = {
+  enabled: false,
+  lastCheckedAt: null,
+  lastResult: null,
+  publishedVersion: null,
+};
+let timer: NodeJS.Timeout | null = null;
+
+function settingsFile(): string {
+  return path.join(env.dataDir, "github-watch.json");
+}
+
+async function loadEnabled(): Promise<boolean> {
+  try {
+    const raw = JSON.parse(await fsp.readFile(settingsFile(), "utf-8")) as { enabled?: boolean };
+    return raw.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setWatcherEnabled(enabled: boolean): Promise<void> {
+  state.enabled = enabled;
+  await fsp.mkdir(env.dataDir, { recursive: true });
+  await fsp.writeFile(settingsFile(), JSON.stringify({ enabled }, null, 2), "utf-8");
+  if (enabled) void checkOnce();
+}
+
+export function watcherState(): WatcherState {
+  return { ...state };
+}
+
+export async function checkOnce(): Promise<WatcherState> {
+  state.lastCheckedAt = new Date().toISOString();
+  if (!hasToken()) {
+    state.lastResult = "Nincs beállítva GitHub token.";
+    return watcherState();
+  }
+  try {
+    const remote = await latestRelease();
+    const current = await publishedFor("android");
+    // Compared against what is published rather than against a remembered
+    // number: someone may have uploaded or deleted a build by hand since the
+    // last check, and the published set is the thing the apps actually see.
+    if (current && compareVersions(remote.version, current.version) <= 0) {
+      state.lastResult = `Nincs újabb kiadás (${remote.tag}).`;
+      state.publishedVersion = current.version;
+      return watcherState();
+    }
+    const published = await syncLatestRelease();
+    state.publishedVersion = published[0]?.version ?? remote.version;
+    state.lastResult = `${remote.tag} behúzva (${published.length} build).`;
+  } catch (err) {
+    state.lastResult = (err as Error).message;
+  }
+  return watcherState();
+}
+
+export async function startReleaseWatcher(intervalMs = CHECK_INTERVAL_MS): Promise<void> {
+  if (timer) return;
+  state.enabled = await loadEnabled();
+  const current = await publishedFor("android");
+  state.publishedVersion = current?.version ?? null;
+  // A check on boot as well as on the timer: a dashboard that is restarted
+  // more often than every six hours would otherwise never check at all.
+  if (state.enabled) void checkOnce();
+  timer = setInterval(() => {
+    if (state.enabled) void checkOnce();
+  }, intervalMs);
+}
+
+export function stopReleaseWatcher(): void {
+  if (timer) clearInterval(timer);
+  timer = null;
 }

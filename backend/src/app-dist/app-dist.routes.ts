@@ -16,6 +16,9 @@ import {
   clearToken,
   latestRelease,
   syncLatestRelease,
+  setWatcherEnabled,
+  watcherState,
+  checkOnce,
   GithubSyncError,
 } from "./github-sync";
 
@@ -105,14 +108,23 @@ appDistAdminRouter.post("/", upload.single("file"), async (req, res) => {
  */
 appDistAdminRouter.get("/github/status", async (_req, res) => {
   if (!hasToken()) {
-    res.json({ configured: false });
+    res.json({ configured: false, watcher: watcherState() });
     return;
   }
   try {
-    res.json({ configured: true, latest: await latestRelease() });
+    res.json({ configured: true, latest: await latestRelease(), watcher: watcherState() });
   } catch (err) {
-    res.json({ configured: true, error: (err as Error).message });
+    res.json({ configured: true, error: (err as Error).message, watcher: watcherState() });
   }
+});
+
+appDistAdminRouter.put("/github/watch", async (req, res) => {
+  await setWatcherEnabled(req.body?.enabled === true);
+  res.json({ watcher: watcherState() });
+});
+
+appDistAdminRouter.post("/github/check", async (_req, res) => {
+  res.json({ watcher: await checkOnce() });
 });
 
 appDistAdminRouter.put("/github/token", async (req, res) => {

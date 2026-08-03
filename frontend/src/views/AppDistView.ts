@@ -39,11 +39,25 @@ export function renderAppDistView(root: HTMLElement): () => void {
   async function load() {
     if (disposed) return;
     let builds: PublishedBuild[];
-    let github: GithubSyncStatus = { configured: false };
+    let github: GithubSyncStatus = {
+      configured: false,
+      watcher: { enabled: false, lastCheckedAt: null, lastResult: null, publishedVersion: null },
+    };
     try {
       [builds, github] = await Promise.all([
         api.listPublishedBuilds(),
-        api.githubStatus().catch(() => ({ configured: false }) as GithubSyncStatus),
+        api.githubStatus().catch(
+          () =>
+            ({
+              configured: false,
+              watcher: {
+                enabled: false,
+                lastCheckedAt: null,
+                lastResult: null,
+                publishedVersion: null,
+              },
+            }) as GithubSyncStatus
+        ),
       ]);
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${escapeHtml(
@@ -95,10 +109,29 @@ export function renderAppDistView(root: HTMLElement): () => void {
           ${
             github.configured
               ? `<button class="btn" id="gh-sync">${t("behuzas_githubrol")}</button>
+                 <button class="btn" id="gh-check">${t("ellenorzes_most")}</button>
                  <button class="btn" id="gh-clear">${t("token_torlese")}</button>`
               : `<button class="btn" id="gh-token">${t("github_token_beallitasa")}</button>`
           }
         </div>
+        ${
+          github.configured
+            ? `<div class="field checkbox-row" style="margin-top:10px;">
+                 <input type="checkbox" id="gh-watch" ${github.watcher.enabled ? "checked" : ""} />
+                 <label for="gh-watch" style="margin:0">${t("automatikus_ellenorzes")}</label>
+               </div>
+               <p class="finding-advice" style="margin:0;">
+                 ${t("automatikus_ellenorzes_leiras")}
+                 ${
+                   github.watcher.lastCheckedAt
+                     ? `<br>${t("utolso_ellenorzes")}: ${new Date(
+                         github.watcher.lastCheckedAt
+                       ).toLocaleString()} — ${escapeHtml(github.watcher.lastResult ?? "")}`
+                     : ""
+                 }
+               </p>`
+            : ""
+        }
         <p class="finding-advice" style="margin-top:8px;">
           ${
             github.error
@@ -139,6 +172,27 @@ export function renderAppDistView(root: HTMLElement): () => void {
         showToast(err instanceof ApiError ? err.message : t("mentes_sikertelen"), "error");
       }
     });
+
+    root.querySelector<HTMLInputElement>("#gh-watch")?.addEventListener("change", async (e) => {
+      await api.setGithubWatch((e.target as HTMLInputElement).checked);
+      void load();
+    });
+
+    const check = root.querySelector<HTMLButtonElement>("#gh-check");
+    if (check) {
+      check.onclick = async () => {
+        check.disabled = true;
+        check.textContent = t("ellenorzes_folyamatban");
+        try {
+          await api.checkGithubNow();
+          void load();
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+          check.disabled = false;
+          check.textContent = t("ellenorzes_most");
+        }
+      };
+    }
 
     root.querySelector<HTMLButtonElement>("#gh-clear")?.addEventListener("click", async () => {
       await api.clearGithubToken();

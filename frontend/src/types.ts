@@ -420,10 +420,18 @@ export interface PublishedBuild {
   url: string;
 }
 
+export interface GithubWatcherState {
+  enabled: boolean;
+  lastCheckedAt: string | null;
+  lastResult: string | null;
+  publishedVersion: string | null;
+}
+
 export interface GithubSyncStatus {
   configured: boolean;
   latest?: { tag: string; version: string; assets: { name: string; sizeBytes: number }[] };
   error?: string;
+  watcher: GithubWatcherState;
 }
 
 export interface WorldSummary {

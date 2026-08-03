@@ -451,4 +451,9 @@ export const en = {
   hub_alkalmazasok: "Publish the desktop, phone and plugin builds",
   hub_labor: "Write, compile and deploy a plugin",
   hub_webhookok: "Event notifications and their delivery",
+  automatikus_ellenorzes: "Check GitHub automatically",
+  automatikus_ellenorzes_leiras: "Every six hours and on every dashboard start, the dashboard looks for a newer release and publishes it here. The apps cannot look for themselves - the repository is private, and a token shipped inside an app is a token everyone holding that app has. Nothing installs by itself: each app still asks first.",
+  utolso_ellenorzes: "Last check",
+  ellenorzes_most: "Check now",
+  ellenorzes_folyamatban: "Checking…",
 };

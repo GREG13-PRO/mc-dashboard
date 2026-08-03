@@ -343,6 +343,12 @@ export const api = {
   async clearGithubToken(): Promise<void> {
     await request("/app/github/token", { method: "DELETE" });
   },
+  async setGithubWatch(enabled: boolean): Promise<void> {
+    await request("/app/github/watch", { method: "PUT", body: JSON.stringify({ enabled }) });
+  },
+  async checkGithubNow(): Promise<void> {
+    await request("/app/github/check", { method: "POST" });
+  },
   async syncFromGithub(): Promise<PublishedBuild[]> {
     const { builds } = await request<{ builds: PublishedBuild[] }>("/app/github/sync", {
       method: "POST",

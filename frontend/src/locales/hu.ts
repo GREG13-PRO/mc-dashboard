@@ -453,4 +453,9 @@ export const hu: typeof en = {
   hub_alkalmazasok: "Az asztali, telefonos és plugin buildek közzététele",
   hub_labor: "Plugin írása, fordítása, telepítése",
   hub_webhookok: "Esemény-értesítések és a kézbesítésük",
+  automatikus_ellenorzes: "Automatikus ellenőrzés a GitHubon",
+  automatikus_ellenorzes_leiras: "Hatóránként és minden dashboard-induláskor megnézi, van-e újabb kiadás, és közzéteszi itt. Az appok maguk nem tudnak felnézni - a repó privát, és egy appba égetett token mindenkié, akinél az app megvan. Semmi nem települ magától: minden app továbbra is rákérdez.",
+  utolso_ellenorzes: "Utolsó ellenőrzés",
+  ellenorzes_most: "Ellenőrzés most",
+  ellenorzes_folyamatban: "Ellenőrzés…",
 };
