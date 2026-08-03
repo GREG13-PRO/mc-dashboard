@@ -37,27 +37,6 @@ jobs:
           gradle wrapper --gradle-version 8.7
           ./gradlew --no-daemon assembleDebug
 
-      - name: Serve a stand-in dashboard
-        run: |
-          mkdir -p /tmp/site
-          cat > /tmp/site/index.html <<'HTML'
-          <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
-          <body style="background:#12151a;color:#f5f5f7;font:16px sans-serif;padding:24px">
-          <h1 id="marker">WEBVIEW OK</h1>
-          <p id="stored"></p>
-          <script>
-            // Exercises the same two things the dashboard needs from the
-            // WebView: JavaScript and localStorage.
-            localStorage.setItem("smoke", "stored");
-            document.getElementById("stored").textContent =
-              "localStorage: " + localStorage.getItem("smoke");
-          </script>
-          </body>
-          HTML
-          (cd /tmp/site && python3 -m http.server 3000 &)
-          sleep 2
-          curl -sf http://127.0.0.1:3000 > /dev/null && echo "stand-in server up"
-
       - name: Run the app in an emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:

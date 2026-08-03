@@ -4,23 +4,61 @@
 Lives in a file rather than in the workflow because the emulator action runs
 each line of its `script` through its own shell, so anything spanning more than
 one line - a function, a loop - is a syntax error at the second line.
+
+It also serves the stand-in page itself instead of leaving that to an earlier
+workflow step, so the server is guaranteed to be alive for exactly as long as
+the test needs it.
 """
 
+import http.server
+import os
 import re
 import subprocess
 import sys
+import tempfile
+import threading
 import time
+import urllib.request
 
 PACKAGE = "hu.mcdashboard.app"
 # The emulator's alias for the runner's own loopback.
 HOST = "10.0.2.2"
+PORT = 3000
+
+PAGE = """<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<body style="background:#12151a;color:#f5f5f7;font:16px sans-serif;padding:24px">
+<h1>WEBVIEW OK</h1>
+<p id="stored"></p>
+<script>
+  // The same two things the dashboard needs from a WebView.
+  localStorage.setItem("smoke", "stored");
+  document.getElementById("stored").textContent =
+    "localStorage: " + localStorage.getItem("smoke");
+</script>
+</body>
+"""
 
 
-def adb(*args, capture=False):
-    if capture:
-        return subprocess.run(["adb", *args], check=True, capture_output=True).stdout
-    subprocess.run(["adb", *args], check=True)
-    return b""
+def serve():
+    directory = tempfile.mkdtemp()
+    with open(os.path.join(directory, "index.html"), "w", encoding="utf-8") as handle:
+        handle.write(PAGE)
+
+    handler = lambda *a, **kw: http.server.SimpleHTTPRequestHandler(
+        *a, directory=directory, **kw
+    )
+    server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/", timeout=5) as response:
+        assert response.status == 200
+    print(f"stand-in page served on {PORT}")
+    return server
+
+
+def adb(*args, capture=False, check=True):
+    result = subprocess.run(["adb", *args], capture_output=True, check=check)
+    return result.stdout if capture else b""
 
 
 def screenshot(name):
@@ -40,35 +78,66 @@ def hierarchy(name):
 BOUNDS = r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"'
 
 
-def tap(description, dump_name):
-    xml = hierarchy(dump_name)
-    node = re.search(r"<node[^>]*/>", xml)
-    match = None
+def find(xml, attribute, value):
     for node in re.finditer(r"<node[^>]*?/?>", xml):
         text = node.group(0)
-        if f'content-desc="{description}"' in text:
+        if f'{attribute}="{value}"' in text:
             match = re.search(BOUNDS, text)
             if match:
-                break
-    if not match:
-        print(xml[:4000])
-        raise SystemExit(f"no view with content-desc={description}")
-    x1, y1, x2, y2 = map(int, match.groups())
+                return tuple(map(int, match.groups()))
+    return None
+
+
+def tap_bounds(bounds, label):
+    x1, y1, x2, y2 = bounds
     adb("shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2))
-    print(f"tapped {description} at {(x1 + x2) // 2},{(y1 + y2) // 2}")
+    print(f"tapped {label} at {(x1 + x2) // 2},{(y1 + y2) // 2}")
+
+
+def dismiss_system_dialog(dump_name):
+    """Clears the keyboard's runtime permission prompt.
+
+    Focusing a text field raises the AOSP keyboard, which on a fresh emulator
+    immediately asks for contacts access - and that dialog swallows the next
+    tap, which is how this test first "failed" with the app working fine.
+    """
+    xml = hierarchy(dump_name)
+    for label in ("DENY", "Deny", "DENY ANYWAY"):
+        bounds = find(xml, "text", label)
+        if bounds:
+            tap_bounds(bounds, f"permission dialog {label}")
+            time.sleep(1.5)
+            return True
+    return False
+
+
+def tap(description, dump_name):
+    for attempt in range(3):
+        xml = hierarchy(dump_name)
+        bounds = find(xml, "content-desc", description)
+        if bounds:
+            tap_bounds(bounds, description)
+            return
+        if not dismiss_system_dialog(f"{dump_name}.dialog{attempt}.xml"):
+            break
+    print(hierarchy(dump_name)[:4000])
+    raise SystemExit(f"no view with content-desc={description}")
 
 
 def main():
+    server = serve()
     adb("install", "-r", "android/app/build/outputs/apk/debug/app-debug.apk")
     adb("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
     time.sleep(6)
     screenshot("1-setup.png")
 
     tap("host", "ui-setup.xml")
+    dismiss_system_dialog("ui-permission.xml")
     adb("shell", "input", "text", HOST)
+    screenshot("2-filled.png")
     tap("connect", "ui-filled.xml")
     time.sleep(10)
-    screenshot("2-loaded.png")
+    screenshot("3-loaded.png")
 
     after = hierarchy("ui-loaded.xml")
     failures = []
@@ -79,8 +148,12 @@ def main():
     if "localStorage: stored" not in after:
         failures.append("localStorage did not work")
 
+    server.shutdown()
+
     if failures:
         print(after[:4000])
+        print("--- app logcat ---")
+        print(adb("logcat", "-d", "-t", "200", capture=True).decode("utf-8", "replace")[-4000:])
         for line in failures:
             print(f"FAIL: {line}")
         sys.exit(1)
