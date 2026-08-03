@@ -463,3 +463,30 @@ export interface DnaImportReport {
   manualPlugins: string[];
   failedPlugins: { filename: string; error: string }[];
 }
+
+export interface ConfigSnapshotFile {
+  path: string;
+  sizeBytes: number;
+  sha256: string;
+}
+
+export interface ConfigSnapshot {
+  id: string;
+  at: string;
+  reason: string;
+  actor: string | null;
+  files: ConfigSnapshotFile[];
+}
+
+export interface DiffLine {
+  kind: "context" | "added" | "removed";
+  text: string;
+}
+
+export interface FileDiff {
+  path: string;
+  lines: DiffLine[];
+  onlyInSnapshot: boolean;
+  onlyInCurrent: boolean;
+  changed: boolean;
+}

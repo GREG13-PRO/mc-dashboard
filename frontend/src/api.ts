@@ -28,6 +28,8 @@ import type {
   WorldsResponse,
   CreateWorldInput,
   DnaImportReport,
+  ConfigSnapshot,
+  FileDiff,
   MacroStep,
   Pack,
   PackKind,
@@ -336,6 +338,35 @@ export const api = {
       method: "POST",
     });
     return builds;
+  },
+
+  async listConfigSnapshots(serverId: string): Promise<ConfigSnapshot[]> {
+    const { snapshots } = await request<{ snapshots: ConfigSnapshot[] }>(
+      `/servers/${serverId}/config-history`
+    );
+    return snapshots;
+  },
+  async takeConfigSnapshot(
+    serverId: string
+  ): Promise<{ snapshots: ConfigSnapshot[]; unchanged: boolean }> {
+    return request(`/servers/${serverId}/config-history`, { method: "POST" });
+  },
+  async diffConfigSnapshot(serverId: string, snapshotId: string): Promise<FileDiff[]> {
+    const { diffs } = await request<{ diffs: FileDiff[] }>(
+      `/servers/${serverId}/config-history/${snapshotId}/diff`
+    );
+    return diffs;
+  },
+  async restoreConfigSnapshot(
+    serverId: string,
+    snapshotId: string,
+    only?: string[]
+  ): Promise<string[]> {
+    const { restored } = await request<{ restored: string[] }>(
+      `/servers/${serverId}/config-history/${snapshotId}/restore`,
+      { method: "POST", body: JSON.stringify({ only: only ?? null }) }
+    );
+    return restored;
   },
 
   dnaDownloadUrl(serverId: string, includeSecrets: boolean): string {

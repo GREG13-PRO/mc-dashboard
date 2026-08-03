@@ -352,4 +352,13 @@ export const hu: typeof en = {
   dns_fajlok_irva: "Írt fájlok",
   dns_pluginok_telepitve: "Telepített bővítmények",
   dns_kezi_pluginok: "Ezeket nem tudtam automatikusan visszatenni (nem a dashboard telepítette őket, így nincs forrásuk)",
+  konfig_tortenet: "Konfigtörténet",
+  konfig_tortenet_leiras: "A dashboard minden változtatása előtt pillanatkép készül a beállításfájlokról, így egy elrontott sor megtalálható és visszatehető. A világ nem tartozik ide - az a mentések dolga.",
+  pillanatkep_keszitese: "Pillanatkép készítése",
+  pillanatkep_kesz: "Pillanatkép kész",
+  nincs_valtozas_pillanatkep: "A legutóbbi pillanatkép óta semmi nem változott.",
+  nincs_pillanatkep: "Még nincs pillanatkép.",
+  elteresek: "Eltérések",
+  nincs_elteres: "Megegyezik a jelenlegi fájlokkal.",
+  konfig_visszaallitas_megerosites: "Visszaállítod a beállításfájlokat erre az állapotra? A mostani állapotról előbb pillanatkép készül, tehát ez is visszavonható.",
 };

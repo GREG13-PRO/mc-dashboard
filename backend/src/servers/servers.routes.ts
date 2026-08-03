@@ -51,6 +51,15 @@ import {
 } from "./worlds";
 import { exportDna, importDna, DnaError } from "./server-dna";
 import {
+  snapshotConfigs,
+  // Aliased: world-timeline already exports listSnapshots and restoreSnapshot
+  // for the world Time Machine, and the two are not interchangeable.
+  listSnapshots as listConfigSnapshots,
+  diffSnapshot,
+  restoreSnapshot as restoreConfigSnapshot,
+  ConfigHistoryError,
+} from "./config-history";
+import {
   listSchematics,
   saveSchematic,
   deleteSchematic,
@@ -516,6 +525,64 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
 });
 
 const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/config-history", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ snapshots: await listConfigSnapshots(entry) });
+});
+
+serversRouter.post("/:id/config-history", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const snapshot = await snapshotConfigs(entry, "kézi pillanatkép", req.user?.username ?? null);
+  res.status(snapshot ? 201 : 200).json({
+    snapshot,
+    snapshots: await listConfigSnapshots(entry),
+    // Null means nothing changed since the last one, which is worth saying
+    // rather than looking like the button did nothing.
+    unchanged: snapshot === null,
+  });
+});
+
+serversRouter.get("/:id/config-history/:snapshotId/diff", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ diffs: await diffSnapshot(entry, req.params.snapshotId) });
+  } catch (err) {
+    res.status(err instanceof ConfigHistoryError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/config-history/:snapshotId/restore", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const only = Array.isArray(req.body?.only) ? (req.body.only as string[]) : null;
+  try {
+    const restored = await restoreConfigSnapshot(
+      entry,
+      req.params.snapshotId,
+      only,
+      req.user?.username
+    );
+    res.json({ restored, snapshots: await listConfigSnapshots(entry) });
+  } catch (err) {
+    res.status(err instanceof ConfigHistoryError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
 
 serversRouter.get("/:id/dna", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);

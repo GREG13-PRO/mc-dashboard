@@ -5,6 +5,7 @@ import { readWorldInfo } from "./anvil";
 import { isServerRunning } from "./process-manager";
 import { readProperties, writeProperties } from "./properties";
 import { clearMapCache } from "./map-service";
+import { snapshotConfigs } from "./config-history";
 import type { ServerEntry } from "../types";
 
 /**
@@ -161,6 +162,7 @@ export async function createWorld(entry: ServerEntry, input: CreateWorldInput): 
     throw new WorldError("A seed túl hosszú.");
   }
 
+  await snapshotConfigs(entry, "világ létrehozása");
   writeProperties(path.join(entry.folder, "server.properties"), {
     "level-name": input.name,
     "level-seed": seed,
@@ -177,6 +179,7 @@ export async function activateWorld(entry: ServerEntry, name: string): Promise<v
   }
   // The seed is left alone deliberately: it belongs to the world that already
   // exists, and level-seed only matters when generating a new one.
+  await snapshotConfigs(entry, "világváltás");
   writeProperties(path.join(entry.folder, "server.properties"), { "level-name": name });
   await clearMapCache(entry);
 }

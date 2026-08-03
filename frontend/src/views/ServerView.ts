@@ -12,6 +12,7 @@ import { escapeHtml } from "../lib/escape";
 import { ansiLineToHtml } from "../lib/ansi";
 import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
+import type { ConfigSnapshot } from "../types";
 import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatus } from "../types";
 
 type Tab =
@@ -498,6 +499,136 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  function renderConfigHistorySection(): string {
+    return `
+      <div class="section" style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h3 style="margin:0;font-size:13px;">${t("konfig_tortenet")}</h3>
+          <button class="btn" id="cfg-snap">${t("pillanatkep_keszitese")}</button>
+        </div>
+        <p class="finding-advice" style="margin:4px 0 10px;">${t("konfig_tortenet_leiras")}</p>
+        <div id="cfg-list"><div class="empty-state" style="padding:0.5rem 0;">${t(
+          "betoltes"
+        )}</div></div>
+      </div>
+    `;
+  }
+
+  function bindConfigHistory(scope: HTMLElement) {
+    const list = scope.querySelector<HTMLDivElement>("#cfg-list");
+    if (!list) return;
+
+    const paint = (snapshots: ConfigSnapshot[]) => {
+      if (snapshots.length === 0) {
+        list.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">${t(
+          "nincs_pillanatkep"
+        )}</div>`;
+        return;
+      }
+      list.innerHTML = snapshots
+        .map(
+          (snap) => `
+          <div class="finding" data-snap="${escapeHtml(snap.id)}">
+            <div class="finding-head">
+              <span class="finding-badge">${snap.files.length}</span>
+              <strong>${new Date(snap.at).toLocaleString()}</strong>
+            </div>
+            <p class="finding-detail">${escapeHtml(snap.reason)}${
+              snap.actor ? ` · ${escapeHtml(snap.actor)}` : ""
+            }</p>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <button class="btn" data-diff="${escapeHtml(snap.id)}">${t("elteresek")}</button>
+              <button class="btn btn-danger" data-restore="${escapeHtml(snap.id)}">${t(
+                "visszaallitas"
+              )}</button>
+            </div>
+            <div class="cfg-diff" id="diff-${escapeHtml(snap.id)}"></div>
+          </div>`
+        )
+        .join("");
+      bindRows();
+    };
+
+    const bindRows = () => {
+      list.querySelectorAll<HTMLButtonElement>("[data-diff]").forEach((button) => {
+        button.onclick = async () => {
+          const id = button.dataset.diff!;
+          const target = list.querySelector<HTMLDivElement>(`#diff-${CSS.escape(id)}`)!;
+          if (target.innerHTML) {
+            target.innerHTML = "";
+            return;
+          }
+          target.innerHTML = `<p class="finding-detail">${t("betoltes")}</p>`;
+          try {
+            const diffs = (await api.diffConfigSnapshot(serverId, id)).filter((d) => d.changed);
+            target.innerHTML =
+              diffs.length === 0
+                ? `<p class="finding-detail">${t("nincs_elteres")}</p>`
+                : diffs
+                    .map(
+                      (d) => `
+                  <div class="cfg-file">
+                    <div class="cfg-file-name">${escapeHtml(d.path)}</div>
+                    <pre class="cfg-diff-body">${d.lines
+                      // Unchanged runs are collapsed: a diff of
+                      // paper-global.yml is two thousand identical lines and
+                      // three that matter.
+                      .map((line, index, all) =>
+                        line.kind === "context" &&
+                        all[index - 1]?.kind === "context" &&
+                        all[index + 1]?.kind === "context"
+                          ? ""
+                          : `<span class="d-${line.kind}">${
+                              line.kind === "added" ? "+" : line.kind === "removed" ? "-" : " "
+                            } ${escapeHtml(line.text)}</span>`
+                      )
+                      .filter(Boolean)
+                      .join("\n")}</pre>
+                  </div>`
+                    )
+                    .join("");
+          } catch (err) {
+            target.innerHTML = `<p class="finding-advice">${escapeHtml(
+              err instanceof ApiError ? err.message : t("nem_sikerult")
+            )}</p>`;
+          }
+        };
+      });
+
+      list.querySelectorAll<HTMLButtonElement>("[data-restore]").forEach((button) => {
+        button.onclick = async () => {
+          if (!(await confirmModal(t("konfig_visszaallitas_megerosites")))) return;
+          try {
+            const restored = await api.restoreConfigSnapshot(serverId, button.dataset.restore!);
+            showToast(`${t("visszaallitva")}: ${restored.length}`);
+            paint(await api.listConfigSnapshots(serverId));
+          } catch (err) {
+            showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+          }
+        };
+      });
+    };
+
+    scope.querySelector<HTMLButtonElement>("#cfg-snap")?.addEventListener("click", async () => {
+      try {
+        const result = await api.takeConfigSnapshot(serverId);
+        showToast(result.unchanged ? t("nincs_valtozas_pillanatkep") : t("pillanatkep_kesz"));
+        paint(result.snapshots);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+      }
+    });
+
+    void api
+      .listConfigSnapshots(serverId)
+      .then(paint)
+      .catch(() => {
+        list.innerHTML = `<div class="empty-state" style="padding:0.5rem 0;">${t(
+          "nem_sikerult_betolteni"
+        )}</div>`;
+      });
   }
 
   function renderDnaSection(): string {
@@ -2044,8 +2175,10 @@ export function renderServerView(
         </div>
         <div id="backups-list"><div class="empty-state" style="padding:0.5rem 0;">${t("betoltes")}</div></div>
       </div>
+      ${renderConfigHistorySection()}
       ${renderDnaSection()}
     `;
+    bindConfigHistory(content);
     bindDnaSection(content);
     content.querySelector<HTMLButtonElement>("#edit-btn")!.onclick = () => {
       openAddServerModal(async () => {

@@ -350,4 +350,13 @@ export const en = {
   dns_fajlok_irva: "Files written",
   dns_pluginok_telepitve: "Plugins installed",
   dns_kezi_pluginok: "Could not be reinstalled automatically (the dashboard did not install them originally, so there is no source)",
+  konfig_tortenet: "Config history",
+  konfig_tortenet_leiras: "A snapshot of the settings files is taken before every change the dashboard makes, so a line that broke something can be found and put back. Not the world - that is what backups are for.",
+  pillanatkep_keszitese: "Take snapshot",
+  pillanatkep_kesz: "Snapshot taken",
+  nincs_valtozas_pillanatkep: "Nothing has changed since the last snapshot.",
+  nincs_pillanatkep: "No snapshot yet.",
+  elteresek: "Differences",
+  nincs_elteres: "Identical to the current files.",
+  konfig_visszaallitas_megerosites: "Put the settings files back as they were in this snapshot? The current state is snapshotted first, so this is itself undoable.",
 };

@@ -7,6 +7,7 @@ import { readProperties } from "./properties";
 import { detectMinecraftVersion } from "./version-check";
 import { isServerRunning } from "./process-manager";
 import { resolveSafePath } from "../files/safe-path";
+import { snapshotConfigs } from "./config-history";
 import type { ServerEntry } from "../types";
 
 /**
@@ -212,6 +213,10 @@ export async function importDna(
   if (await isServerRunning(entry)) {
     throw new DnaError("Ehhez le kell állítani a szervert.");
   }
+
+  // The whole point of the DNA restore is that it overwrites configs, so the
+  // state it overwrites is exactly what someone will want back.
+  await snapshotConfigs(entry, "DNS visszatöltés előtt");
 
   const report: ImportReport = {
     wroteFiles: [],
