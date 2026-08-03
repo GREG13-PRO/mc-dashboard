@@ -124,22 +124,56 @@ def tap(description, dump_name):
     raise SystemExit(f"no view with content-desc={description}")
 
 
+def disable_keyboards():
+    """Turns off every input method for the run.
+
+    Focusing a text field otherwise raises the AOSP keyboard, which on a fresh
+    emulator immediately asks for contacts access - and that dialog sits over
+    the button the test needs to press next. `input text` injects key events
+    directly and does not need an IME at all, so the simplest fix is to have no
+    keyboard on screen.
+    """
+    listing = adb("shell", "ime", "list", "-s", capture=True).decode("utf-8", "replace")
+    for ime in listing.split():
+        if "/" in ime:
+            adb("shell", "ime", "disable", ime, check=False)
+            print(f"disabled ime {ime}")
+
+
+def wait_for(text, timeout=30):
+    """Polls the view hierarchy instead of sleeping a guessed number of seconds."""
+    deadline = time.time() + timeout
+    xml = ""
+    while time.time() < deadline:
+        xml = hierarchy("ui-loaded.xml")
+        if text in xml:
+            return xml
+        time.sleep(2)
+    return xml
+
+
 def main():
     server = serve()
     adb("install", "-r", "android/app/build/outputs/apk/debug/app-debug.apk")
+    disable_keyboards()
     adb("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
     time.sleep(6)
     screenshot("1-setup.png")
 
+    setup = hierarchy("ui-setup.xml")
+    for field in ("host", "port", "connect"):
+        if f'content-desc="{field}"' not in setup:
+            print(setup[:4000])
+            raise SystemExit(f"the setup screen has no {field} field")
+    print("PASS: the setup screen rendered with all its fields")
+
     tap("host", "ui-setup.xml")
-    dismiss_system_dialog("ui-permission.xml")
     adb("shell", "input", "text", HOST)
     screenshot("2-filled.png")
     tap("connect", "ui-filled.xml")
-    time.sleep(10)
-    screenshot("3-loaded.png")
 
-    after = hierarchy("ui-loaded.xml")
+    after = wait_for("WEBVIEW OK")
+    screenshot("3-loaded.png")
     failures = []
     # The page's own text in the view hierarchy is the proof it rendered; a
     # screenshot alone can look plausible while showing nothing.
