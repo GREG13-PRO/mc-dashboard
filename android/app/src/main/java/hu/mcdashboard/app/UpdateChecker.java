@@ -86,7 +86,7 @@ final class UpdateChecker {
             new AlertDialog.Builder(activity)
                     .setMessage(R.string.update_needs_permission)
                     .setPositiveButton(android.R.string.ok, (d, w) -> activity.startActivity(
-                            new Intent(Settings.ACTION_UNKNOWN_APP_SOURCES_SETTINGS,
+                            new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                                     Uri.parse("package:" + activity.getPackageName()))))
                     .setNegativeButton(android.R.string.cancel, null)
                     .show();
