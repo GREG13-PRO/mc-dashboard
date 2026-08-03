@@ -4,6 +4,7 @@ import { ConsoleSocket } from "../ws-client";
 import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
 import { openPluginBrowser } from "../components/PluginBrowser";
+import { createWorldMap, type WorldMapHandle } from "../components/WorldMap";
 import { sparklineSvg } from "../components/Sparkline";
 import { confirmModal, openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
@@ -26,6 +27,7 @@ type Tab =
   | "macros"
   | "stats"
   | "schematics"
+  | "map"
   | "settings";
 const ALL_TABS: Tab[] = [
   "console",
@@ -40,6 +42,7 @@ const ALL_TABS: Tab[] = [
   "macros",
   "stats",
   "schematics",
+  "map",
   "settings",
 ];
 
@@ -58,6 +61,8 @@ export function renderServerView(
   const capabilityFor = (tab: Tab) =>
     tab === "plugins" || tab === "content" || tab === "schematics"
       ? "files"
+      : tab === "map"
+        ? "settings"
       : tab === "macros"
         ? "console"
         : tab === "stats"
@@ -78,6 +83,7 @@ export function renderServerView(
   let socket: ConsoleSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let statsTimer: ReturnType<typeof setInterval> | null = null;
+  let mapHandle: WorldMapHandle | null = null;
   const consoleHistory: string[] = [];
 
   root.innerHTML = `<div class="empty-state">${t("betoltes")}</div>`;
@@ -131,10 +137,22 @@ export function renderServerView(
     `;
 
     const tabEls = [...root.querySelectorAll<HTMLDivElement>(".tab")];
+    // The strip scrolls horizontally now that there are a dozen-plus tabs, and
+    // re-rendering resets it to the left - which would hide the very tab that
+    // was just clicked.
+    tabEls
+      .find((el) => el.dataset.tab === activeTab)
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     tabEls.forEach((tabEl, index) => {
       const select = () => {
         if (tabEl.dataset.tab === activeTab) return;
         teardownConsole();
+        // Leaving the map tab has to stop its player poll and drop its pointer
+        // listeners; doing it here rather than in the click handler covers the
+        // keyboard path too, and skips the case where the active tab is
+        // re-selected and nothing is rebuilt.
+        mapHandle?.destroy();
+        mapHandle = null;
         activeTab = tabEl.dataset.tab as Tab;
         renderShell();
       };
@@ -238,6 +256,7 @@ export function renderServerView(
       macros: t("makrok"),
       stats: t("statisztika"),
       schematics: t("schematicek"),
+      map: t("terkep"),
       settings: t("beallitasok"),
     }[tab];
   }
@@ -289,6 +308,8 @@ export function renderServerView(
       void renderStats(content);
     } else if (activeTab === "schematics") {
       void renderSchematics(content);
+    } else if (activeTab === "map") {
+      void renderMap(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -467,6 +488,32 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderMap(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
+    let info;
+    try {
+      info = await api.getMapInfo(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+
+    if (info.dimensions.length === 0) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("nincs_vilagadat")}</div>`;
+      return;
+    }
+
+    content.innerHTML = "";
+    // Torn down explicitly: the map installs pointer and wheel listeners on
+    // its own viewport that would otherwise outlive the tab.
+    mapHandle?.destroy();
+    mapHandle = createWorldMap(serverId, info, info.dimensions[0].id);
+    content.appendChild(mapHandle.element);
   }
 
   async function renderSchematics(content: HTMLElement) {
@@ -1828,6 +1875,8 @@ export function renderServerView(
 
   return () => {
     disposed = true;
+    mapHandle?.destroy();
+    mapHandle = null;
     if (statsTimer) clearInterval(statsTimer);
     statsTimer = null;
     teardownConsole();

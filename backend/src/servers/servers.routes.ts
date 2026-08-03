@@ -29,6 +29,8 @@ import {
 } from "./macros";
 import { cloneServer, CloneError } from "./clone";
 import { compareWeeks } from "./stats";
+import { mapInfo, regionTile, clearMapCache, MapError, type Dimension } from "./map-service";
+import { playerPositions } from "./map-players";
 import {
   listSchematics,
   saveSchematic,
@@ -492,6 +494,65 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
   } catch (err) {
     res.status(409).json({ error: (err as Error).message });
   }
+});
+
+const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/map", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json(await mapInfo(entry));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/map/players", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ players: await playerPositions(entry) });
+});
+
+serversRouter.get("/:id/map/:dim/:x/:z.png", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const dim = req.params.dim;
+  const x = Number(req.params.x);
+  const z = Number((req.params as Record<string, string>).z);
+  if (!DIMENSIONS.has(dim) || !Number.isInteger(x) || !Number.isInteger(z)) {
+    res.status(400).json({ error: "Invalid tile request" });
+    return;
+  }
+  try {
+    const { png } = await regionTile(entry, dim as Dimension, x, z);
+    res.setHeader("Content-Type", "image/png");
+    // Revalidated by the client on pan; the tile itself is regenerated only
+    // when the region file changes.
+    res.setHeader("Cache-Control", "no-cache");
+    res.send(png);
+  } catch (err) {
+    res.status(err instanceof MapError ? 404 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/map/cache", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  await clearMapCache(entry);
+  res.json({ ok: true });
 });
 
 serversRouter.get("/:id/schematics", requirePermission("files"), async (req, res) => {

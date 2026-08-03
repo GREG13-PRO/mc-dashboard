@@ -1,5 +1,6 @@
-import { Rcon } from "rcon-client";
 import { serverRegistry } from "./registry";
+import { rconCommand } from "./rcon";
+import type { ServerEntry } from "../types";
 import { isServerRunning } from "./process-manager";
 
 interface PlayersSnapshot {
@@ -27,16 +28,12 @@ function parseListResponse(response: string): Omit<PlayersSnapshot, "fetchedAt">
   return { online: Number(online), max: Number(max), names };
 }
 
-async function pollOne(serverId: string, host: string, port: number, password: string): Promise<void> {
-  let rcon: Rcon | undefined;
+async function pollOne(entry: ServerEntry): Promise<void> {
   try {
-    rcon = await Rcon.connect({ host, port, password, timeout: 5000 });
-    const response = await rcon.send("list");
-    cache.set(serverId, { ...parseListResponse(response), fetchedAt: new Date().toISOString() });
+    const response = await rconCommand(entry, "list");
+    cache.set(entry.id, { ...parseListResponse(response), fetchedAt: new Date().toISOString() });
   } catch {
     // Leave any previous cached snapshot in place; don't thrash the UI on a transient failure.
-  } finally {
-    await rcon?.end().catch(() => undefined);
   }
 }
 
@@ -48,7 +45,7 @@ async function pollAll(): Promise<void> {
         cache.delete(entry.id);
         return;
       }
-      await pollOne(entry.id, entry.rcon.host, entry.rcon.port, entry.rcon.password);
+      await pollOne(entry);
     })
   );
 }

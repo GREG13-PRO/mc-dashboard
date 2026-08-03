@@ -291,4 +291,11 @@ export const hu: typeof en = {
   csomagok: "Csomagok",
   statisztika: "Statisztika",
   schematicek: "Schematicek",
+  map_fit: "Igazítás",
+  terkep: "Térkép",
+  nincs_vilagadat: "Ehhez a szerverhez nincs világadat.",
+  map_spawn: "Spawn",
+  dim_overworld: "Felszín",
+  dim_nether: "Nether",
+  dim_end: "The End",
 };

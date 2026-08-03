@@ -19,6 +19,8 @@ import type {
   JvmRecommendation,
   LagReport,
   Macro,
+  MapInfo,
+  PlayerPosition,
   MacroStep,
   Pack,
   PackKind,
@@ -289,6 +291,17 @@ export const api = {
       body: JSON.stringify({ resource, leaving }),
     });
     return present;
+  },
+
+  async getMapInfo(serverId: string): Promise<MapInfo> {
+    return request(`/servers/${serverId}/map`);
+  },
+  async getMapPlayers(serverId: string): Promise<PlayerPosition[]> {
+    const { players } = await request<{ players: PlayerPosition[] }>(`/servers/${serverId}/map/players`);
+    return players;
+  },
+  async clearMapCache(serverId: string): Promise<void> {
+    await request(`/servers/${serverId}/map/cache`, { method: "DELETE" });
   },
 
   async listSchematics(serverId: string): Promise<{ schematics: Schematic[]; worldEdit: boolean }> {

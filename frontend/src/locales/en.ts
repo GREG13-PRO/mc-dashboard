@@ -289,4 +289,11 @@ export const en = {
   csomagok: "Packages",
   statisztika: "Statistics",
   schematicek: "Schematics",
+  map_fit: "Fit",
+  terkep: "Map",
+  nincs_vilagadat: "No world data for this server.",
+  map_spawn: "Spawn",
+  dim_overworld: "Overworld",
+  dim_nether: "Nether",
+  dim_end: "The End",
 };

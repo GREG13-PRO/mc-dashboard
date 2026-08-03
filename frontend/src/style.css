@@ -684,6 +684,15 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 2px;
   padding: var(--gap-sm) var(--gap-xl) 0;
   border-bottom: 0.5px solid var(--border);
+  /* There are now enough tabs to run past the window edge on a laptop; without
+     this the last ones are simply unreachable. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab {
+  flex: none;
+  white-space: nowrap;
 }
 
 .tab {
@@ -1461,4 +1470,100 @@ table.file-table tr.file-row:hover {
   text-overflow: clip;
   white-space: normal;
   margin-bottom: var(--gap-xs);
+}
+
+/* --------------------------------------------------------------- world map */
+
+.map-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: var(--gap-sm);
+}
+
+.map-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+}
+
+.map-toolbar select {
+  max-width: 150px;
+}
+
+.map-coords {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: "SF Mono", ui-monospace, monospace;
+}
+
+.map-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 320px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  /* A fixed dark field in both themes: ungenerated world has to read as empty
+     space, and on a light background transparent tiles just look like a gap in
+     the page. */
+  background: #12151a;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.map-viewport:active {
+  cursor: grabbing;
+}
+
+.map-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.map-tile {
+  position: absolute;
+  width: 512px;
+  height: 512px;
+  /* One pixel per block: smoothing would blur the blocks into mush. */
+  image-rendering: pixelated;
+}
+
+.map-players {
+  position: absolute;
+  inset: 0;
+  /* Purely decorative overlay: dragging the map has to keep working when the
+     pointer happens to be over a marker. */
+  pointer-events: none;
+}
+
+.map-player {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transform: translate(-4px, -4px);
+  white-space: nowrap;
+}
+
+.map-player-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+
+.map-player-name {
+  color: #fff;
+  font-size: 11px;
+  font-weight: 590;
+  /* The map underneath is arbitrary colours, so the label carries its own
+     contrast rather than relying on what it happens to sit on. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.9);
 }

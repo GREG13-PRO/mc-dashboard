@@ -363,3 +363,20 @@ export interface Schematic {
   modifiedAt: string;
   size: { x: number; y: number; z: number } | null;
 }
+
+export type Dimension = "overworld" | "nether" | "end";
+
+export interface PlayerPosition {
+  name: string;
+  x: number;
+  z: number;
+  dimension: Dimension;
+}
+
+export interface MapInfo {
+  dimensions: {
+    id: Dimension;
+    regions: { x: number; z: number }[];
+    spawn: { x: number; z: number };
+  }[];
+}
