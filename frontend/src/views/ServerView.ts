@@ -5,7 +5,7 @@ import { ConsoleLogView } from "../components/ConsoleLog";
 import { FileBrowser } from "../components/FileBrowser";
 import { openPluginBrowser } from "../components/PluginBrowser";
 import { createWorldMap, type WorldMapHandle } from "../components/WorldMap";
-import { sparklineSvg } from "../components/Sparkline";
+import { ratioBarSvg, sparklineSvg } from "../components/Sparkline";
 import { confirmModal, openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { escapeHtml } from "../lib/escape";
@@ -984,22 +984,45 @@ export function renderServerView(
               <table class="file-table" style="margin-top:8px;">
                 <thead><tr>
                   <th>${t("jatekos")}</th><th>${t("ercek")}</th>
-                  <th>${t("rejtett_ercek")}</th><th>${t("max_sebesseg")}</th>
+                  <th>${t("rejtett_ercek")}</th><th>${t("ertekes_ercek")}</th>
+                  <th>${t("max_sebesseg")}</th>
                 </tr></thead>
                 <tbody>
                   ${guard.players
-                    .map(
-                      (p) => `<tr>
+                    .map((p) => {
+                      const ratio = p.oresMined > 0 ? p.hiddenOres / p.oresMined : 0;
+                      const valuable =
+                        p.valuableOres > 0 ? p.hiddenValuableOres / p.valuableOres : 0;
+                      return `<tr>
                         <td>${escapeHtml(p.name)}</td>
                         <td>${p.oresMined}</td>
-                        <td>${p.hiddenOres}${
-                          p.oresMined > 0
-                            ? ` (${Math.round((p.hiddenOres / p.oresMined) * 100)}%)`
-                            : ""
-                        }</td>
+                        <td style="white-space:nowrap;">
+                          ${ratioBarSvg({
+                            ratio,
+                            label: `${p.hiddenOres}/${p.oresMined}`,
+                            width: 120,
+                          })}
+                          <span style="margin-left:6px;">${p.hiddenOres}/${p.oresMined} · ${Math.round(
+                            ratio * 100
+                          )}%</span>
+                        </td>
+                        <td style="white-space:nowrap;">
+                          ${
+                            p.valuableOres > 0
+                              ? `${ratioBarSvg({
+                                  ratio: valuable,
+                                  label: `${p.hiddenValuableOres}/${p.valuableOres}`,
+                                  warnAbove: 0.9,
+                                  width: 80,
+                                })} <span style="margin-left:6px;">${p.hiddenValuableOres}/${
+                                  p.valuableOres
+                                }</span>`
+                              : "—"
+                          }
+                        </td>
                         <td>${p.maxSpeed.toFixed(1)}</td>
-                      </tr>`
-                    )
+                      </tr>`;
+                    })
                     .join("")}
                 </tbody>
               </table>`

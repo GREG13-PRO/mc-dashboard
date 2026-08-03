@@ -8,6 +8,7 @@ import { auditRouter, xpRouter } from "../audit/audit.routes";
 import { auditMiddleware } from "../audit/audit.middleware";
 import { appDistPublicRouter, appDistAdminRouter } from "../app-dist/app-dist.routes";
 import { labRouter } from "../servers/plugin-lab.routes";
+import { webhooksRouter } from "../webhooks/webhooks.routes";
 
 export const apiRouter = Router();
 
@@ -27,3 +28,4 @@ apiRouter.use("/admin-xp", requireAuth, xpRouter);
 apiRouter.use("/app", appDistPublicRouter);
 apiRouter.use("/app", requireAuth, requireAdmin, appDistAdminRouter);
 apiRouter.use("/lab", requireAuth, requireAdmin, labRouter);
+apiRouter.use("/webhooks", requireAuth, requireAdmin, webhooksRouter);

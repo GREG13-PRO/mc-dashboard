@@ -37,6 +37,8 @@ import type {
   LabCompileResult,
   LabDeployResult,
   LoadTestReport,
+  Webhook,
+  WebhooksResponse,
   MacroStep,
   Pack,
   PackKind,
@@ -434,6 +436,23 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ serverId, reload }),
     });
+  },
+
+  async listWebhooks(): Promise<WebhooksResponse> {
+    return request("/webhooks");
+  },
+  async saveWebhook(input: Partial<Webhook> & { url: string }): Promise<Webhook> {
+    const { webhook } = await request<{ webhook: Webhook }>("/webhooks", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return webhook;
+  },
+  async deleteWebhook(id: string): Promise<void> {
+    await request(`/webhooks/${encodeURIComponent(id)}`, { method: "DELETE" });
+  },
+  async testWebhook(id: string): Promise<void> {
+    await request(`/webhooks/${encodeURIComponent(id)}/test`, { method: "POST" });
   },
 
   async runLoadTest(

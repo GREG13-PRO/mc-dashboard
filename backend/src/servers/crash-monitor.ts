@@ -93,6 +93,16 @@ async function checkAll(): Promise<void> {
         `(attempt ${entryState.attempts.length}/${entry.crashRestart.maxAttempts})`
     );
     let ok = true;
+    // Fired before the restart so the notification carries the crash even if
+    // the restart itself then fails.
+    void (async () => {
+      try {
+        const { emit } = await import("../webhooks/webhooks");
+        await emit("server.crashed", `${entry.name} magától leállt, újraindítás következik.`);
+      } catch {
+        // A missed notification must not stop the restart.
+      }
+    })();
     await startServer(entry).catch((err) => {
       ok = false;
       console.error(`[crash-monitor] Failed to restart "${entry.name}":`, err);

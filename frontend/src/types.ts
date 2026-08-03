@@ -591,3 +591,50 @@ export interface LoadTestReport {
   errors: Record<string, number>;
   latencyMs: { min: number; median: number; p95: number; max: number } | null;
 }
+
+export type WebhookEvent =
+  | "server.started"
+  | "server.stopped"
+  | "server.crashed"
+  | "security.alert"
+  | "player.joined"
+  | "player.left";
+
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  format: "discord" | "json";
+  events: WebhookEvent[];
+  enabled: boolean;
+  createdAt: string;
+}
+
+export interface WebhookDelivery {
+  at: string;
+  webhookId: string;
+  event: WebhookEvent;
+  status: number | null;
+  ok: boolean;
+  durationMs: number;
+  error: string | null;
+  rateLimit: { limit: string | null; remaining: string | null; resetSeconds: string | null } | null;
+}
+
+export interface RateLimitSummary {
+  webhookId: string;
+  attempts: number;
+  failures: number;
+  throttled: number;
+  lastStatus: number | null;
+  lastRemaining: string | null;
+  lastResetSeconds: string | null;
+  medianMs: number | null;
+}
+
+export interface WebhooksResponse {
+  webhooks: Webhook[];
+  events: WebhookEvent[];
+  deliveries: WebhookDelivery[];
+  rateLimits: RateLimitSummary[];
+}

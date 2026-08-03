@@ -53,3 +53,34 @@ export function sparklineSvg({ values, color, width = 260, height = 44, max }: S
                 stroke-linejoin="round" stroke-linecap="round" />
     </svg>`;
 }
+
+export interface RatioBarOptions {
+  /** 0..1 */
+  ratio: number;
+  label: string;
+  /** Above this the bar turns to the warning colour. */
+  warnAbove?: number;
+  width?: number;
+}
+
+/**
+ * A single proportion, drawn as a bar.
+ *
+ * The anti-cheat numbers are ratios, and a ratio is the one thing a table of
+ * counts hides: "18 of 20" and "180 of 900" read the same in two columns and
+ * mean completely different things. Same inline-SVG reasoning as the
+ * sparkline - these views rewrite their innerHTML wholesale.
+ */
+export function ratioBarSvg({ ratio, label, warnAbove = 0.85, width = 160 }: RatioBarOptions): string {
+  const height = 14;
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const colour = clamped >= warnAbove ? "var(--red)" : "var(--accent)";
+  return `
+    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"
+         role="img" aria-label="${label}">
+      <rect x="0" y="3" width="${width}" height="${height - 6}" rx="4"
+            fill="var(--bg-inset)" />
+      <rect x="0" y="3" width="${(width * clamped).toFixed(1)}" height="${height - 6}" rx="4"
+            fill="${colour}" />
+    </svg>`;
+}

@@ -102,6 +102,23 @@ export function isIntentionallyStopped(serverId: string): boolean {
   return intentionallyStopped.has(serverId);
 }
 
+/**
+ * Fires a webhook without letting it affect the operation that triggered it.
+ *
+ * Imported here rather than at the top of the file: the webhook module reaches
+ * back into server state, and a static import would close a cycle at load
+ * time. A failing notification must never turn a successful start into an
+ * error, so everything is swallowed.
+ */
+async function notify(event: string, message: string): Promise<void> {
+  try {
+    const { emit } = await import("../webhooks/webhooks");
+    await emit(event as Parameters<typeof emit>[0], message);
+  } catch {
+    // A notification nobody receives is not a reason to fail the action.
+  }
+}
+
 export async function startServer(entry: ServerEntry): Promise<void> {
   await assertScreenInstalled();
   // Starting it is the clearest possible statement that it should be up.
@@ -136,6 +153,7 @@ export async function startServer(entry: ServerEntry): Promise<void> {
     // attaches (see console-stream.ts for the full explanation).
     { env: { ...process.env, TERM: "xterm-256color" } }
   );
+  void notify("server.started", `${entry.name} elindult.`);
 }
 
 /**
@@ -157,6 +175,7 @@ export async function stopServer(entry: ServerEntry, timeoutMs = 30_000): Promis
   while (Date.now() - start < timeoutMs) {
     await new Promise((r) => setTimeout(r, 1000));
     if (!(await isServerRunning(entry))) {
+      void notify("server.stopped", `${entry.name} leállt.`);
       return;
     }
   }
@@ -164,6 +183,7 @@ export async function stopServer(entry: ServerEntry, timeoutMs = 30_000): Promis
   // Graceful stop timed out - kill the whole screen session (and whatever
   // process tree it holds) rather than leaving it to fight a restart loop.
   await execFileAsync("screen", ["-S", entry.screenName, "-X", "quit"]).catch(() => undefined);
+  void notify("server.stopped", `${entry.name} leállt (a türelmi idő letelte után kilőve).`);
 }
 
 export async function restartServer(entry: ServerEntry): Promise<void> {
