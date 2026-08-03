@@ -10,8 +10,11 @@ android {
         applicationId "hu.mcdashboard.app"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "2.20.0"
+        // Taken from the build rather than edited by hand: Android refuses an
+        // update whose versionCode is not higher, and a number nobody
+        // remembers to bump is a number that stays at 1.
+        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+        versionName System.getenv("ANDROID_VERSION_NAME") ?: "dev"
     }
 
     // Signed with a key held as a repository secret rather than one committed
