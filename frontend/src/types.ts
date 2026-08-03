@@ -419,3 +419,9 @@ export interface PublishedBuild {
   uploadedAt: string;
   url: string;
 }
+
+export interface GithubSyncStatus {
+  configured: boolean;
+  latest?: { tag: string; version: string; assets: { name: string; sizeBytes: number }[] };
+  error?: string;
+}

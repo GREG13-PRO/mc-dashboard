@@ -10,6 +10,14 @@ import {
   PLATFORMS,
   type Platform,
 } from "./app-dist";
+import {
+  hasToken,
+  setToken,
+  clearToken,
+  latestRelease,
+  syncLatestRelease,
+  GithubSyncError,
+} from "./github-sync";
 
 /**
  * The read side is deliberately outside `requireAuth`.
@@ -89,6 +97,48 @@ appDistAdminRouter.post("/", upload.single("file"), async (req, res) => {
   }
 });
 
+
+/**
+ * GitHub side. The token is write-only from the browser's point of view: it can
+ * be set and cleared, but never read back, so a session on this dashboard is
+ * not a way to walk off with someone's repository token.
+ */
+appDistAdminRouter.get("/github/status", async (_req, res) => {
+  if (!hasToken()) {
+    res.json({ configured: false });
+    return;
+  }
+  try {
+    res.json({ configured: true, latest: await latestRelease() });
+  } catch (err) {
+    res.json({ configured: true, error: (err as Error).message });
+  }
+});
+
+appDistAdminRouter.put("/github/token", async (req, res) => {
+  try {
+    await setToken(String((req.body ?? {}).token ?? ""));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(err instanceof GithubSyncError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+appDistAdminRouter.delete("/github/token", async (_req, res) => {
+  await clearToken();
+  res.json({ ok: true });
+});
+
+appDistAdminRouter.post("/github/sync", async (_req, res) => {
+  try {
+    res.json({ builds: await syncLatestRelease() });
+  } catch (err) {
+    res.status(err instanceof GithubSyncError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+// Registered last: a bare "/:filename" would otherwise also match the
+// /github/... paths above it.
 appDistAdminRouter.delete("/:filename", async (req, res) => {
   try {
     await deleteBuild(req.params.filename);

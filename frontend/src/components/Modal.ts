@@ -81,3 +81,51 @@ export function confirmModal(message: string): Promise<boolean> {
     };
   });
 }
+
+/**
+ * Asks for a single secret value.
+ *
+ * The field is a password input and the value is never written back into the
+ * DOM afterwards: the only thing this is used for so far is a repository token,
+ * and a token left sitting in a form field is a token in a screen share.
+ */
+export function promptModal(label: string, hint: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = `
+      <label class="field">
+        <span>${label}</span>
+        <input type="password" id="prompt-value" autocomplete="off" />
+      </label>
+      <p style="color:var(--text-dim);font-size:12px;margin:6px 0 0;">${hint}</p>
+    `;
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn";
+    cancelBtn.textContent = t("megse");
+    const okBtn = document.createElement("button");
+    okBtn.className = "btn btn-primary";
+    okBtn.textContent = t("mentes");
+    actions.append(cancelBtn, okBtn);
+    wrap.appendChild(actions);
+
+    const close = openModal(wrap);
+    const input = wrap.querySelector<HTMLInputElement>("#prompt-value")!;
+    input.focus();
+    const submit = () => {
+      const value = input.value.trim();
+      close();
+      resolve(value ? value : null);
+    };
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") submit();
+    };
+    cancelBtn.onclick = () => {
+      close();
+      resolve(null);
+    };
+    okBtn.onclick = submit;
+  });
+}
+

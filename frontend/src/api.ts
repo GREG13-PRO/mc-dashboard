@@ -24,6 +24,7 @@ import type {
   SurfaceView,
   SecurityReport,
   PublishedBuild,
+  GithubSyncStatus,
   MacroStep,
   Pack,
   PackKind,
@@ -317,6 +318,21 @@ export const api = {
   },
   async deleteBuild(filename: string): Promise<void> {
     await request(`/app/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+  async githubStatus(): Promise<GithubSyncStatus> {
+    return request("/app/github/status");
+  },
+  async setGithubToken(token: string): Promise<void> {
+    await request("/app/github/token", { method: "PUT", body: JSON.stringify({ token }) });
+  },
+  async clearGithubToken(): Promise<void> {
+    await request("/app/github/token", { method: "DELETE" });
+  },
+  async syncFromGithub(): Promise<PublishedBuild[]> {
+    const { builds } = await request<{ builds: PublishedBuild[] }>("/app/github/sync", {
+      method: "POST",
+    });
+    return builds;
   },
 
   async getSecurityReport(serverId: string): Promise<SecurityReport> {
