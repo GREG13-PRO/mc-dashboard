@@ -8,6 +8,7 @@ import { renderUsersView } from "./UsersView";
 import { renderAuditView } from "./AuditView";
 import { renderXpView } from "./XpView";
 import { renderAppDistView } from "./AppDistView";
+import { renderLabView } from "./LabView";
 import { isAdmin, setCurrentUser } from "../auth-state";
 import { getThemeChoice, setThemeChoice, nextTheme, themeIcon, themeLabel, notifyThemeChanged } from "../lib/theme";
 import {
@@ -47,6 +48,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">${t("auditnaplo")}</button>` : ""}
         <button class="btn users-nav-btn" id="xp-nav-btn" style="width:100%;">${t("admin_szintek")}</button>
         ${isAdmin() ? `<button class="btn users-nav-btn" id="appdist-nav-btn" style="width:100%;">${t("alkalmazasok")}</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="lab-nav-btn" style="width:100%;">${t("plugin_labor")}</button>` : ""}
         <div class="server-list" id="server-list" role="list"></div>
       </nav>
       <main class="main-content" id="main-content" tabindex="-1">
@@ -155,6 +157,9 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   root.querySelector<HTMLButtonElement>("#appdist-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/app";
   });
+  root.querySelector<HTMLButtonElement>("#lab-nav-btn")?.addEventListener("click", () => {
+    location.hash = "#/lab";
+  });
   root.querySelector<HTMLButtonElement>("#xp-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/xp";
   });
@@ -218,6 +223,16 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     disposeServerView = null;
 
     const mainContent = root.querySelector<HTMLDivElement>("#main-content")!;
+
+    if (location.hash === "#/lab") {
+      if (!isAdmin()) {
+        location.hash = "";
+        return;
+      }
+      disposeServerView = renderLabView(mainContent);
+      renderList();
+      return;
+    }
 
     if (location.hash === "#/app") {
       if (!isAdmin()) {

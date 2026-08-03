@@ -1844,3 +1844,35 @@ table.file-table tr.file-row:hover {
 .d-context {
   color: var(--text-dim);
 }
+
+/* ------------------------------------------------------------- plugin lab */
+
+.lab-editor {
+  height: 380px;
+  overflow: hidden;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.lab-editor .cm-editor {
+  height: 100%;
+}
+
+.lab-output {
+  margin: 10px 0 0;
+  padding: 10px;
+  min-height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  /* Compiler errors carry long paths and carets; they scroll rather than
+     stretching the page. */
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.lab-output-error {
+  color: var(--red);
+}

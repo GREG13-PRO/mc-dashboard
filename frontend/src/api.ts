@@ -32,6 +32,10 @@ import type {
   FileDiff,
   NetworkReport,
   AntiCheatStatus,
+  LabProject,
+  LabToolchain,
+  LabCompileResult,
+  LabDeployResult,
   MacroStep,
   Pack,
   PackKind,
@@ -399,6 +403,36 @@ export const api = {
   },
   async deleteWorld(serverId: string, name: string): Promise<void> {
     await request(`/servers/${serverId}/worlds/${encodeURIComponent(name)}`, { method: "DELETE" });
+  },
+
+  async listLabProjects(): Promise<{ projects: LabProject[]; toolchain: LabToolchain }> {
+    return request("/lab/projects");
+  },
+  async saveLabProject(name: string, source?: string): Promise<LabProject> {
+    const { project } = await request<{ project: LabProject }>("/lab/projects", {
+      method: "POST",
+      body: JSON.stringify({ name, source }),
+    });
+    return project;
+  },
+  async deleteLabProject(name: string): Promise<void> {
+    await request(`/lab/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
+  },
+  async compileLabProject(name: string, serverId: string): Promise<LabCompileResult> {
+    return request(`/lab/projects/${encodeURIComponent(name)}/compile`, {
+      method: "POST",
+      body: JSON.stringify({ serverId }),
+    });
+  },
+  async deployLabProject(
+    name: string,
+    serverId: string,
+    reload: boolean
+  ): Promise<LabDeployResult> {
+    return request(`/lab/projects/${encodeURIComponent(name)}/deploy`, {
+      method: "POST",
+      body: JSON.stringify({ serverId, reload }),
+    });
   },
 
   async getAntiCheat(serverId: string): Promise<AntiCheatStatus> {

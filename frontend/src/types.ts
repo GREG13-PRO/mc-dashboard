@@ -557,3 +557,25 @@ export interface AntiCheatStatus {
   generatedAt: string | null;
   players: AntiCheatPlayer[];
 }
+
+export interface LabProject {
+  name: string;
+  source: string;
+  updatedAt: string;
+}
+
+export interface LabToolchain {
+  javac: string | null;
+  jar: string | null;
+}
+
+export interface LabCompileResult {
+  ok: boolean;
+  output: string;
+  minecraftVersion: string;
+}
+
+export interface LabDeployResult {
+  installed: string;
+  reloadOutput: string | null;
+}

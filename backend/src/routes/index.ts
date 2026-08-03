@@ -7,6 +7,7 @@ import { installRouter } from "../servers/install.routes";
 import { auditRouter, xpRouter } from "../audit/audit.routes";
 import { auditMiddleware } from "../audit/audit.middleware";
 import { appDistPublicRouter, appDistAdminRouter } from "../app-dist/app-dist.routes";
+import { labRouter } from "../servers/plugin-lab.routes";
 
 export const apiRouter = Router();
 
@@ -25,3 +26,4 @@ apiRouter.use("/admin-xp", requireAuth, xpRouter);
 // public and only publishing a build needs an admin.
 apiRouter.use("/app", appDistPublicRouter);
 apiRouter.use("/app", requireAuth, requireAdmin, appDistAdminRouter);
+apiRouter.use("/lab", requireAuth, requireAdmin, labRouter);
