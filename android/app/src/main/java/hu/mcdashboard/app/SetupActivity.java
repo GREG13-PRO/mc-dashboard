@@ -49,12 +49,16 @@ public class SetupActivity extends Activity {
 
         EditText host = new EditText(this);
         host.setHint(R.string.host_hint);
+        // These views are built in code, so they have no resource ids for a
+        // screen reader - or for the emulator smoke test - to hold on to.
+        host.setContentDescription("host");
         host.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         host.setSingleLine(true);
         box.addView(host);
 
         EditText port = new EditText(this);
         port.setHint(R.string.port_hint);
+        port.setContentDescription("port");
         port.setInputType(InputType.TYPE_CLASS_NUMBER);
         port.setSingleLine(true);
         port.setText(DEFAULT_PORT);
@@ -76,6 +80,7 @@ public class SetupActivity extends Activity {
 
         Button connect = new Button(this);
         connect.setText(R.string.connect);
+        connect.setContentDescription("connect");
         connect.setOnClickListener(v -> {
             String h = host.getText().toString().trim().replaceFirst("^https?://", "");
             String p = port.getText().toString().trim();

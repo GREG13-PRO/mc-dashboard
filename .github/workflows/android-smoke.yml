@@ -1,0 +1,116 @@
+name: Android smoke test
+
+# The APK cannot be run anywhere else in this project's setup, so "it compiles"
+# is otherwise the only thing anyone knows about it. This boots an emulator,
+# installs the app, points it at a throwaway HTTP server and screenshots what
+# comes up - which is what proves the WebView, the cleartext exception and the
+# saved server address all actually work.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Build the debug APK
+        working-directory: android
+        run: |
+          gradle wrapper --gradle-version 8.7
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Serve a stand-in dashboard
+        run: |
+          mkdir -p /tmp/site
+          cat > /tmp/site/index.html <<'HTML'
+          <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+          <body style="background:#12151a;color:#f5f5f7;font:16px sans-serif;padding:24px">
+          <h1 id="marker">WEBVIEW OK</h1>
+          <p id="stored"></p>
+          <script>
+            // Exercises the same two things the dashboard needs from the
+            // WebView: JavaScript and localStorage.
+            localStorage.setItem("smoke", "stored");
+            document.getElementById("stored").textContent =
+              "localStorage: " + localStorage.getItem("smoke");
+          </script>
+          </body>
+          HTML
+          (cd /tmp/site && python3 -m http.server 3000 &)
+          sleep 2
+          curl -sf http://127.0.0.1:3000 > /dev/null && echo "stand-in server up"
+
+      - name: Run the app in an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          disable-animations: true
+          script: |
+            set -e
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n hu.mcdashboard.app/.MainActivity
+            sleep 6
+            adb exec-out screencap -p > setup.png
+
+            # 10.0.2.2 is the emulator's alias for the runner's own loopback.
+            tap() {
+              adb shell uiautomator dump /sdcard/ui.xml > /dev/null
+              adb pull /sdcard/ui.xml ui.xml > /dev/null
+              python3 - "$1" <<'PY'
+            import re, subprocess, sys
+            want = sys.argv[1]
+            xml = open("ui.xml", encoding="utf-8").read()
+            m = re.search(r'content-desc="%s"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"' % want, xml)
+            if not m:
+                m = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"[^>]*content-desc="%s"' % want, xml)
+            if not m:
+                print(xml[:4000])
+                raise SystemExit("no view with content-desc=%s" % want)
+            x1, y1, x2, y2 = map(int, m.groups())
+            subprocess.run(["adb", "shell", "input", "tap",
+                            str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
+            PY
+            }
+
+            tap host
+            adb shell input text "10.0.2.2"
+            tap connect
+            sleep 8
+            adb exec-out screencap -p > loaded.png
+
+            # The page's own marker text is the proof that it rendered, rather
+            # than a screenshot that merely looks plausible.
+            adb shell uiautomator dump /sdcard/after.xml > /dev/null
+            adb pull /sdcard/after.xml after.xml > /dev/null
+            grep -q "WEBVIEW OK" after.xml && echo "PAGE RENDERED IN WEBVIEW"
+            grep -q "localStorage: stored" after.xml && echo "LOCALSTORAGE WORKS"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-smoke-screenshots
+          path: |
+            *.png
+            ui.xml
+            after.xml
+          if-no-files-found: warn
