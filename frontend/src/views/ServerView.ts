@@ -500,6 +500,70 @@ export function renderServerView(
     await render();
   }
 
+  function renderDnaSection(): string {
+    return `
+      <div class="section" style="margin-top:16px;">
+        <h3 style="margin:0 0 4px;font-size:13px;">${t("szerver_dns")}</h3>
+        <p class="finding-advice" style="margin:0 0 10px;">${t("szerver_dns_leiras")}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <a class="btn" href="${api.dnaDownloadUrl(serverId, false)}">${t("dns_export")}</a>
+          <a class="btn" href="${api.dnaDownloadUrl(serverId, true)}">${t("dns_export_titkokkal")}</a>
+          <label class="btn" for="dna-file">${t("dns_visszatoltes")}</label>
+          <input type="file" id="dna-file" accept=".json" hidden />
+        </div>
+        <div id="dna-report"></div>
+      </div>
+    `;
+  }
+
+  function bindDnaSection(scope: HTMLElement) {
+    const input = scope.querySelector<HTMLInputElement>("#dna-file");
+    if (!input) return;
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      input.value = "";
+      let dna: unknown;
+      try {
+        dna = JSON.parse(await file.text());
+      } catch {
+        showToast(t("dns_ervenytelen_fajl"), "error");
+        return;
+      }
+      if (!(await confirmModal(t("dns_visszatoltes_megerosites")))) return;
+
+      const report = scope.querySelector<HTMLDivElement>("#dna-report")!;
+      report.innerHTML = `<p class="finding-detail">${t("betoltes")}</p>`;
+      try {
+        const result = await api.importDna(serverId, dna, { plugins: true, access: false });
+        report.innerHTML = `
+          <div class="finding finding-info" style="margin-top:10px;">
+            <p class="finding-detail">${t("dns_fajlok_irva")}: ${result.wroteFiles.length}</p>
+            <p class="finding-detail">${t("dns_pluginok_telepitve")}: ${
+              result.installedPlugins.length
+            }</p>
+            ${
+              result.manualPlugins.length > 0
+                ? `<p class="finding-advice">${t("dns_kezi_pluginok")}: ${escapeHtml(
+                    result.manualPlugins.join(", ")
+                  )}</p>`
+                : ""
+            }
+            ${result.failedPlugins
+              .map(
+                (f) =>
+                  `<p class="finding-advice">${escapeHtml(f.filename)}: ${escapeHtml(f.error)}</p>`
+              )
+              .join("")}
+          </div>`;
+      } catch (err) {
+        report.innerHTML = `<p class="finding-advice">${escapeHtml(
+          err instanceof ApiError ? err.message : t("nem_sikerult")
+        )}</p>`;
+      }
+    };
+  }
+
   async function renderWorlds(content: HTMLElement) {
     content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
     let data;
@@ -1980,7 +2044,9 @@ export function renderServerView(
         </div>
         <div id="backups-list"><div class="empty-state" style="padding:0.5rem 0;">${t("betoltes")}</div></div>
       </div>
+      ${renderDnaSection()}
     `;
+    bindDnaSection(content);
     content.querySelector<HTMLButtonElement>("#edit-btn")!.onclick = () => {
       openAddServerModal(async () => {
         await load();

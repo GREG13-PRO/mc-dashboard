@@ -27,6 +27,7 @@ import type {
   GithubSyncStatus,
   WorldsResponse,
   CreateWorldInput,
+  DnaImportReport,
   MacroStep,
   Pack,
   PackKind,
@@ -335,6 +336,21 @@ export const api = {
       method: "POST",
     });
     return builds;
+  },
+
+  dnaDownloadUrl(serverId: string, includeSecrets: boolean): string {
+    return `/api/servers/${serverId}/dna${includeSecrets ? "?secrets=1" : ""}`;
+  },
+  async importDna(
+    serverId: string,
+    dna: unknown,
+    options: { plugins: boolean; access: boolean }
+  ): Promise<DnaImportReport> {
+    const { report } = await request<{ report: DnaImportReport }>(`/servers/${serverId}/dna`, {
+      method: "POST",
+      body: JSON.stringify({ dna, ...options }),
+    });
+    return report;
   },
 
   async listWorlds(serverId: string): Promise<WorldsResponse> {

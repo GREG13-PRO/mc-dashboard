@@ -49,6 +49,7 @@ import {
   WORLD_TYPES,
   WorldError,
 } from "./worlds";
+import { exportDna, importDna, DnaError } from "./server-dna";
 import {
   listSchematics,
   saveSchematic,
@@ -515,6 +516,45 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
 });
 
 const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/dna", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const includeSecrets = req.query.secrets === "1";
+  try {
+    const dna = await exportDna(entry, includeSecrets);
+    const suffix = includeSecrets ? "-titkokkal" : "";
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${entry.name.replace(/[^A-Za-z0-9_-]/g, "_")}${suffix}.mcdna.json"`
+    );
+    res.setHeader("Content-Type", "application/json");
+    res.send(JSON.stringify(dna, null, 2));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/dna", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const { dna, plugins, access } = req.body ?? {};
+  try {
+    const report = await importDna(entry, dna, {
+      plugins: plugins !== false,
+      access: access === true,
+    });
+    res.json({ report });
+  } catch (err) {
+    res.status(err instanceof DnaError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
 
 serversRouter.get("/:id/worlds", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);

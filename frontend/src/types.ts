@@ -456,3 +456,10 @@ export interface CreateWorldInput {
   type?: string;
   generateStructures?: boolean;
 }
+
+export interface DnaImportReport {
+  wroteFiles: string[];
+  installedPlugins: string[];
+  manualPlugins: string[];
+  failedPlugins: { filename: string; error: string }[];
+}
