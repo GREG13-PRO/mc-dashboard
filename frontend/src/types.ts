@@ -579,3 +579,15 @@ export interface LabDeployResult {
   installed: string;
   reloadOutput: string | null;
 }
+
+export interface LoadTestReport {
+  host: string;
+  port: number;
+  connections: number;
+  durationSeconds: number;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  errors: Record<string, number>;
+  latencyMs: { min: number; median: number; p95: number; max: number } | null;
+}

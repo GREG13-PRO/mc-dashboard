@@ -36,6 +36,7 @@ import type {
   LabToolchain,
   LabCompileResult,
   LabDeployResult,
+  LoadTestReport,
   MacroStep,
   Pack,
   PackKind,
@@ -432,6 +433,17 @@ export const api = {
     return request(`/lab/projects/${encodeURIComponent(name)}/deploy`, {
       method: "POST",
       body: JSON.stringify({ serverId, reload }),
+    });
+  },
+
+  async runLoadTest(
+    serverId: string,
+    connections: number,
+    durationSeconds: number
+  ): Promise<LoadTestReport> {
+    return request(`/servers/${serverId}/load-test`, {
+      method: "POST",
+      body: JSON.stringify({ connections, durationSeconds }),
     });
   },
 

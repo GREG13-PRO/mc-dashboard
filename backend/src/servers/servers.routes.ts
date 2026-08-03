@@ -42,6 +42,7 @@ import { playerPositions } from "./map-players";
 import { securityReport } from "./security";
 import { connectionHistory, connectionAlerts } from "./connection-monitor";
 import { analyseIps } from "./ip-analysis";
+import { runLoadTest, LoadTestError } from "./load-test";
 import { antiCheatStatus, installAntiCheat, removeAntiCheat, AntiCheatError } from "./anticheat";
 import {
   listWorlds,
@@ -563,6 +564,24 @@ serversRouter.delete("/:id/anticheat", requirePermission("settings"), async (req
     res.json({ status: await antiCheatStatus(entry) });
   } catch (err) {
     res.status(err instanceof AntiCheatError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/load-test", requireAdmin, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json(
+      await runLoadTest(entry, {
+        connections: Number(req.body?.connections ?? 25),
+        durationSeconds: Number(req.body?.durationSeconds ?? 10),
+      })
+    );
+  } catch (err) {
+    res.status(err instanceof LoadTestError ? 400 : 500).json({ error: (err as Error).message });
   }
 });
 

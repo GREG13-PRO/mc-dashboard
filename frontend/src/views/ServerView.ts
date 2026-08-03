@@ -1719,7 +1719,78 @@ export function renderServerView(
 
       <h4 style="margin:24px 0 8px;">${t("jvm_parameterek")}</h4>
       <div id="perf-jvm"><div style="color:var(--text-dim);font-size:12px;">${t("betoltes")}</div></div>
+
+      <h4 style="margin:24px 0 8px;">${t("terhelesteszt")}</h4>
+      <p style="max-width:620px;color:var(--text-dim);font-size:12px;margin-top:0;">${t(
+        "terhelesteszt_leiras"
+      )}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <label style="font-size:12px;">${t("parhuzamos_kapcsolatok")}
+          <input id="lt-conns" type="number" min="1" max="500" value="25" style="width:80px;" />
+        </label>
+        <label style="font-size:12px;">${t("hossz_mp")}
+          <input id="lt-secs" type="number" min="1" max="60" value="10" style="width:70px;" />
+        </label>
+        <button class="btn" id="lt-run" ${running ? "" : "disabled"}>${t("teszt_inditasa")}</button>
+        ${
+          running
+            ? ""
+            : `<span style="color:var(--text-dim);font-size:12px;">${t(
+                "futnia_kell_a_szervernek"
+              )}</span>`
+        }
+      </div>
+      <div id="lt-out" style="margin-top:12px;"></div>
     `;
+
+    content.querySelector<HTMLButtonElement>("#lt-run")?.addEventListener("click", async () => {
+      const button = content.querySelector<HTMLButtonElement>("#lt-run")!;
+      const out = content.querySelector<HTMLDivElement>("#lt-out")!;
+      const connections = Number(content.querySelector<HTMLInputElement>("#lt-conns")!.value);
+      const seconds = Number(content.querySelector<HTMLInputElement>("#lt-secs")!.value);
+      button.disabled = true;
+      // The request blocks for the whole run, so the button has to say so or
+      // it reads as a dead click for ten seconds.
+      out.innerHTML = `<div style="color:var(--text-dim);font-size:12px;">${t(
+        "teszt_folyamatban"
+      )}</div>`;
+      try {
+        const report = await api.runLoadTest(serverId, connections, seconds);
+        const errors = Object.entries(report.errors);
+        out.innerHTML = `
+          <div class="finding ${report.failed > 0 ? "finding-warning" : "finding-info"}">
+            <div class="finding-head">
+              <span class="finding-badge">${report.succeeded}/${report.attempted}</span>
+              <strong>${escapeHtml(report.host)}:${report.port}</strong>
+            </div>
+            <p class="finding-detail">
+              ${report.connections} ${t("parhuzamos_kapcsolat_kisbetu")}, ${
+                report.durationSeconds
+              } ${t("masodperc")} ·
+              ${
+                report.latencyMs
+                  ? `${t("valaszido")}: ${report.latencyMs.min}/${report.latencyMs.median}/${
+                      report.latencyMs.p95
+                    }/${report.latencyMs.max} ms (min/median/p95/max)`
+                  : t("nem_erkezett_valasz")
+              }
+            </p>
+            ${
+              errors.length === 0
+                ? ""
+                : `<p class="finding-advice">${errors
+                    .map(([message, count]) => `${escapeHtml(message)} ×${count}`)
+                    .join(" · ")}</p>`
+            }
+          </div>`;
+      } catch (err) {
+        out.innerHTML = `<div class="finding finding-warning"><p class="finding-detail">${escapeHtml(
+          err instanceof ApiError ? err.message : String(err)
+        )}</p></div>`;
+      } finally {
+        button.disabled = !running;
+      }
+    });
 
     void (async () => {
       const box = content.querySelector<HTMLDivElement>("#perf-conflicts")!;
