@@ -30,7 +30,9 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   root.innerHTML = `
     <a href="#main-content" class="skip-link">${t("ugras_a_tartalomhoz")}</a>
     <div class="app-shell">
-      <nav class="sidebar" aria-label="Szerverek">
+      <button class="drawer-toggle" id="drawer-toggle" aria-label="${t("szerverek_menu")}" aria-expanded="false">☰</button>
+      <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+      <nav class="sidebar" id="sidebar" aria-label="Szerverek">
         <div class="sidebar-header">
           <h1>Dashboard</h1>
           <div style="display:flex;gap:6px;">
@@ -50,6 +52,32 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       </main>
     </div>
   `;
+
+  // On a phone the sidebar is an overlay drawer rather than a column: 240px of
+  // a 390px screen is most of the viewport, and the server list is only needed
+  // when switching servers.
+  const sidebar = root.querySelector<HTMLElement>("#sidebar")!;
+  const backdrop = root.querySelector<HTMLElement>("#drawer-backdrop")!;
+  const drawerToggle = root.querySelector<HTMLButtonElement>("#drawer-toggle")!;
+
+  function setDrawer(open: boolean) {
+    sidebar.classList.toggle("open", open);
+    backdrop.hidden = !open;
+    drawerToggle.setAttribute("aria-expanded", String(open));
+    // The button stays put over the open drawer, so it doubles as its close
+    // control rather than sitting there still saying "open me".
+    drawerToggle.textContent = open ? "✕" : "☰";
+    drawerToggle.setAttribute("aria-label", open ? t("bezaras") : t("szerverek_menu"));
+  }
+  drawerToggle.onclick = () => setDrawer(!sidebar.classList.contains("open"));
+  backdrop.onclick = () => setDrawer(false);
+  // Anything that navigates closes it - otherwise the drawer stays over the
+  // view it just opened.
+  sidebar.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest(".server-card, .users-nav-btn, .add-server-btn")) {
+      setDrawer(false);
+    }
+  });
 
   const themeBtn = root.querySelector<HTMLButtonElement>("#theme-btn")!;
   themeBtn.title = `Megjelenés: ${themeLabel(getThemeChoice())}`;

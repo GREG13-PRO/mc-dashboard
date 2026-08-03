@@ -305,4 +305,5 @@ export const en = {
   nincs_talalat_biztonsag: "Nothing flagged on this server.",
   nincs_log_ellenorzes: "No current log file, so login patterns were not checked.",
   biztonsag_hatokor: "This checks configuration, plugin provenance and the login log. It does not watch player movement - catching flying or reach needs code running inside the server.",
+  szerverek_menu: "Servers menu",
 };

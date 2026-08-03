@@ -38,3 +38,13 @@ async function boot() {
 }
 
 void boot();
+
+// Registered after the app is up rather than on load: the worker only serves
+// the shell when offline, so nothing on screen waits for it.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      // No worker means no offline shell; everything else works unchanged.
+    });
+  });
+}

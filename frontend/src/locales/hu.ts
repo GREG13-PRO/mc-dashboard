@@ -307,4 +307,5 @@ export const hu: typeof en = {
   nincs_talalat_biztonsag: "Ezen a szerveren nincs kifogásolnivaló.",
   nincs_log_ellenorzes: "Nincs aktuális logfájl, így a bejelentkezési mintázatokat nem néztem meg.",
   biztonsag_hatokor: "Ez a konfigurációt, a bővítmények eredetét és a bejelentkezési logot nézi. A játékosok mozgását nem figyeli - a repülés vagy a túlnyúlás észleléséhez a szerveren belül futó kód kell.",
+  szerverek_menu: "Szerverek menü",
 };
