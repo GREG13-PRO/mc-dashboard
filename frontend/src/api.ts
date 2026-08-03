@@ -23,7 +23,7 @@ import type {
   PlayerPosition,
   SurfaceView,
   SecurityReport,
-  AndroidBuild,
+  PublishedBuild,
   MacroStep,
   Pack,
   PackKind,
@@ -296,19 +296,14 @@ export const api = {
     return present;
   },
 
-  async getAndroidBuild(): Promise<AndroidBuild | null> {
-    try {
-      return await request<AndroidBuild>("/app/android");
-    } catch (err) {
-      // No build published yet is the normal state, not an error to surface.
-      if (err instanceof ApiError && err.status === 404) return null;
-      throw err;
-    }
+  async listPublishedBuilds(): Promise<PublishedBuild[]> {
+    const { builds } = await request<{ builds: PublishedBuild[] }>("/app/manifest");
+    return builds;
   },
-  async uploadAndroidBuild(file: File): Promise<AndroidBuild> {
+  async uploadBuild(file: File): Promise<PublishedBuild> {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/app/android", {
+    const res = await fetch("/api/app", {
       method: "POST",
       credentials: "same-origin",
       body: form,
@@ -318,10 +313,10 @@ export const api = {
       throw new ApiError(res.status, body.error ?? res.statusText);
     }
     const { build } = await res.json();
-    return build as AndroidBuild;
+    return build as PublishedBuild;
   },
-  async deleteAndroidBuild(): Promise<void> {
-    await request("/app/android", { method: "DELETE" });
+  async deleteBuild(filename: string): Promise<void> {
+    await request(`/app/${encodeURIComponent(filename)}`, { method: "DELETE" });
   },
 
   async getSecurityReport(serverId: string): Promise<SecurityReport> {

@@ -5,39 +5,72 @@ import path from "node:path";
 import { env } from "../config/env";
 
 /**
- * Hosts the Android app so phones can update themselves from the dashboard.
+ * Hosts the installable apps so they can update themselves from the dashboard.
  *
  * Not from GitHub: this project's repository is private, so an unauthenticated
- * request for its latest release gets a 404 - which is exactly why the desktop
- * app's update check has never found anything. Embedding a token in a shipped
- * app is not an option either, since anyone holding the app holds the token.
+ * request for its latest release gets a 404 - which is why the desktop app's
+ * update check had never found anything in its life, and why a phone could not
+ * have checked at all. Embedding a token in a shipped app is not an option
+ * either, since anyone holding the app holds the token.
  *
- * The dashboard is the one thing every phone running this app can already
- * reach, so it is the natural place to serve the update from.
+ * The dashboard is the one server every copy of these apps is already pointed
+ * at, so it is the natural place to serve an update from.
  */
 
-export interface AndroidBuild {
+export type Platform = "android" | "mac-arm64" | "mac-x64" | "windows";
+
+export const PLATFORMS: Platform[] = ["android", "mac-arm64", "mac-x64", "windows"];
+
+export interface PublishedBuild {
+  platform: Platform;
   version: string;
   filename: string;
   sizeBytes: number;
   sha256: string;
   uploadedAt: string;
+  url: string;
 }
 
 export class AppDistError extends Error {}
 
-// The name CI gives the artifact. Parsing the version out of the APK itself
-// would mean decoding binary AndroidManifest XML; the filename carries it
-// already, and an upload that does not match is rejected rather than guessed.
-const APK_NAME_RE = /^mc-dashboard-v(\d+\.\d+\.\d+)\.apk$/;
+/**
+ * The names CI produces, which already carry the version and the platform.
+ *
+ * Reading the version out of the files themselves would mean decoding binary
+ * AndroidManifest XML and picking apart a dmg; an upload whose name does not
+ * match is rejected rather than guessed at, so a mistaken file can never be
+ * offered to everyone as an update.
+ */
+const NAME_PATTERNS: { platform: Platform; re: RegExp }[] = [
+  { platform: "android", re: /^mc-dashboard-v(\d+\.\d+\.\d+)\.apk$/ },
+  { platform: "mac-arm64", re: /^Minecraft\.Dashboard-(\d+\.\d+\.\d+)-arm64\.dmg$/ },
+  { platform: "mac-x64", re: /^Minecraft\.Dashboard-(\d+\.\d+\.\d+)\.dmg$/ },
+  { platform: "windows", re: /^Minecraft\.Dashboard\.Setup\.(\d+\.\d+\.\d+)\.exe$/ },
+];
+
+// Cheap structural checks, so an accidental upload of the wrong file is caught
+// before it reaches anyone. Both dmg and exe start with a recognisable header;
+// an APK is a zip that has to contain an AndroidManifest.
+const MAGIC: Record<Platform, (data: Buffer) => boolean> = {
+  android: (d) => d[0] === 0x50 && d[1] === 0x4b && d.includes("AndroidManifest.xml"),
+  // "koly" is the trailer of a UDIF disk image; electron-builder also produces
+  // zip-based dmgs, so the zip header is accepted too.
+  "mac-arm64": (d) => d.subarray(-512).includes("koly") || (d[0] === 0x78 || d[0] === 0x50),
+  "mac-x64": (d) => d.subarray(-512).includes("koly") || (d[0] === 0x78 || d[0] === 0x50),
+  // MZ, the DOS header every Windows executable still begins with.
+  windows: (d) => d[0] === 0x4d && d[1] === 0x5a,
+};
 
 function dir(): string {
   return path.join(env.dataDir, "app-dist");
 }
 
-export function parseApkVersion(filename: string): string | null {
-  const match = APK_NAME_RE.exec(filename);
-  return match ? match[1] : null;
+export function identify(filename: string): { platform: Platform; version: string } | null {
+  for (const { platform, re } of NAME_PATTERNS) {
+    const match = re.exec(filename);
+    if (match) return { platform, version: match[1] };
+  }
+  return null;
 }
 
 export function compareVersions(a: string, b: string): number {
@@ -50,71 +83,77 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export async function currentAndroidBuild(): Promise<AndroidBuild | null> {
+async function describe(filename: string): Promise<PublishedBuild | null> {
+  const identified = identify(filename);
+  if (!identified) return null;
+  const file = path.join(dir(), filename);
+  const stat = await fsp.stat(file).catch(() => null);
+  if (!stat) return null;
+  return {
+    platform: identified.platform,
+    version: identified.version,
+    filename,
+    sizeBytes: stat.size,
+    // Lets a client verify it got the file the dashboard meant to send.
+    sha256: crypto.createHash("sha256").update(await fsp.readFile(file)).digest("hex"),
+    uploadedAt: stat.mtime.toISOString(),
+    url: `/api/app/download/${encodeURIComponent(filename)}`,
+  };
+}
+
+export async function publishedBuilds(): Promise<PublishedBuild[]> {
   let names: string[];
   try {
     names = await fsp.readdir(dir());
   } catch {
-    return null;
+    return [];
   }
-  const builds = names
-    .map((name) => ({ name, version: parseApkVersion(name) }))
-    .filter((entry): entry is { name: string; version: string } => entry.version !== null)
-    .sort((a, b) => compareVersions(b.version, a.version));
-  if (builds.length === 0) return null;
-
-  const newest = builds[0];
-  const file = path.join(dir(), newest.name);
-  const stat = await fsp.stat(file);
-  return {
-    version: newest.version,
-    filename: newest.name,
-    sizeBytes: stat.size,
-    // Lets a phone verify it got the file the dashboard meant to send, and
-    // gives the upload screen something to show besides a name.
-    sha256: crypto.createHash("sha256").update(await fsp.readFile(file)).digest("hex"),
-    uploadedAt: stat.mtime.toISOString(),
-  };
+  const builds = (await Promise.all(names.map(describe))).filter(
+    (b): b is PublishedBuild => b !== null
+  );
+  return builds.sort((a, b) => PLATFORMS.indexOf(a.platform) - PLATFORMS.indexOf(b.platform));
 }
 
-export function apkPath(filename: string): string {
-  if (!APK_NAME_RE.test(filename)) throw new AppDistError("Ismeretlen fájlnév.");
+export async function publishedFor(platform: Platform): Promise<PublishedBuild | null> {
+  const builds = await publishedBuilds();
+  return builds.find((b) => b.platform === platform) ?? null;
+}
+
+export function buildPath(filename: string): string {
+  if (!identify(filename)) throw new AppDistError("Ismeretlen fájlnév.");
   return path.join(dir(), filename);
 }
 
-export async function saveAndroidBuild(filename: string, data: Buffer): Promise<AndroidBuild> {
-  const version = parseApkVersion(filename);
-  if (!version) {
+export async function saveBuild(filename: string, data: Buffer): Promise<PublishedBuild> {
+  const identified = identify(filename);
+  if (!identified) {
     throw new AppDistError(
-      "A fájlnévnek mc-dashboard-vX.Y.Z.apk alakúnak kell lennie - ezen a néven adja ki a build."
+      "Ismeretlen fájlnév. A buildek eredeti nevén töltsd fel őket (mc-dashboard-vX.Y.Z.apk, " +
+        "Minecraft.Dashboard-X.Y.Z.dmg, Minecraft.Dashboard-X.Y.Z-arm64.dmg, " +
+        "Minecraft.Dashboard.Setup.X.Y.Z.exe)."
     );
   }
-  // A zip signature is the cheapest check that this is an APK at all, and it
-  // stops an accidental upload of the wrong file from being offered to every
-  // phone as an update.
-  if (data.length < 4 || data[0] !== 0x50 || data[1] !== 0x4b) {
-    throw new AppDistError("Ez nem APK fájl.");
-  }
-  if (!data.includes("AndroidManifest.xml")) {
-    throw new AppDistError("Ez nem APK fájl: nincs benne AndroidManifest.xml.");
+  if (data.length < 4 || !MAGIC[identified.platform](data)) {
+    throw new AppDistError("A fájl tartalma nem stimmel ehhez a típushoz.");
   }
 
   await fsp.mkdir(dir(), { recursive: true });
-  // Only the newest build is kept: this is an update source, not an archive,
-  // and old APKs on a disk this small are pure cost.
+  // One build per platform: this is an update source, not an archive, and old
+  // installers are 80-100 MB each on a disk that also holds Minecraft worlds.
   for (const name of await fsp.readdir(dir())) {
-    if (parseApkVersion(name) && name !== filename) {
+    const other = identify(name);
+    if (other && other.platform === identified.platform && name !== filename) {
       await fsp.rm(path.join(dir(), name), { force: true });
     }
   }
   await fsp.writeFile(path.join(dir(), filename), data);
 
-  const build = await currentAndroidBuild();
-  if (!build) throw new AppDistError("A feltöltés nem sikerült.");
-  return build;
+  const saved = await describe(filename);
+  if (!saved) throw new AppDistError("A feltöltés nem sikerült.");
+  return saved;
 }
 
-export async function deleteAndroidBuild(): Promise<void> {
-  if (!fs.existsSync(dir())) return;
-  await fsp.rm(dir(), { recursive: true, force: true });
+export async function deleteBuild(filename: string): Promise<void> {
+  if (!identify(filename)) throw new AppDistError("Ismeretlen fájlnév.");
+  await fsp.rm(path.join(dir(), filename), { force: true });
 }

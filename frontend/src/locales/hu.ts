@@ -313,4 +313,9 @@ export const hu: typeof en = {
   nincs_kozzetett_apk: "Még nincs közzétett APK.",
   apk_feltoltese: "APK feltöltése",
   biztosan_torlod_az_apkt: "Törlöd a közzétett APK-t? A telefonok ezután nem kapnak frissítési ajánlatot.",
+  alkalmazasok: "Alkalmazások",
+  alkalmazasok_leiras: "Tölts fel ide egy buildet, és az app minden példánya felajánlja magának a frissítést. Innen szolgálja ki, nem a GitHubról, mert a repó privát, és egy app nem lát bele egy privát kiadásba.",
+  varhato_fajlnev: "Várt fájlnév",
+  build_feltoltese: "Build feltöltése",
+  biztosan_torlod_a_buildet: "Törlöd ezt a buildet? Az app példányai ezután nem kapják meg.",
 };

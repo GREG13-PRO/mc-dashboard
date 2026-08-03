@@ -21,7 +21,7 @@ apiRouter.use("/install-server", requireAuth, installRouter);
 apiRouter.use("/audit", requireAuth, requireAdmin, auditRouter);
 apiRouter.use("/admin-xp", requireAuth, xpRouter);
 
-// The Android app's update check runs before anyone has logged in, so the read
-// side is public and only publishing a build needs an admin.
+// An app's update check runs before anyone has logged in, so the read side is
+// public and only publishing a build needs an admin.
 apiRouter.use("/app", appDistPublicRouter);
 apiRouter.use("/app", requireAuth, requireAdmin, appDistAdminRouter);

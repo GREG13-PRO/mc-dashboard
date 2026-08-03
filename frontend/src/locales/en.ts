@@ -311,4 +311,9 @@ export const en = {
   nincs_kozzetett_apk: "No APK published yet.",
   apk_feltoltese: "Upload APK",
   biztosan_torlod_az_apkt: "Delete the published APK? Phones will stop being offered updates.",
+  alkalmazasok: "Apps",
+  alkalmazasok_leiras: "Upload a build here and every copy of the app offers itself the update. They are served from this dashboard rather than from GitHub, because the repository is private and an app cannot read a private release.",
+  varhato_fajlnev: "Expected filename",
+  build_feltoltese: "Upload build",
+  biztosan_torlod_a_buildet: "Delete this build? Copies of the app will stop being offered it.",
 };

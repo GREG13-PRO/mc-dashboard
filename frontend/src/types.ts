@@ -408,7 +408,10 @@ export interface SecurityReport {
   loginsChecked: boolean;
 }
 
-export interface AndroidBuild {
+export type AppPlatform = "android" | "mac-arm64" | "mac-x64" | "windows";
+
+export interface PublishedBuild {
+  platform: AppPlatform;
   version: string;
   filename: string;
   sizeBytes: number;

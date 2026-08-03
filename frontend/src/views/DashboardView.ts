@@ -46,7 +46,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;">${t("felhasznalok")}</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">${t("auditnaplo")}</button>` : ""}
         <button class="btn users-nav-btn" id="xp-nav-btn" style="width:100%;">${t("admin_szintek")}</button>
-        ${isAdmin() ? `<button class="btn users-nav-btn" id="appdist-nav-btn" style="width:100%;">${t("android_app")}</button>` : ""}
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="appdist-nav-btn" style="width:100%;">${t("alkalmazasok")}</button>` : ""}
         <div class="server-list" id="server-list" role="list"></div>
       </nav>
       <main class="main-content" id="main-content" tabindex="-1">
