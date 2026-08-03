@@ -1954,3 +1954,79 @@ table.file-table tr.file-row:hover {
     padding-right: var(--gap-md);
   }
 }
+
+/* ------------------------------------------------------- sliding indicators */
+
+.tabs,
+.subtabs {
+  position: relative;
+}
+
+/* Travels to whichever item is active rather than being redrawn under it.
+   Hidden until it has been placed, so it never flashes at the left edge on
+   first paint. */
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 260ms var(--ease),
+    width 260ms var(--ease),
+    opacity 160ms var(--ease);
+}
+
+.subtab-indicator {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  pointer-events: none;
+  /* Behind the labels: this is the pill they sit on, not a marker beside them. */
+  z-index: 0;
+  transition:
+    transform 260ms var(--ease),
+    width 260ms var(--ease),
+    opacity 160ms var(--ease);
+}
+
+.subtab {
+  position: relative;
+  z-index: 1;
+}
+
+/* The pill is the indicator now, so the active item only changes its text. */
+.subtab.active {
+  background: none;
+  box-shadow: none;
+}
+
+/* The underline is the sliding indicator now. The active tab keeps its card
+   background and weight, but drops the inset shadow that used to draw the
+   line - otherwise there are two of them, one of which cannot move. */
+.tab.active {
+  box-shadow: none;
+}
+
+.tab-content > * {
+  animation: tab-content-in 180ms var(--ease);
+}
+
+@keyframes tab-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

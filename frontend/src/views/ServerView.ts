@@ -144,6 +144,81 @@ export function renderServerView(
     }
   }
 
+  /**
+   * Puts the sliding indicator under the active item of a strip.
+   *
+   * Read from the element's own box rather than tracked in state: the strips
+   * scroll horizontally and their items are sized by their text, so the only
+   * reliable source for where the marker belongs is where the item actually
+   * is.
+   */
+  /** Set by renderShell; bindSubtabs is defined outside its scope and needs it. */
+  let goToTab: (tab: Tab) => void = () => {};
+
+  function moveIndicator(strip: HTMLElement | null, activeSelector: string, indicatorClass: string) {
+    if (!strip) return;
+    const active = strip.querySelector<HTMLElement>(activeSelector);
+    const indicator = strip.querySelector<HTMLElement>(`.${indicatorClass}`);
+    if (!active || !indicator) return;
+    indicator.style.width = `${active.offsetWidth}px`;
+    indicator.style.transform = `translateX(${active.offsetLeft}px)`;
+    indicator.style.opacity = "1";
+  }
+
+  function moveIndicators() {
+    moveIndicator(root.querySelector(".tabs"), ".tab.active", "tab-indicator");
+    moveIndicator(root.querySelector(".subtabs"), ".subtab.active", "subtab-indicator");
+  }
+
+  /** Rebuilds the second row when the group changes, and rebinds it. */
+  function renderSubtabs() {
+    const existing = root.querySelector<HTMLElement>(".subtabs");
+    const tabs = currentGroupTabs();
+    if (tabs.length <= 1) {
+      existing?.remove();
+      return;
+    }
+    const markup =
+      tabs
+        .map(
+          (tab) =>
+            `<div class="subtab ${tab === activeTab ? "active" : ""}" data-tab="${tab}"
+                  role="tab" tabindex="${tab === activeTab ? "0" : "-1"}"
+                  aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
+        )
+        .join("") + `<span class="subtab-indicator" aria-hidden="true"></span>`;
+
+    if (existing) {
+      existing.innerHTML = markup;
+    } else {
+      const row = document.createElement("div");
+      row.className = "subtabs";
+      row.setAttribute("role", "tablist");
+      row.innerHTML = markup;
+      root.querySelector(".tabs")?.after(row);
+    }
+    bindSubtabs();
+  }
+
+  /** Bound as its own function because the second row is rebuilt on group change. */
+  function bindSubtabs() {
+    const subEls = [...root.querySelectorAll<HTMLDivElement>(".subtab")];
+    subEls.forEach((subEl, index) => {
+      const select = () => goToTab(subEl.dataset.tab as Tab);
+      subEl.onclick = select;
+      subEl.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          select();
+        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          const step = e.key === "ArrowRight" ? 1 : -1;
+          subEls[(index + step + subEls.length) % subEls.length]?.focus();
+        }
+      };
+    });
+  }
+
   function renderShell() {
     if (!server) return;
     const resourceText =
@@ -173,6 +248,7 @@ export function renderServerView(
                     aria-selected="${active}">${group.label()}</div>`;
           })
           .join("")}
+        <span class="tab-indicator" aria-hidden="true"></span>
       </div>
       ${
         currentGroupTabs().length > 1
@@ -185,6 +261,7 @@ export function renderServerView(
                           aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
                 )
                 .join("")}
+              <span class="subtab-indicator" aria-hidden="true"></span>
             </div>`
           : ""
       }
@@ -192,14 +269,47 @@ export function renderServerView(
       <div class="tab-content" id="tab-content"></div>
     `;
 
-    /** Switching away has to stop whatever the old tab left running. */
-    const goTo = (tab: Tab) => {
+    /**
+     * Switches tab without rebuilding the strips.
+     *
+     * The whole point of the sliding indicator is that it travels from where
+     * it was, and a strip that is thrown away and rebuilt has nowhere to
+     * travel from - the indicator would simply appear in its new place. So a
+     * tab change updates the classes, moves the indicators and re-renders only
+     * the content; renderShell stays for the initial paint and for changes to
+     * the server itself.
+     */
+    goToTab = (tab: Tab) => {
       if (tab === activeTab) return;
+      const previousGroup = currentGroupTabs();
       teardownConsole();
       mapHandle?.destroy();
       mapHandle = null;
       activeTab = tab;
-      renderShell();
+
+      groupEls.forEach((el) => {
+        const group = groupsWithTabs().find(([g]) => g.id === el.dataset.group);
+        const active = Boolean(group?.[1].includes(activeTab));
+        el.classList.toggle("active", active);
+        el.setAttribute("aria-selected", String(active));
+        el.tabIndex = active ? 0 : -1;
+      });
+
+      // A different group means a different second row, which has to be
+      // rebuilt - but the row above it stays, so its indicator still slides.
+      if (previousGroup.join() !== currentGroupTabs().join()) {
+        renderSubtabs();
+      } else {
+        root.querySelectorAll<HTMLDivElement>(".subtab").forEach((el) => {
+          const active = el.dataset.tab === activeTab;
+          el.classList.toggle("active", active);
+          el.setAttribute("aria-selected", String(active));
+          el.tabIndex = active ? 0 : -1;
+        });
+      }
+
+      moveIndicators();
+      renderTabContent();
     };
 
     const groupEls = [...root.querySelectorAll<HTMLDivElement>(".tab[data-group]")];
@@ -208,7 +318,7 @@ export function renderServerView(
       // else that group can go.
       const open = () => {
         const group = groupsWithTabs().find(([g]) => g.id === groupEl.dataset.group);
-        if (group && !group[1].includes(activeTab)) goTo(group[1][0]);
+        if (group && !group[1].includes(activeTab)) goToTab(group[1][0]);
       };
       groupEl.onclick = open;
       groupEl.onkeydown = (e) => {
@@ -223,21 +333,11 @@ export function renderServerView(
       };
     });
 
-    const subEls = [...root.querySelectorAll<HTMLDivElement>(".subtab")];
-    subEls.forEach((subEl, index) => {
-      const select = () => goTo(subEl.dataset.tab as Tab);
-      subEl.onclick = select;
-      subEl.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          select();
-        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-          e.preventDefault();
-          const step = e.key === "ArrowRight" ? 1 : -1;
-          subEls[(index + step + subEls.length) % subEls.length]?.focus();
-        }
-      };
-    });
+    bindSubtabs();
+    // The strips have no geometry until they are laid out, so the first
+    // placement waits a frame; it is also the reason the indicator starts at
+    // opacity 0 rather than flashing at the left edge.
+    requestAnimationFrame(moveIndicators);
 
     root.querySelector<HTMLButtonElement>("#start-btn")?.addEventListener("click", () =>
       runAction(() => api.startServer(serverId))
