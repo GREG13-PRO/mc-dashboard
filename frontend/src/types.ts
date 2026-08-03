@@ -638,3 +638,12 @@ export interface WebhooksResponse {
   deliveries: WebhookDelivery[];
   rateLimits: RateLimitSummary[];
 }
+
+export interface BundleRestoreReport {
+  serverName: string;
+  wroteFiles: string[];
+  installedPlugins: string[];
+  copiedPlugins: string[];
+  restoredWorld: string | null;
+  failedPlugins: { filename: string; error: string }[];
+}

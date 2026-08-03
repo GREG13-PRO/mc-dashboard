@@ -1,5 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
+import fsp from "node:fs/promises";
+import os from "node:os";
 import { serverRegistry, toPublicEntry } from "./registry";
 import {
   startServer,
@@ -54,6 +56,7 @@ import {
   WorldError,
 } from "./worlds";
 import { exportDna, importDna, DnaError } from "./server-dna";
+import { writeBundle, restoreBundle, MigrationError } from "./migration";
 import {
   snapshotConfigs,
   // Aliased: world-timeline already exports listSnapshots and restoreSnapshot
@@ -401,6 +404,13 @@ serversRouter.get("/:id/resource-history", requireAnyPermission, (req, res) => {
 // Resource packs can be large; the same 500MB ceiling as the file manager.
 const packUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
+// A migration bundle carries a whole world, so it goes to disk rather than
+// into memory - the others here are megabytes, this one can be gigabytes.
+const bundleUpload = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 8 * 1024 * 1024 * 1024 },
+});
+
 function packKind(value: unknown): PackKind {
   if (value !== "resourcepack" && value !== "datapack") {
     throw new ContentError(`Unknown pack kind: ${String(value)}`);
@@ -653,6 +663,52 @@ serversRouter.post("/:id/config-history/:snapshotId/restore", requirePermission(
     res.json({ restored, snapshots: await listConfigSnapshots(entry) });
   } catch (err) {
     res.status(err instanceof ConfigHistoryError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/bundle", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const safeName = entry.name.replace(/[^A-Za-z0-9_-]/g, "_");
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeName}.mcbundle.zip"`);
+  try {
+    // Streamed straight to the response: a world is gigabytes, and staging a
+    // second copy on a disk that also holds the first is how a migration runs
+    // the machine out of space.
+    await writeBundle(
+      entry,
+      { includeWorld: req.query.world !== "0", includeSecrets: req.query.secrets === "1" },
+      res
+    );
+  } catch (err) {
+    // Headers are already out by the time most failures happen, so the only
+    // honest thing left is to break the stream rather than send a truncated
+    // archive that looks complete.
+    console.error("[migration] bundle failed:", err);
+    res.destroy();
+  }
+});
+
+serversRouter.post("/:id/bundle", requirePermission("settings"), bundleUpload.single("file"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (!req.file) {
+    res.status(400).json({ error: "file is required" });
+    return;
+  }
+  try {
+    res.json({ report: await restoreBundle(entry, req.file.path) });
+  } catch (err) {
+    res.status(err instanceof MigrationError ? 400 : 500).json({ error: (err as Error).message });
+  } finally {
+    await fsp.rm(req.file.path, { force: true }).catch(() => undefined);
   }
 });
 

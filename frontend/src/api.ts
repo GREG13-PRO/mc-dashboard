@@ -28,6 +28,7 @@ import type {
   WorldsResponse,
   CreateWorldInput,
   DnaImportReport,
+  BundleRestoreReport,
   ConfigSnapshot,
   FileDiff,
   NetworkReport,
@@ -376,6 +377,29 @@ export const api = {
       { method: "POST", body: JSON.stringify({ only: only ?? null }) }
     );
     return restored;
+  },
+
+  bundleDownloadUrl(serverId: string, includeWorld: boolean, includeSecrets: boolean): string {
+    const params = new URLSearchParams();
+    if (!includeWorld) params.set("world", "0");
+    if (includeSecrets) params.set("secrets", "1");
+    const query = params.toString();
+    return `/api/servers/${serverId}/bundle${query ? `?${query}` : ""}`;
+  },
+  async restoreBundle(serverId: string, file: File): Promise<BundleRestoreReport> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`/api/servers/${serverId}/bundle`, {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, body.error ?? res.statusText);
+    }
+    const { report } = await res.json();
+    return report as BundleRestoreReport;
   },
 
   dnaDownloadUrl(serverId: string, includeSecrets: boolean): string {

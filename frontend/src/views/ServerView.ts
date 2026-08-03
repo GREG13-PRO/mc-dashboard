@@ -631,6 +631,64 @@ export function renderServerView(
       });
   }
 
+  function renderMigrationSection(): string {
+    return `
+      <div class="section" style="margin-top:16px;">
+        <h3 style="margin:0 0 4px;font-size:13px;">${t("koltoztetes")}</h3>
+        <p class="finding-advice" style="margin:0 0 10px;">${t("koltoztetes_leiras")}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <a class="btn" href="${api.bundleDownloadUrl(serverId, true, false)}">${t(
+            "csomag_letoltese"
+          )}</a>
+          <a class="btn" href="${api.bundleDownloadUrl(serverId, false, false)}">${t(
+            "csomag_vilag_nelkul"
+          )}</a>
+          <label class="btn" for="bundle-file">${t("csomag_visszatoltese")}</label>
+          <input type="file" id="bundle-file" accept=".zip" hidden />
+        </div>
+        <div id="bundle-report"></div>
+      </div>
+    `;
+  }
+
+  function bindMigrationSection(scope: HTMLElement) {
+    const input = scope.querySelector<HTMLInputElement>("#bundle-file");
+    if (!input) return;
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      input.value = "";
+      if (!(await confirmModal(t("csomag_visszatoltes_megerosites")))) return;
+
+      const report = scope.querySelector<HTMLDivElement>("#bundle-report")!;
+      report.innerHTML = `<p class="finding-detail">${t("visszatoltes_folyamatban")}</p>`;
+      try {
+        const result = await api.restoreBundle(serverId, file);
+        report.innerHTML = `
+          <div class="finding finding-info" style="margin-top:10px;">
+            <p class="finding-detail">${escapeHtml(result.serverName)}</p>
+            <p class="finding-detail">${t("dns_fajlok_irva")}: ${result.wroteFiles.length} ·
+              ${t("dns_pluginok_telepitve")}: ${result.installedPlugins.length} ·
+              ${t("masolt_pluginok")}: ${result.copiedPlugins.length}</p>
+            <p class="finding-detail">${
+              result.restoredWorld
+                ? `${t("visszaallitott_vilag")}: ${escapeHtml(result.restoredWorld)}`
+                : t("vilag_nem_volt_a_csomagban")
+            }</p>
+            ${result.failedPlugins
+              .map(
+                (f) => `<p class="finding-advice">${escapeHtml(f.filename)}: ${escapeHtml(f.error)}</p>`
+              )
+              .join("")}
+          </div>`;
+      } catch (err) {
+        report.innerHTML = `<p class="finding-advice">${escapeHtml(
+          err instanceof ApiError ? err.message : t("nem_sikerult")
+        )}</p>`;
+      }
+    };
+  }
+
   function renderDnaSection(): string {
     return `
       <div class="section" style="margin-top:16px;">
@@ -2443,9 +2501,11 @@ export function renderServerView(
       </div>
       ${renderConfigHistorySection()}
       ${renderDnaSection()}
+      ${renderMigrationSection()}
     `;
     bindConfigHistory(content);
     bindDnaSection(content);
+    bindMigrationSection(content);
     content.querySelector<HTMLButtonElement>("#edit-btn")!.onclick = () => {
       openAddServerModal(async () => {
         await load();
