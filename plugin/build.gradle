@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+}
+
+group = 'hu.mcdashboard'
+version = System.getenv("GUARD_VERSION") ?: "dev"
+
+java {
+    // Paper 1.21 runs on Java 21 and refuses plugins built for anything newer.
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+dependencies {
+    // compileOnly: the server provides this at runtime, and shipping a copy
+    // inside the jar is how plugins end up fighting the server's own classes.
+    compileOnly 'io.papermc.paper:paper-api:1.21.1-R0.1-SNAPSHOT'
+}
+
+processResources {
+    // plugin.yml carries the version, and Paper refuses to load a plugin whose
+    // version is a literal token.
+    filesMatching('plugin.yml') {
+        expand(version: project.version)
+    }
+}
+
+jar {
+    archiveBaseName = 'McDashGuard'
+    archiveVersion = project.version.toString()
+}

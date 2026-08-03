@@ -1,0 +1,6 @@
+name: McDashGuard
+version: '${version}'
+main: hu.mcdashboard.guard.GuardPlugin
+api-version: '1.21'
+description: Signals for the mc-dashboard security tab. Reports; never punishes.
+author: mc-dashboard

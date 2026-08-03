@@ -104,11 +104,41 @@ jobs:
           path: android/out/*.apk
           if-no-files-found: error
 
+
+  # The anti-cheat plugin. Built on the same runner family as the APK; the only
+  # dependency is Paper's API, which the server provides at runtime.
+  plugin:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Generate the Gradle wrapper
+        working-directory: plugin
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Build the plugin
+        working-directory: plugin
+        env:
+          GUARD_VERSION: ${{ github.ref_name }}
+        run: ./gradlew --no-daemon build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcdash-guard
+          path: plugin/build/libs/McDashGuard-*.jar
+          if-no-files-found: error
+
   # Workflow artifacts expire and are only reachable from the run page while
   # signed in. A release gives every tag a permanent page with the installers
   # attached, which is what anyone actually wants to download.
   release:
-    needs: [build, android]
+    needs: [build, android, plugin]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -122,6 +152,6 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.{dmg,exe,apk}
+          files: artifacts/**/*.{dmg,exe,apk,jar}
           generate_release_notes: true
           fail_on_unmatched_files: true

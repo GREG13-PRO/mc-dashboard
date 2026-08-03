@@ -17,3 +17,7 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+
+# Paper plugin build output
+plugin/.gradle/
+plugin/build/
