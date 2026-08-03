@@ -306,4 +306,9 @@ export const en = {
   nincs_log_ellenorzes: "No current log file, so login patterns were not checked.",
   biztonsag_hatokor: "This checks configuration, plugin provenance and the login log. It does not watch player movement - catching flying or reach needs code running inside the server.",
   szerverek_menu: "Servers menu",
+  android_app: "Android app",
+  android_app_leiras: "Publish the APK here and every phone running the app offers itself the update. It is served from this dashboard rather than from GitHub, because the repository is private and a phone cannot read a private release.",
+  nincs_kozzetett_apk: "No APK published yet.",
+  apk_feltoltese: "Upload APK",
+  biztosan_torlod_az_apkt: "Delete the published APK? Phones will stop being offered updates.",
 };

@@ -6,6 +6,7 @@ import { serversRouter } from "../servers/servers.routes";
 import { installRouter } from "../servers/install.routes";
 import { auditRouter, xpRouter } from "../audit/audit.routes";
 import { auditMiddleware } from "../audit/audit.middleware";
+import { appDistPublicRouter, appDistAdminRouter } from "../app-dist/app-dist.routes";
 
 export const apiRouter = Router();
 
@@ -19,3 +20,8 @@ apiRouter.use("/servers", requireAuth, serversRouter);
 apiRouter.use("/install-server", requireAuth, installRouter);
 apiRouter.use("/audit", requireAuth, requireAdmin, auditRouter);
 apiRouter.use("/admin-xp", requireAuth, xpRouter);
+
+// The Android app's update check runs before anyone has logged in, so the read
+// side is public and only publishing a build needs an admin.
+apiRouter.use("/app", appDistPublicRouter);
+apiRouter.use("/app", requireAuth, requireAdmin, appDistAdminRouter);

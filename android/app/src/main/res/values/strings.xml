@@ -14,4 +14,11 @@
     <string name="download_started">Letöltés elindult</string>
     <string name="download_failed">A letöltés nem indult el</string>
     <string name="cannot_open_link">Nem sikerült megnyitni a hivatkozást</string>
+    <string name="update_title">Új verzió elérhető</string>
+    <string name="update_message">A dashboard %1$s verziót kínál, a telepített %2$s. Letöltöd most?</string>
+    <string name="update_now">Letöltés</string>
+    <string name="update_later">Most nem</string>
+    <string name="update_downloading">Letöltés folyamatban…</string>
+    <string name="update_failed">A frissítés letöltése nem sikerült</string>
+    <string name="update_needs_permission">A frissítés telepítéséhez engedélyezned kell ennek az alkalmazásnak az ismeretlen forrásból való telepítést.</string>
 </resources>

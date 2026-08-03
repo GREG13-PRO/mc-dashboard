@@ -407,3 +407,12 @@ export interface SecurityReport {
   findings: SecurityFinding[];
   loginsChecked: boolean;
 }
+
+export interface AndroidBuild {
+  version: string;
+  filename: string;
+  sizeBytes: number;
+  sha256: string;
+  uploadedAt: string;
+  url: string;
+}

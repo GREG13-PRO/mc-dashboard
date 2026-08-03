@@ -23,6 +23,7 @@ import type {
   PlayerPosition,
   SurfaceView,
   SecurityReport,
+  AndroidBuild,
   MacroStep,
   Pack,
   PackKind,
@@ -293,6 +294,34 @@ export const api = {
       body: JSON.stringify({ resource, leaving }),
     });
     return present;
+  },
+
+  async getAndroidBuild(): Promise<AndroidBuild | null> {
+    try {
+      return await request<AndroidBuild>("/app/android");
+    } catch (err) {
+      // No build published yet is the normal state, not an error to surface.
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  },
+  async uploadAndroidBuild(file: File): Promise<AndroidBuild> {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/app/android", {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, body.error ?? res.statusText);
+    }
+    const { build } = await res.json();
+    return build as AndroidBuild;
+  },
+  async deleteAndroidBuild(): Promise<void> {
+    await request("/app/android", { method: "DELETE" });
   },
 
   async getSecurityReport(serverId: string): Promise<SecurityReport> {

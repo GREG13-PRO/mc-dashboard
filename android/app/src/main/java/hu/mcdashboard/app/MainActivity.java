@@ -48,7 +48,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
 
-        String url = Settings.serverUrl(this);
+        String url = Prefs.serverUrl(this);
         if (url == null) {
             startActivity(new Intent(this, SetupActivity.class));
             finish();
@@ -71,6 +71,8 @@ public class MainActivity extends Activity {
 
         setContentView(root);
         web.loadUrl(url);
+
+        new UpdateChecker(this).checkInBackground();
     }
 
     private void configureWebView() {
@@ -117,7 +119,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String target = request.getUrl().toString();
-                String base = Settings.serverUrl(MainActivity.this);
+                String base = Prefs.serverUrl(MainActivity.this);
                 // Links to plugin pages and the LuckPerms editor point at other
                 // sites; those belong in the browser, not inside the shell.
                 if (base != null && target.startsWith(base)) {

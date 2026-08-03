@@ -308,4 +308,9 @@ export const hu: typeof en = {
   nincs_log_ellenorzes: "Nincs aktuális logfájl, így a bejelentkezési mintázatokat nem néztem meg.",
   biztonsag_hatokor: "Ez a konfigurációt, a bővítmények eredetét és a bejelentkezési logot nézi. A játékosok mozgását nem figyeli - a repülés vagy a túlnyúlás észleléséhez a szerveren belül futó kód kell.",
   szerverek_menu: "Szerverek menü",
+  android_app: "Android app",
+  android_app_leiras: "Töltsd fel ide az APK-t, és minden telefon, amin fut az app, felajánlja magának a frissítést. Innen szolgálja ki, nem a GitHubról, mert a repó privát, és egy telefon nem lát bele egy privát kiadásba.",
+  nincs_kozzetett_apk: "Még nincs közzétett APK.",
+  apk_feltoltese: "APK feltöltése",
+  biztosan_torlod_az_apkt: "Törlöd a közzétett APK-t? A telefonok ezután nem kapnak frissítési ajánlatot.",
 };

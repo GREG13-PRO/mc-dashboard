@@ -11,6 +11,7 @@ the test needs it.
 """
 
 import http.server
+import json
 import os
 import re
 import subprocess
@@ -40,14 +41,46 @@ PAGE = """<!doctype html>
 """
 
 
+# Far ahead of anything the app could be built as, so the update check has
+# something to offer no matter what version the APK under test carries.
+OFFERED_VERSION = "99.0.0"
+
+
 def serve():
     directory = tempfile.mkdtemp()
     with open(os.path.join(directory, "index.html"), "w", encoding="utf-8") as handle:
         handle.write(PAGE)
 
-    handler = lambda *a, **kw: http.server.SimpleHTTPRequestHandler(
-        *a, directory=directory, **kw
-    )
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=directory, **kwargs)
+
+        def do_GET(self):
+            # Stands in for the dashboard's update endpoint so the app's check
+            # has a real answer to parse.
+            if self.path == "/api/app/android":
+                body = json.dumps(
+                    {
+                        "version": OFFERED_VERSION,
+                        "filename": f"mc-dashboard-v{OFFERED_VERSION}.apk",
+                        "sizeBytes": 1,
+                        "sha256": "",
+                        "uploadedAt": "2026-01-01T00:00:00.000Z",
+                        "url": "/api/app/android/download",
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            super().do_GET()
+
+        def log_message(self, *args):
+            pass
+
+    handler = Handler
     server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/", timeout=5) as response:
@@ -174,6 +207,10 @@ def main():
 
     after = wait_for("WEBVIEW OK")
     screenshot("3-loaded.png")
+
+    # The update check runs on start, so by now it has had its answer.
+    offer = wait_for(OFFERED_VERSION, timeout=20)
+    screenshot("4-update-offer.png")
     failures = []
     # The page's own text in the view hierarchy is the proof it rendered; a
     # screenshot alone can look plausible while showing nothing.
@@ -181,6 +218,8 @@ def main():
         failures.append("the page did not render in the WebView")
     if "localStorage: stored" not in after:
         failures.append("localStorage did not work")
+    if OFFERED_VERSION not in offer:
+        failures.append("the update check did not offer the newer version")
 
     server.shutdown()
 
@@ -194,6 +233,7 @@ def main():
 
     print("PASS: page rendered in the WebView")
     print("PASS: JavaScript and localStorage work")
+    print(f"PASS: the update check offered {OFFERED_VERSION}")
 
 
 if __name__ == "__main__":

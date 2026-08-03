@@ -4,12 +4,12 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /** Where the dashboard lives, as entered on the setup screen. */
-final class Settings {
+final class Prefs {
 
     private static final String PREFS = "mc-dashboard";
     private static final String KEY_URL = "serverUrl";
 
-    private Settings() {
+    private Prefs() {
     }
 
     private static SharedPreferences prefs(Context context) {

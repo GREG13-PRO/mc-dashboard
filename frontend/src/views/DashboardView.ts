@@ -7,6 +7,7 @@ import { renderServerView } from "./ServerView";
 import { renderUsersView } from "./UsersView";
 import { renderAuditView } from "./AuditView";
 import { renderXpView } from "./XpView";
+import { renderAppDistView } from "./AppDistView";
 import { isAdmin, setCurrentUser } from "../auth-state";
 import { getThemeChoice, setThemeChoice, nextTheme, themeIcon, themeLabel, notifyThemeChanged } from "../lib/theme";
 import {
@@ -45,6 +46,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         ${isAdmin() ? `<button class="btn users-nav-btn" id="users-nav-btn" style="width:100%;">${t("felhasznalok")}</button>` : ""}
         ${isAdmin() ? `<button class="btn users-nav-btn" id="audit-nav-btn" style="width:100%;">${t("auditnaplo")}</button>` : ""}
         <button class="btn users-nav-btn" id="xp-nav-btn" style="width:100%;">${t("admin_szintek")}</button>
+        ${isAdmin() ? `<button class="btn users-nav-btn" id="appdist-nav-btn" style="width:100%;">${t("android_app")}</button>` : ""}
         <div class="server-list" id="server-list" role="list"></div>
       </nav>
       <main class="main-content" id="main-content" tabindex="-1">
@@ -150,6 +152,9 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   root.querySelector<HTMLButtonElement>("#audit-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/audit";
   });
+  root.querySelector<HTMLButtonElement>("#appdist-nav-btn")?.addEventListener("click", () => {
+    location.hash = "#/app";
+  });
   root.querySelector<HTMLButtonElement>("#xp-nav-btn")?.addEventListener("click", () => {
     location.hash = "#/xp";
   });
@@ -213,6 +218,16 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     disposeServerView = null;
 
     const mainContent = root.querySelector<HTMLDivElement>("#main-content")!;
+
+    if (location.hash === "#/app") {
+      if (!isAdmin()) {
+        location.hash = "";
+        return;
+      }
+      disposeServerView = renderAppDistView(mainContent);
+      renderList();
+      return;
+    }
 
     if (location.hash === "#/xp") {
       disposeServerView = renderXpView(mainContent);

@@ -66,7 +66,7 @@ public class SetupActivity extends Activity {
 
         // Prefilled when changing servers, so a port-only correction does not
         // mean retyping the address.
-        String existing = Settings.serverUrl(this);
+        String existing = Prefs.serverUrl(this);
         if (existing != null) {
             String stripped = existing.replaceFirst("^https?://", "");
             int colon = stripped.lastIndexOf(':');
@@ -92,7 +92,7 @@ public class SetupActivity extends Activity {
             // A trailing slash here becomes a double slash in every request the
             // page makes, which some of the API routes do not match.
             while (h.endsWith("/")) h = h.substring(0, h.length() - 1);
-            Settings.setServerUrl(this, "http://" + h + ":" + p);
+            Prefs.setServerUrl(this, "http://" + h + ":" + p);
             startActivity(new Intent(this, MainActivity.class));
             finish();
         });
