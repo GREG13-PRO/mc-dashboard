@@ -42,6 +42,7 @@ import { playerPositions } from "./map-players";
 import { securityReport } from "./security";
 import { connectionHistory, connectionAlerts } from "./connection-monitor";
 import { analyseIps } from "./ip-analysis";
+import { antiCheatStatus, installAntiCheat, removeAntiCheat, AntiCheatError } from "./anticheat";
 import {
   listWorlds,
   worldSettings,
@@ -527,6 +528,43 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
 });
 
 const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/anticheat", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json(await antiCheatStatus(entry));
+});
+
+serversRouter.post("/:id/anticheat", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const filename = await installAntiCheat(entry);
+    res.status(201).json({ filename, status: await antiCheatStatus(entry) });
+  } catch (err) {
+    res.status(err instanceof AntiCheatError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/anticheat", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    await removeAntiCheat(entry);
+    res.json({ status: await antiCheatStatus(entry) });
+  } catch (err) {
+    res.status(err instanceof AntiCheatError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
 
 serversRouter.get("/:id/network", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);

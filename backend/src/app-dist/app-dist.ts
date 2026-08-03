@@ -17,9 +17,9 @@ import { env } from "../config/env";
  * at, so it is the natural place to serve an update from.
  */
 
-export type Platform = "android" | "mac-arm64" | "mac-x64" | "windows";
+export type Platform = "android" | "mac-arm64" | "mac-x64" | "windows" | "plugin";
 
-export const PLATFORMS: Platform[] = ["android", "mac-arm64", "mac-x64", "windows"];
+export const PLATFORMS: Platform[] = ["android", "mac-arm64", "mac-x64", "windows", "plugin"];
 
 export interface PublishedBuild {
   platform: Platform;
@@ -46,6 +46,7 @@ const NAME_PATTERNS: { platform: Platform; re: RegExp }[] = [
   { platform: "mac-arm64", re: /^Minecraft\.Dashboard-(\d+\.\d+\.\d+)-arm64\.dmg$/ },
   { platform: "mac-x64", re: /^Minecraft\.Dashboard-(\d+\.\d+\.\d+)\.dmg$/ },
   { platform: "windows", re: /^Minecraft\.Dashboard\.Setup\.(\d+\.\d+\.\d+)\.exe$/ },
+  { platform: "plugin", re: /^McDashGuard-v(\d+\.\d+\.\d+)\.jar$/ },
 ];
 
 // Cheap structural checks, so an accidental upload of the wrong file is caught
@@ -59,6 +60,8 @@ const MAGIC: Record<Platform, (data: Buffer) => boolean> = {
   "mac-x64": (d) => d.subarray(-512).includes("koly") || (d[0] === 0x78 || d[0] === 0x50),
   // MZ, the DOS header every Windows executable still begins with.
   windows: (d) => d[0] === 0x4d && d[1] === 0x5a,
+  // A plugin jar is a zip that has to declare itself to Paper.
+  plugin: (d) => d[0] === 0x50 && d[1] === 0x4b && d.includes("plugin.yml"),
 };
 
 function dir(): string {
@@ -130,7 +133,7 @@ export async function saveBuild(filename: string, data: Buffer): Promise<Publish
     throw new AppDistError(
       "Ismeretlen fájlnév. A buildek eredeti nevén töltsd fel őket (mc-dashboard-vX.Y.Z.apk, " +
         "Minecraft.Dashboard-X.Y.Z.dmg, Minecraft.Dashboard-X.Y.Z-arm64.dmg, " +
-        "Minecraft.Dashboard.Setup.X.Y.Z.exe)."
+        "Minecraft.Dashboard.Setup.X.Y.Z.exe, McDashGuard-vX.Y.Z.jar)."
     );
   }
   if (data.length < 4 || !MAGIC[identified.platform](data)) {

@@ -24,6 +24,7 @@ const SLOTS: { platform: AppPlatform; label: string; expects: string }[] = [
   },
   { platform: "mac-x64", label: "macOS (Intel)", expects: "Minecraft.Dashboard-X.Y.Z.dmg" },
   { platform: "windows", label: "Windows", expects: "Minecraft.Dashboard.Setup.X.Y.Z.exe" },
+  { platform: "plugin", label: "Anti-cheat plugin", expects: "McDashGuard-vX.Y.Z.jar" },
 ];
 
 function sizeText(bytes: number): string {

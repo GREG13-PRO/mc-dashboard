@@ -408,7 +408,7 @@ export interface SecurityReport {
   loginsChecked: boolean;
 }
 
-export type AppPlatform = "android" | "mac-arm64" | "mac-x64" | "windows";
+export type AppPlatform = "android" | "mac-arm64" | "mac-x64" | "windows" | "plugin";
 
 export interface PublishedBuild {
   platform: AppPlatform;
@@ -530,4 +530,30 @@ export interface NetworkReport {
     ips: IpSummary[];
     players: { player: string; ips: string[]; logins: number }[];
   };
+}
+
+export interface AntiCheatFlag {
+  kind: string;
+  detail: string;
+  at: string;
+}
+
+export interface AntiCheatPlayer {
+  name: string;
+  blocksBroken: number;
+  oresMined: number;
+  hiddenOres: number;
+  valuableOres: number;
+  hiddenValuableOres: number;
+  maxSpeed: number;
+  flags: AntiCheatFlag[];
+}
+
+export interface AntiCheatStatus {
+  installed: boolean;
+  installedVersion: string | null;
+  availableVersion: string | null;
+  running: boolean;
+  generatedAt: string | null;
+  players: AntiCheatPlayer[];
 }

@@ -12,7 +12,7 @@ import { escapeHtml } from "../lib/escape";
 import { ansiLineToHtml } from "../lib/ansi";
 import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
-import type { ConfigSnapshot, NetworkReport } from "../types";
+import type { AntiCheatStatus, ConfigSnapshot, NetworkReport } from "../types";
 import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatus } from "../types";
 
 type Tab =
@@ -861,6 +861,12 @@ export function renderServerView(
       )
       .join("");
 
+    let guard: AntiCheatStatus | null = null;
+    try {
+      guard = await api.getAntiCheat(serverId);
+    } catch {
+      // Same reasoning as the network block below.
+    }
     let network: NetworkReport | null = null;
     try {
       network = await api.getNetworkReport(serverId);
@@ -896,8 +902,108 @@ export function renderServerView(
         }
         <p class="finding-detail">${t("biztonsag_hatokor")}</p>
 
+        ${guard ? renderAntiCheat(guard) : ""}
         ${network ? renderNetwork(network) : ""}
       </div>
+    `;
+
+    content.querySelector<HTMLButtonElement>("#guard-install")?.addEventListener("click", async () => {
+      try {
+        await api.installAntiCheat(serverId);
+        showToast(t("anticheat_telepitve"));
+        void renderSecurity(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+      }
+    });
+    content.querySelector<HTMLButtonElement>("#guard-remove")?.addEventListener("click", async () => {
+      if (!(await confirmModal(t("anticheat_eltavolitas_megerosites")))) return;
+      try {
+        await api.removeAntiCheat(serverId);
+        void renderSecurity(content);
+      } catch (err) {
+        showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+      }
+    });
+  }
+
+  function renderAntiCheat(guard: AntiCheatStatus): string {
+    const flagged = guard.players.filter((p) => p.flags.length > 0);
+    const controls = guard.installed
+      ? `<button class="btn btn-danger" id="guard-remove" ${
+          guard.running ? "disabled" : ""
+        }>${t("anticheat_eltavolitasa")}</button>`
+      : `<button class="btn btn-primary" id="guard-install" ${
+          guard.running || !guard.availableVersion ? "disabled" : ""
+        }>${t("anticheat_telepitese")}</button>`;
+
+    return `
+      <h3 style="margin:24px 0 4px;font-size:13px;">${t("anticheat")}</h3>
+      <p class="finding-advice" style="margin:0 0 10px;">${t("anticheat_leiras")}</p>
+      <p class="finding-detail">
+        ${
+          guard.installed
+            ? `${t("telepitve")}: <strong>${escapeHtml(guard.installedVersion ?? "?")}</strong>`
+            : t("nincs_telepitve")
+        }
+        ${
+          guard.availableVersion
+            ? ` · ${t("elerheto")}: ${escapeHtml(guard.availableVersion)}`
+            : ` · ${t("nincs_kozzeteve_plugin")}`
+        }
+        ${
+          guard.generatedAt
+            ? ` · ${t("utolso_jelentes")}: ${new Date(guard.generatedAt).toLocaleString()}`
+            : ""
+        }
+      </p>
+      <div style="display:flex;gap:8px;margin:8px 0 12px;">${controls}</div>
+      ${
+        !guard.installed
+          ? ""
+          : guard.players.length === 0
+            ? `<p class="finding-advice">${t("anticheat_nincs_adat")}</p>`
+            : `${flagged
+                .map(
+                  (p) => `<div class="finding finding-warning">
+                    <div class="finding-head">
+                      <span class="finding-badge">${p.flags.length}</span>
+                      <strong>${escapeHtml(p.name)}</strong>
+                    </div>
+                    ${p.flags
+                      .map(
+                        (f) =>
+                          `<p class="finding-detail">${escapeHtml(f.kind)}: ${escapeHtml(
+                            f.detail
+                          )} (${new Date(f.at).toLocaleString()})</p>`
+                      )
+                      .join("")}
+                  </div>`
+                )
+                .join("")}
+              <table class="file-table" style="margin-top:8px;">
+                <thead><tr>
+                  <th>${t("jatekos")}</th><th>${t("ercek")}</th>
+                  <th>${t("rejtett_ercek")}</th><th>${t("max_sebesseg")}</th>
+                </tr></thead>
+                <tbody>
+                  ${guard.players
+                    .map(
+                      (p) => `<tr>
+                        <td>${escapeHtml(p.name)}</td>
+                        <td>${p.oresMined}</td>
+                        <td>${p.hiddenOres}${
+                          p.oresMined > 0
+                            ? ` (${Math.round((p.hiddenOres / p.oresMined) * 100)}%)`
+                            : ""
+                        }</td>
+                        <td>${p.maxSpeed.toFixed(1)}</td>
+                      </tr>`
+                    )
+                    .join("")}
+                </tbody>
+              </table>`
+      }
     `;
   }
 

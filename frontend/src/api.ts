@@ -31,6 +31,7 @@ import type {
   ConfigSnapshot,
   FileDiff,
   NetworkReport,
+  AntiCheatStatus,
   MacroStep,
   Pack,
   PackKind,
@@ -398,6 +399,22 @@ export const api = {
   },
   async deleteWorld(serverId: string, name: string): Promise<void> {
     await request(`/servers/${serverId}/worlds/${encodeURIComponent(name)}`, { method: "DELETE" });
+  },
+
+  async getAntiCheat(serverId: string): Promise<AntiCheatStatus> {
+    return request(`/servers/${serverId}/anticheat`);
+  },
+  async installAntiCheat(serverId: string): Promise<AntiCheatStatus> {
+    const { status } = await request<{ status: AntiCheatStatus }>(`/servers/${serverId}/anticheat`, {
+      method: "POST",
+    });
+    return status;
+  },
+  async removeAntiCheat(serverId: string): Promise<AntiCheatStatus> {
+    const { status } = await request<{ status: AntiCheatStatus }>(`/servers/${serverId}/anticheat`, {
+      method: "DELETE",
+    });
+    return status;
   },
 
   async getNetworkReport(serverId: string): Promise<NetworkReport> {
