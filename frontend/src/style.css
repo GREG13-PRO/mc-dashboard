@@ -1567,3 +1567,43 @@ table.file-table tr.file-row:hover {
      contrast rather than relying on what it happens to sit on. */
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 0.9);
 }
+
+.map-3d-host {
+  position: absolute;
+  inset: 0;
+  background: #12151a;
+}
+
+.map-3d,
+.map-3d-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.map-3d {
+  position: relative;
+  /* The orbit drag is the canvas's own; the 2D map's pan handlers sit on the
+     viewport underneath and must not also fire. */
+  touch-action: none;
+  cursor: grab;
+}
+
+.map-3d:active {
+  cursor: grabbing;
+}
+
+.map-3d-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.map-toolbar .btn.active {
+  background: var(--accent);
+  color: #fff;
+}

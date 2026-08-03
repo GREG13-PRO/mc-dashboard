@@ -366,6 +366,17 @@ export interface Schematic {
 
 export type Dimension = "overworld" | "nether" | "end";
 
+export interface SurfaceView {
+  x: number;
+  z: number;
+  size: number;
+  palette: string[];
+  /** size*size palette indices, one byte each, base64. */
+  colours: string;
+  /** size*size heights as signed 16-bit little-endian, base64. */
+  heights: string;
+}
+
 export interface PlayerPosition {
   name: string;
   x: number;

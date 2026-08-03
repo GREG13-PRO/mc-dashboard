@@ -21,6 +21,7 @@ import type {
   Macro,
   MapInfo,
   PlayerPosition,
+  SurfaceView,
   MacroStep,
   Pack,
   PackKind,
@@ -299,6 +300,15 @@ export const api = {
   async getMapPlayers(serverId: string): Promise<PlayerPosition[]> {
     const { players } = await request<{ players: PlayerPosition[] }>(`/servers/${serverId}/map/players`);
     return players;
+  },
+  async getSurfaceView(
+    serverId: string,
+    dimension: string,
+    x: number,
+    z: number,
+    size: number
+  ): Promise<SurfaceView> {
+    return request(`/servers/${serverId}/map/${dimension}/view?x=${x}&z=${z}&size=${size}`);
   },
   async clearMapCache(serverId: string): Promise<void> {
     await request(`/servers/${serverId}/map/cache`, { method: "DELETE" });

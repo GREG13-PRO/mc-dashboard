@@ -29,7 +29,15 @@ import {
 } from "./macros";
 import { cloneServer, CloneError } from "./clone";
 import { compareWeeks } from "./stats";
-import { mapInfo, regionTile, clearMapCache, MapError, type Dimension } from "./map-service";
+import {
+  mapInfo,
+  regionTile,
+  surfaceView,
+  clearMapCache,
+  MapError,
+  MAX_VIEW_SIZE,
+  type Dimension,
+} from "./map-service";
 import { playerPositions } from "./map-players";
 import {
   listSchematics,
@@ -518,6 +526,27 @@ serversRouter.get("/:id/map/players", requireAnyPermission, async (req, res) => 
     return;
   }
   res.json({ players: await playerPositions(entry) });
+});
+
+serversRouter.get("/:id/map/:dim/view", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const dim = req.params.dim;
+  const x = Number(req.query.x);
+  const z = Number(req.query.z);
+  const size = Number(req.query.size ?? MAX_VIEW_SIZE);
+  if (!DIMENSIONS.has(dim) || !Number.isInteger(x) || !Number.isInteger(z)) {
+    res.status(400).json({ error: "Invalid view request" });
+    return;
+  }
+  try {
+    res.json(await surfaceView(entry, dim as Dimension, x, z, size));
+  } catch (err) {
+    res.status(err instanceof MapError ? 400 : 500).json({ error: (err as Error).message });
+  }
 });
 
 serversRouter.get("/:id/map/:dim/:x/:z.png", requireAnyPermission, async (req, res) => {

@@ -1,6 +1,7 @@
 import { api } from "../api";
 import { escapeHtml } from "../lib/escape";
 import { t } from "../lib/i18n";
+import { createWorldView3D, type WorldView3DHandle } from "./WorldView3D";
 import type { Dimension, MapInfo, PlayerPosition } from "../types";
 
 /**
@@ -38,6 +39,7 @@ export function createWorldMap(
   let dragging = false;
   let players: PlayerPosition[] = [];
   let stopped = false;
+  let view3d: WorldView3DHandle | null = null;
   let lastX = 0;
   let lastY = 0;
 
@@ -57,11 +59,13 @@ export function createWorldMap(
       <button class="btn" id="map-zoom-in">+</button>
       <button class="btn" id="map-spawn">${t("map_spawn")}</button>
       <button class="btn" id="map-fit">${t("map_fit")}</button>
+      <button class="btn" id="map-3d">${t("map_3d")}</button>
       <span class="map-coords" id="map-coords"></span>
     </div>
     <div class="map-viewport" id="map-viewport">
       <div class="map-canvas" id="map-canvas"></div>
       <div class="map-players" id="map-players"></div>
+      <div class="map-3d-host" id="map-3d-host" hidden></div>
     </div>
   `;
 
@@ -158,6 +162,7 @@ export function createWorldMap(
 
   root.querySelector<HTMLSelectElement>("#map-dim")!.onchange = (e) => {
     dimension = (e.target as HTMLSelectElement).value as Dimension;
+    close3d();
     buildTiles();
     goToSpawn();
   };
@@ -171,6 +176,32 @@ export function createWorldMap(
   };
   root.querySelector<HTMLButtonElement>("#map-fit")!.onclick = fit;
   root.querySelector<HTMLButtonElement>("#map-spawn")!.onclick = goToSpawn;
+
+  const host3d = root.querySelector<HTMLDivElement>("#map-3d-host")!;
+  const button3d = root.querySelector<HTMLButtonElement>("#map-3d")!;
+  button3d.onclick = () => {
+    if (view3d) {
+      close3d();
+      return;
+    }
+    // Opens on whatever the 2D map is currently centred on, so switching views
+    // does not lose your place.
+    const box = viewport.getBoundingClientRect();
+    const centreX = (box.width / 2 - offsetX) / scale;
+    const centreZ = (box.height / 2 - offsetY) / scale;
+    view3d = createWorldView3D(serverId, dimension, centreX, centreZ);
+    host3d.appendChild(view3d.element);
+    host3d.hidden = false;
+    button3d.classList.add("active");
+  };
+
+  function close3d() {
+    view3d?.destroy();
+    view3d = null;
+    host3d.innerHTML = "";
+    host3d.hidden = true;
+    button3d.classList.remove("active");
+  }
 
   const onPointerDown = (e: PointerEvent) => {
     dragging = true;
@@ -227,6 +258,7 @@ export function createWorldMap(
     element: root,
     destroy() {
       stopped = true;
+      close3d();
       clearInterval(playerTimer);
       viewport.removeEventListener("pointerdown", onPointerDown);
       viewport.removeEventListener("pointermove", onPointerMove);

@@ -1,5 +1,5 @@
 import zlib from "node:zlib";
-import type { ChunkSurface } from "./anvil";
+import { EMPTY, type RegionSurface } from "./map-surface";
 
 /**
  * Renders a region's surface into a PNG.
@@ -131,7 +131,7 @@ function fallbackColour(name: string): Rgb {
   return [((h >>> 16) & 0x7f) + 80, ((h >>> 8) & 0x7f) + 80, (h & 0x7f) + 80];
 }
 
-function colourFor(block: string): Rgb {
+export function colourOf(block: string): Rgb {
   return COLOURS[block] ?? fallbackColour(block);
 }
 
@@ -197,29 +197,27 @@ export function encodePng(width: number, height: number, rgba: Buffer): Buffer {
 export const REGION_PIXELS = 512;
 
 /**
- * Draws one region as a 512x512 PNG - one pixel per block column. Chunks that
- * are absent stay fully transparent so the client can tile regions without
+ * Draws one region as a 512x512 PNG - one pixel per block column. Columns with
+ * no block stay fully transparent so the client can tile regions without
  * painting over its background.
  */
-export function renderRegionPng(chunks: ChunkSurface[]): Buffer {
+export function renderSurfacePng(surface: RegionSurface): Buffer {
   const size = REGION_PIXELS;
   const rgba = Buffer.alloc(size * size * 4);
+  // Palette colours are resolved once per region rather than per pixel; a
+  // region is a quarter of a million columns and the lookup includes a hash
+  // for every block the table does not know.
+  const colours = surface.palette.map(colourOf);
 
-  for (const c of chunks) {
-    const baseX = c.x * 16;
-    const baseZ = c.z * 16;
-    for (let z = 0; z < 16; z++) {
-      for (let x = 0; x < 16; x++) {
-        const col = c.columns[z * 16 + x];
-        if (!col?.block) continue;
-        const [r, g, b] = shade(colourFor(col.block), col.y);
-        const p = ((baseZ + z) * size + (baseX + x)) * 4;
-        rgba[p] = r;
-        rgba[p + 1] = g;
-        rgba[p + 2] = b;
-        rgba[p + 3] = 255;
-      }
-    }
+  for (let i = 0; i < size * size; i++) {
+    const block = surface.blocks[i];
+    if (block === EMPTY) continue;
+    const [r, g, b] = shade(colours[block] ?? [128, 128, 128], surface.heights[i]);
+    const p = i * 4;
+    rgba[p] = r;
+    rgba[p + 1] = g;
+    rgba[p + 2] = b;
+    rgba[p + 3] = 255;
   }
   return encodePng(size, size, rgba);
 }

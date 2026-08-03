@@ -296,4 +296,6 @@ export const en = {
   dim_overworld: "Overworld",
   dim_nether: "Nether",
   dim_end: "The End",
+  map_3d: "3D",
+  nincs_webgl: "This browser has no WebGL support.",
 };

@@ -298,4 +298,6 @@ export const hu: typeof en = {
   dim_overworld: "Felszín",
   dim_nether: "Nether",
   dim_end: "The End",
+  map_3d: "3D",
+  nincs_webgl: "Ez a böngésző nem támogatja a WebGL-t.",
 };
