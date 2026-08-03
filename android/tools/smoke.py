@@ -144,6 +144,24 @@ def dismiss_system_dialog(dump_name):
     return False
 
 
+def tap_text(label, dump_name):
+    """Taps a node by its visible text, case-insensitively.
+
+    Dialog buttons are upper-cased by the theme on some Android versions and
+    left alone on others, so matching the string as written is not reliable.
+    """
+    xml = hierarchy(dump_name)
+    for node in re.finditer(r"<node[^>]*?/?>", xml):
+        text = node.group(0)
+        match = re.search(r'text="([^"]*)"', text)
+        if match and match.group(1).strip().upper() == label.upper():
+            bounds = re.search(BOUNDS, text)
+            if bounds:
+                tap_bounds(tuple(map(int, bounds.groups())), label)
+                return True
+    return False
+
+
 def tap(description, dump_name):
     for attempt in range(3):
         xml = hierarchy(dump_name)
@@ -205,12 +223,16 @@ def main():
     screenshot("2-filled.png")
     tap("connect", "ui-filled.xml")
 
-    after = wait_for("WEBVIEW OK")
-    screenshot("3-loaded.png")
+    # The update check runs as the app starts and its dialog sits over the
+    # page, so it has to be dealt with before the WebView can be inspected at
+    # all - uiautomator only ever dumps the topmost window.
+    offer = wait_for(OFFERED_VERSION, timeout=25)
+    screenshot("3-update-offer.png")
+    tap_text("Most nem", "ui-offer.xml")
+    time.sleep(2)
 
-    # The update check runs on start, so by now it has had its answer.
-    offer = wait_for(OFFERED_VERSION, timeout=20)
-    screenshot("4-update-offer.png")
+    after = wait_for("WEBVIEW OK")
+    screenshot("4-loaded.png")
     failures = []
     # The page's own text in the view hierarchy is the proof it rendered; a
     # screenshot alone can look plausible while showing nothing.
