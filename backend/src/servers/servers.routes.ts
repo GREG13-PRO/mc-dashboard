@@ -39,6 +39,7 @@ import {
   type Dimension,
 } from "./map-service";
 import { playerPositions } from "./map-players";
+import { securityReport } from "./security";
 import {
   listSchematics,
   saveSchematic,
@@ -505,6 +506,19 @@ serversRouter.post("/:id/packs/resourcepack/require", requirePermission("files")
 });
 
 const DIMENSIONS = new Set(["overworld", "nether", "end"]);
+
+serversRouter.get("/:id/security", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json(await securityReport(entry));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 serversRouter.get("/:id/map", requireAnyPermission, async (req, res) => {
   const entry = serverRegistry.get(req.params.id);

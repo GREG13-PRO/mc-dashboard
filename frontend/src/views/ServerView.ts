@@ -28,6 +28,7 @@ type Tab =
   | "stats"
   | "schematics"
   | "map"
+  | "security"
   | "settings";
 const ALL_TABS: Tab[] = [
   "console",
@@ -43,6 +44,7 @@ const ALL_TABS: Tab[] = [
   "stats",
   "schematics",
   "map",
+  "security",
   "settings",
 ];
 
@@ -61,7 +63,7 @@ export function renderServerView(
   const capabilityFor = (tab: Tab) =>
     tab === "plugins" || tab === "content" || tab === "schematics"
       ? "files"
-      : tab === "map"
+      : tab === "map" || tab === "security"
         ? "settings"
       : tab === "macros"
         ? "console"
@@ -257,6 +259,7 @@ export function renderServerView(
       stats: t("statisztika"),
       schematics: t("schematicek"),
       map: t("terkep"),
+      security: t("biztonsag"),
       settings: t("beallitasok"),
     }[tab];
   }
@@ -310,6 +313,8 @@ export function renderServerView(
       void renderSchematics(content);
     } else if (activeTab === "map") {
       void renderMap(content);
+    } else if (activeTab === "security") {
+      void renderSecurity(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
     }
@@ -488,6 +493,65 @@ export function renderServerView(
     }
 
     await render();
+  }
+
+  async function renderSecurity(content: HTMLElement) {
+    content.innerHTML = `<div class="empty-state" style="padding:16px;">${t("betoltes")}</div>`;
+    let report;
+    try {
+      report = await api.getSecurityReport(serverId);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state" style="padding:16px;">${escapeHtml(
+        err instanceof ApiError ? err.message : t("nem_sikerult_betolteni")
+      )}</div>`;
+      return;
+    }
+    if (disposed) return;
+
+    const counts = { critical: 0, warning: 0, info: 0 };
+    for (const f of report.findings) counts[f.severity]++;
+
+    const rows = report.findings
+      .map(
+        (f) => `
+        <div class="finding finding-${f.severity}">
+          <div class="finding-head">
+            <span class="finding-badge">${t(`sev_${f.severity}`)}</span>
+            <strong>${escapeHtml(f.title)}</strong>
+          </div>
+          <p class="finding-detail">${escapeHtml(f.detail)}</p>
+          <p class="finding-advice">${escapeHtml(f.advice)}</p>
+        </div>`
+      )
+      .join("");
+
+    content.innerHTML = `
+      <div class="section" style="padding:16px;">
+        <div class="security-summary">
+          ${(["critical", "warning", "info"] as const)
+            .map(
+              // A zero count is coloured neutrally: a red 0 next to "Critical"
+              // reads at a glance as if something were wrong.
+              (level) =>
+                `<span class="finding-badge ${
+                  counts[level] > 0 ? `finding-${level}-badge` : ""
+                }">${counts[level]}</span> ${t(`sev_${level}`)}`
+            )
+            .join("")}
+        </div>
+        ${
+          report.findings.length === 0
+            ? `<div class="empty-state">${t("nincs_talalat_biztonsag")}</div>`
+            : rows
+        }
+        ${
+          report.loginsChecked
+            ? ""
+            : `<p class="finding-detail">${t("nincs_log_ellenorzes")}</p>`
+        }
+        <p class="finding-detail">${t("biztonsag_hatokor")}</p>
+      </div>
+    `;
   }
 
   async function renderMap(content: HTMLElement) {

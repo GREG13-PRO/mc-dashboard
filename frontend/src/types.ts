@@ -391,3 +391,19 @@ export interface MapInfo {
     spawn: { x: number; z: number };
   }[];
 }
+
+export type Severity = "critical" | "warning" | "info";
+
+export interface SecurityFinding {
+  id: string;
+  severity: Severity;
+  title: string;
+  detail: string;
+  advice: string;
+}
+
+export interface SecurityReport {
+  generatedAt: string;
+  findings: SecurityFinding[];
+  loginsChecked: boolean;
+}

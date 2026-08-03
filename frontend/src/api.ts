@@ -22,6 +22,7 @@ import type {
   MapInfo,
   PlayerPosition,
   SurfaceView,
+  SecurityReport,
   MacroStep,
   Pack,
   PackKind,
@@ -292,6 +293,10 @@ export const api = {
       body: JSON.stringify({ resource, leaving }),
     });
     return present;
+  },
+
+  async getSecurityReport(serverId: string): Promise<SecurityReport> {
+    return request(`/servers/${serverId}/security`);
   },
 
   async getMapInfo(serverId: string): Promise<MapInfo> {

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
@@ -323,12 +324,15 @@ function pluginsDir(entry: ServerEntry): string {
 
 const MANIFEST_NAME = ".mc-dashboard-plugins.json";
 
-interface ManifestRecord {
+export interface ManifestRecord {
   source: PluginSource;
   projectId: string;
   versionId: string;
   versionName: string;
   installedAt: string;
+  /** Hash of the jar as downloaded, so a later change to it is detectable.
+   *  Absent on records written before this was recorded. */
+  sha256?: string;
 }
 
 /**
@@ -338,7 +342,9 @@ interface ManifestRecord {
  * overwrite a plugin with an unrelated project's jar. Jars placed by hand are
  * simply listed without update info rather than guessed at.
  */
-async function readManifest(entry: ServerEntry): Promise<Record<string, ManifestRecord>> {
+export async function readPluginManifest(
+  entry: ServerEntry
+): Promise<Record<string, ManifestRecord>> {
   const file = path.join(pluginsDir(entry), MANIFEST_NAME);
   if (!fs.existsSync(file)) return {};
   try {
@@ -381,7 +387,7 @@ async function readPluginYml(jarPath: string): Promise<{ name: string | null; ve
 export async function listInstalledPlugins(entry: ServerEntry, checkUpdates = false): Promise<InstalledPlugin[]> {
   const dir = pluginsDir(entry);
   if (!fs.existsSync(dir)) return [];
-  const manifest = await readManifest(entry);
+  const manifest = await readPluginManifest(entry);
   const platform = detectPlatform(entry);
   const files = (await fsp.readdir(dir)).filter((f) => f.toLowerCase().endsWith(".jar"));
 
@@ -438,7 +444,7 @@ export async function installPlugin(
   const dest = resolveSafePath(dir, version.filename);
   await downloadFile(version.downloadUrl, dest);
 
-  const manifest = await readManifest(entry);
+  const manifest = await readPluginManifest(entry);
   // Replacing a plugin usually means a differently-named jar (the version is
   // in the filename), so the old entry and its jar have to go or the server
   // would load both copies.
@@ -454,6 +460,7 @@ export async function installPlugin(
     versionId: version.id,
     versionName: version.name,
     installedAt: new Date().toISOString(),
+    sha256: crypto.createHash("sha256").update(await fsp.readFile(dest)).digest("hex"),
   };
   await writeManifest(entry, manifest);
 
@@ -478,7 +485,7 @@ export async function deletePlugin(entry: ServerEntry, filename: string): Promis
     throw new Error("Only .jar files can be removed here");
   }
   await fsp.rm(target, { force: true });
-  const manifest = await readManifest(entry);
+  const manifest = await readPluginManifest(entry);
   if (manifest[filename]) {
     delete manifest[filename];
     await writeManifest(entry, manifest);

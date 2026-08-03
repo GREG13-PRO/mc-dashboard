@@ -1607,3 +1607,83 @@ table.file-table tr.file-row:hover {
   background: var(--accent);
   color: #fff;
 }
+
+/* ------------------------------------------------------- security findings */
+
+.security-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--gap-md);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.finding {
+  border: 0.5px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: var(--gap-sm);
+  background: var(--bg-panel);
+}
+
+.finding-critical {
+  border-left-color: var(--red);
+}
+.finding-warning {
+  border-left-color: var(--yellow);
+}
+.finding-info {
+  border-left-color: var(--accent);
+}
+
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.finding-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 590;
+}
+
+.finding-critical .finding-badge,
+.finding-critical-badge {
+  background: var(--red);
+  color: #fff;
+}
+.finding-warning .finding-badge,
+.finding-warning-badge {
+  background: var(--yellow);
+  color: #3a2c00;
+}
+.finding-info .finding-badge,
+.finding-info-badge {
+  background: var(--accent);
+  color: #fff;
+}
+
+.finding-detail {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.finding-advice {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}

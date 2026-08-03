@@ -300,4 +300,11 @@ export const hu: typeof en = {
   dim_end: "The End",
   map_3d: "3D",
   nincs_webgl: "Ez a böngésző nem támogatja a WebGL-t.",
+  biztonsag: "Biztonság",
+  sev_critical: "Kritikus",
+  sev_warning: "Figyelmeztetés",
+  sev_info: "Megjegyzés",
+  nincs_talalat_biztonsag: "Ezen a szerveren nincs kifogásolnivaló.",
+  nincs_log_ellenorzes: "Nincs aktuális logfájl, így a bejelentkezési mintázatokat nem néztem meg.",
+  biztonsag_hatokor: "Ez a konfigurációt, a bővítmények eredetét és a bejelentkezési logot nézi. A játékosok mozgását nem figyeli - a repülés vagy a túlnyúlás észleléséhez a szerveren belül futó kód kell.",
 };
