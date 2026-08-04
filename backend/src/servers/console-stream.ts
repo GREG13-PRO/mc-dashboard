@@ -3,11 +3,14 @@ import type { ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import type { ServerEntry } from "../types";
 import { consoleLogPath } from "./process-manager";
+import { followFile, hasTail, type TailFollower } from "./file-tail";
 
 type OutputListener = (chunk: Buffer) => void;
 
 interface TailHandle {
-  proc: ChildProcessByStdio<null, Readable, Readable>;
+  /** One or the other: `tail` where it exists, a file follower where it does not. */
+  proc: ChildProcessByStdio<null, Readable, Readable> | null;
+  follower: TailFollower | null;
   listeners: Set<OutputListener>;
 }
 
@@ -32,26 +35,39 @@ export function subscribeConsole(entry: ServerEntry, onData: OutputListener): ()
   let handle = tails.get(entry.id);
 
   if (!handle) {
-    // -n 200: seed the view with recent history on attach.
-    // -F (not -f): follow by name and keep retrying if the file doesn't exist
-    // yet (server not started) or gets recreated/truncated on the next start.
-    const proc = spawn("tail", ["-n", "200", "-F", consoleLogPath(entry)], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    handle = { proc, listeners: new Set() };
-    tails.set(entry.id, handle);
-
-    proc.stdout.on("data", (data: Buffer) => {
+    const emit = (data: Buffer) => {
       for (const listener of handle!.listeners) {
         listener(data);
       }
-    });
-    // While the logfile is missing, `tail -F` prints "cannot open ... No such
-    // file" retry chatter to stderr - swallow it so it never reaches the view.
-    proc.stderr.on("data", () => undefined);
-    proc.on("exit", () => {
-      tails.delete(entry.id);
-    });
+    };
+
+    if (!hasTail()) {
+      // Windows has no tail. The follower does the same job in Node - see
+      // file-tail for why it polls rather than watching.
+      handle = {
+        proc: null,
+        follower: followFile(consoleLogPath(entry), 200, emit),
+        listeners: new Set(),
+      };
+      tails.set(entry.id, handle);
+    } else {
+      // -n 200: seed the view with recent history on attach.
+      // -F (not -f): follow by name and keep retrying if the file doesn't exist
+      // yet (server not started) or gets recreated/truncated on the next start.
+      const proc = spawn("tail", ["-n", "200", "-F", consoleLogPath(entry)], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      handle = { proc, follower: null, listeners: new Set() };
+      tails.set(entry.id, handle);
+
+      proc.stdout.on("data", emit);
+      // While the logfile is missing, `tail -F` prints "cannot open ... No such
+      // file" retry chatter to stderr - swallow it so it never reaches the view.
+      proc.stderr.on("data", () => undefined);
+      proc.on("exit", () => {
+        tails.delete(entry.id);
+      });
+    }
   }
 
   handle.listeners.add(onData);
@@ -61,7 +77,8 @@ export function subscribeConsole(entry: ServerEntry, onData: OutputListener): ()
     if (!current) return;
     current.listeners.delete(onData);
     if (current.listeners.size === 0) {
-      current.proc.kill();
+      current.proc?.kill();
+      current.follower?.stop();
       tails.delete(entry.id);
     }
   };

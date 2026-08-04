@@ -44,6 +44,10 @@ export function followFile(
         // mid-file read is usually a fragment.
         const lines = buffer.toString("utf-8").split("\n");
         if (from > 0) lines.shift();
+        // A file ending in a newline splits to a trailing empty element, which
+        // would otherwise eat one of the requested lines: `tail -n 200` gives
+        // two hundred, and so should this.
+        if (lines[lines.length - 1] === "") lines.pop();
         const tail = lines.slice(-seedLines).join("\n");
         if (tail) onData(Buffer.from(tail));
       } finally {
