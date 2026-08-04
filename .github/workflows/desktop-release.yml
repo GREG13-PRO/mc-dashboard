@@ -41,6 +41,15 @@ jobs:
         with:
           node-version: 20
 
+      # The root install is not optional: this is a workspaces monorepo, so
+      # TypeScript hoists to the root node_modules, and prepare-backend needs it
+      # to compile the backend it bundles. Installing only in desktop/ is why
+      # every installer build since v2.39.0 failed with "A TypeScript fordító
+      # nincs telepítve" - the APK and the plugin kept building, so the release
+      # was never empty enough to notice.
+      - name: Install root dependencies
+        run: npm ci || npm install
+
       - name: Install desktop dependencies
         working-directory: desktop
         run: npm ci || npm install

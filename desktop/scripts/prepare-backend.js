@@ -36,23 +36,28 @@ function run(command, args, cwd) {
  * called `tsc` from the registry instead - which prints "This is not the tsc
  * command you are looking for" and, in a less lucky version, could have
  * produced a silently wrong build.
+ *
+ * Nor is node_modules/.bin/tsc, which is what this reached for first. That is a
+ * shell script on every platform and a .cmd shim beside it on Windows, so
+ * execFileSync on the extensionless name works on macOS and fails on the
+ * Windows runner - which is exactly the sort of difference that only shows up
+ * on one of the two build machines.
+ *
+ * The package's own entry point has neither problem: it is a .js file, and this
+ * process is already a Node that can run it.
  */
-function tscBinary() {
-  const candidates = [
-    path.join(repo, "node_modules", ".bin", "tsc"),
-    path.join(backend, "node_modules", ".bin", "tsc"),
-  ];
-  const found = candidates.find((c) => fs.existsSync(c));
-  if (!found) {
+function tscEntry() {
+  try {
+    return require.resolve("typescript/lib/tsc.js", { paths: [repo, backend, desktop] });
+  } catch {
     throw new Error(
       "A TypeScript fordító nincs telepítve. Futtasd a repó gyökerében: npm install"
     );
   }
-  return found;
 }
 
 console.log("[prepare-backend] fordítás");
-run(tscBinary(), ["-p", "tsconfig.json"], backend);
+run(process.execPath, [tscEntry(), "-p", "tsconfig.json"], backend);
 
 console.log("[prepare-backend] staging:", staging);
 fs.rmSync(staging, { recursive: true, force: true });
