@@ -2577,3 +2577,221 @@ table.file-table tr.file-row:hover {
     transform: none;
   }
 }
+
+/* ------------------------------------------------------- server.properties */
+
+.prop-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-md);
+}
+
+.prop-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.prop-group {
+  margin-bottom: var(--gap-sm);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.prop-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  width: 100%;
+  padding: 11px var(--gap-md);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.prop-group-head:hover {
+  background: var(--bg-hover);
+}
+
+.prop-group-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.prop-group-title {
+  flex: 1;
+  min-width: 0;
+}
+
+/* How many settings are in here, so a section is worth opening or not before
+   opening it. */
+.prop-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.prop-chevron {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  transition: transform var(--dur) var(--ease);
+}
+
+.prop-group.open .prop-chevron {
+  transform: rotate(180deg);
+}
+
+/* Closed sections are not rendered away, only hidden, so opening one costs no
+   redraw and the scroll position does not jump. */
+.prop-rows {
+  display: none;
+  border-top: 0.5px solid var(--border);
+}
+
+.prop-group.open .prop-rows {
+  display: block;
+}
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-lg);
+  padding: 10px var(--gap-md);
+}
+
+.prop-row + .prop-row {
+  border-top: 0.5px solid var(--border);
+}
+
+.prop-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.prop-label code {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.prop-label p {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+/* Says the value will not do anything until the server next starts, which is
+   otherwise only discoverable by changing it and waiting. */
+.prop-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.prop-control {
+  flex: 0 0 auto;
+  width: 190px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.prop-control input[type="text"],
+.prop-control input[type="password"],
+.prop-control input[type="number"],
+.prop-control select {
+  width: 100%;
+}
+
+@media (max-width: 620px) {
+  .prop-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--gap-sm);
+  }
+
+  .prop-control {
+    width: 100%;
+    justify-content: stretch;
+  }
+}
+
+/* ------------------------------------------------------------------ switch */
+
+/* A checkbox for a setting that is on or off reads as a form field to fill in;
+   a switch reads as a state that is currently one way. Same input underneath -
+   it is still what the label toggles and what the keyboard focuses. */
+.switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.switch-track {
+  display: block;
+  width: 38px;
+  height: 22px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  box-shadow: inset 0 0 0 0.5px var(--border);
+  transition: background var(--dur) var(--ease);
+}
+
+.switch-thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur) var(--ease);
+}
+
+.switch input:checked + .switch-track {
+  background: var(--accent);
+}
+
+.switch input:checked + .switch-track .switch-thumb {
+  transform: translateX(16px);
+}
+
+.switch input:focus-visible + .switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A key that is not in the file at all: what is shown is Minecraft's default,
+   and saying so is the difference between reading a value and guessing one. */
+.prop-badge-quiet {
+  background: var(--bg-inset);
+  color: var(--text-faint);
+}

@@ -53,6 +53,7 @@ import type {
   WeekComparison,
   UserInput,
   UserPublic,
+  ServerProperties,
 } from "./types";
 
 class ApiError extends Error {
@@ -724,6 +725,18 @@ export const api = {
       body: JSON.stringify({ source, projectId, versionId }),
     });
     return plugin;
+  },
+  async getProperties(serverId: string): Promise<ServerProperties> {
+    return request<ServerProperties>(`/servers/${serverId}/properties`);
+  },
+  async saveProperties(
+    serverId: string,
+    values: Record<string, string>
+  ): Promise<{ saved: number; values: Record<string, string> }> {
+    return request<{ saved: number; values: Record<string, string> }>(
+      `/servers/${serverId}/properties`,
+      { method: "PUT", body: JSON.stringify({ values }) }
+    );
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

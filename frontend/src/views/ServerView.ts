@@ -14,6 +14,7 @@ import { openAddServerModal } from "./AddServerModal";
 import { isAdmin, permissionsFor } from "../auth-state";
 import type { AntiCheatStatus, ConfigSnapshot, NetworkReport } from "../types";
 import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatus } from "../types";
+import { renderPropertiesEditor } from "../components/PropertiesEditor";
 
 type Tab =
   | "console"
@@ -31,7 +32,8 @@ type Tab =
   | "map"
   | "worlds"
   | "security"
-  | "settings";
+  | "settings"
+  | "properties";
 /**
  * The tabs, grouped.
  *
@@ -55,7 +57,7 @@ const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
     tabs: ["timeline", "performance", "macros", "stats"],
   },
   { id: "security", label: () => t("biztonsag"), tabs: ["security"] },
-  { id: "settings", label: () => t("beallitasok"), tabs: ["settings"] },
+  { id: "settings", label: () => t("beallitasok"), tabs: ["settings", "properties"] },
 ];
 
 const ALL_TABS: Tab[] = [
@@ -75,6 +77,7 @@ const ALL_TABS: Tab[] = [
   "worlds",
   "security",
   "settings",
+  "properties",
 ];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
@@ -96,7 +99,7 @@ export function renderServerView(
         ? "settings"
       : tab === "macros"
         ? "console"
-        : tab === "stats"
+        : tab === "stats" || tab === "properties"
           ? "settings"
       : tab === "access"
         ? "players"
@@ -429,6 +432,7 @@ export function renderServerView(
       security: t("biztonsag"),
       worlds: t("vilagok"),
       settings: t("beallitasok"),
+      properties: "server.properties",
     }[tab];
   }
 
@@ -487,6 +491,8 @@ export function renderServerView(
       void renderWorlds(content);
     } else if (activeTab === "settings") {
       renderSettings(content);
+    } else if (activeTab === "properties") {
+      renderPropertiesEditor(content, serverId);
     }
   }
 

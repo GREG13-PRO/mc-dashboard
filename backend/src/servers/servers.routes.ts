@@ -1,6 +1,14 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
+import fs from "node:fs";
 import fsp from "node:fs/promises";
+import path from "node:path";
+import { readProperties, writeProperties } from "./properties";
+import {
+  allDefinitions as allPropertyDefinitions,
+  definitionFor as propertyDefinition,
+  validate as validatePropertyValue,
+} from "./properties-schema";
 import os from "node:os";
 import { serverRegistry, toPublicEntry } from "./registry";
 import {
@@ -606,6 +614,98 @@ serversRouter.get("/:id/network", requirePermission("settings"), async (req, res
     alerts: connectionAlerts(entry.id),
     ips: await analyseIps(entry),
   });
+});
+
+/**
+ * Blanks every value the schema marks secret.
+ *
+ * Applied on the way out of *both* the read and the save: the first version of
+ * this only blanked the read, and the save echoed the file back - so the RCON
+ * password was write-only right up until you pressed the button. One helper on
+ * every exit is what makes that impossible to get half right.
+ */
+function withoutSecrets(values: Record<string, string>): Record<string, string> {
+  const out = { ...values };
+  for (const def of allPropertyDefinitions()) {
+    if (def.secret && out[def.key] !== undefined) out[def.key] = "";
+  }
+  return out;
+}
+
+/**
+ * server.properties, typed.
+ *
+ * Values are returned alongside the schema rather than merged into it, so a key
+ * this dashboard has never heard of still comes back and still round-trips: a
+ * mod's property silently vanishing on the first save would be this screen
+ * eating somebody's configuration.
+ */
+serversRouter.get("/:id/properties", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const file = path.join(entry.folder, "server.properties");
+  if (!fs.existsSync(file)) {
+    // A proxy has no server.properties and never will; saying so is better
+    // than an empty form that saves into a file nothing reads.
+    res.status(409).json({ error: "Ennek a szervernek nincs server.properties fájlja (proxy?)." });
+    return;
+  }
+  const values = withoutSecrets(readProperties(file));
+  const known = new Set(allPropertyDefinitions().map((def) => def.key));
+  res.json({
+    definitions: allPropertyDefinitions(),
+    values,
+    unknown: Object.keys(values).filter((key) => !known.has(key)).sort(),
+  });
+});
+
+serversRouter.put("/:id/properties", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const file = path.join(entry.folder, "server.properties");
+  if (!fs.existsSync(file)) {
+    res.status(409).json({ error: "Ennek a szervernek nincs server.properties fájlja (proxy?)." });
+    return;
+  }
+  const incoming = (req.body ?? {}).values;
+  if (!incoming || typeof incoming !== "object") {
+    res.status(400).json({ error: "values is required" });
+    return;
+  }
+
+  const before = readProperties(file);
+  const write: Record<string, string> = {};
+  try {
+    for (const [key, raw] of Object.entries(incoming as Record<string, unknown>)) {
+      const value = String(raw ?? "");
+      const def = propertyDefinition(key);
+      // An untouched secret arrives blank, because that is what was sent out.
+      // Writing it would erase the password rather than leave it alone.
+      if (def?.secret && value === "") continue;
+      write[key] = validatePropertyValue(key, value);
+    }
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+    return;
+  }
+
+  // Snapshot first: the config history already tracks this file, so every save
+  // through this screen is one the user can diff and roll back.
+  await snapshotConfigs(entry, "server.properties szerkesztés", req.user?.username ?? null).catch(
+    () => null
+  );
+  writeProperties(file, write);
+  // What actually moved, not how many lines were rewritten. The whole file goes
+  // through the writer on every save, so counting the write said "66 settings
+  // saved" after changing one - a number that reads as an accident.
+  const changed = Object.keys(write).filter((key) => before[key] !== write[key]);
+  res.json({ saved: changed.length, changed, values: withoutSecrets(readProperties(file)) });
 });
 
 serversRouter.get("/:id/config-history", requirePermission("settings"), async (req, res) => {

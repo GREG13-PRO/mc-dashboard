@@ -655,3 +655,35 @@ export interface BundleRestoreReport {
   restoredWorld: string | null;
   failedPlugins: { filename: string; error: string }[];
 }
+
+export type PropertyCategory =
+  | "gameplay"
+  | "world"
+  | "players"
+  | "network"
+  | "performance"
+  | "security"
+  | "rcon"
+  | "resourcepack"
+  | "info"
+  | "advanced";
+
+export interface PropertyDef {
+  key: string;
+  category: PropertyCategory;
+  type: "bool" | "int" | "string" | "enum";
+  options?: string[];
+  min?: number;
+  max?: number;
+  secret?: boolean;
+  restart?: boolean;
+  /** What Minecraft uses when the key is absent from the file. */
+  fallback: string;
+}
+
+export interface ServerProperties {
+  definitions: PropertyDef[];
+  values: Record<string, string>;
+  /** Keys present in the file that the schema does not describe. */
+  unknown: string[];
+}
