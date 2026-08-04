@@ -35,3 +35,7 @@ plugin/build/
 
 # Staged copy of the backend for the desktop installer
 desktop/backend-bundle/
+
+# Python leaves these behind next to any script that gets imported
+__pycache__/
+*.pyc
