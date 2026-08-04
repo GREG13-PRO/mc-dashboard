@@ -668,4 +668,5 @@ export const en = {
   veglegesen: "Permanently",
   indoklas: "Why",
   pl_szandekos_cracked: "e.g. deliberate, AuthMe guards it",
+  uveg_hatas: "Glass surfaces",
 };

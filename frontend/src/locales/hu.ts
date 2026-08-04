@@ -670,4 +670,5 @@ export const hu: typeof en = {
   veglegesen: "Véglegesen",
   indoklas: "Indoklás",
   pl_szandekos_cracked: "pl. szándékos, az AuthMe őrzi",
+  uveg_hatas: "Üveghatás",
 };

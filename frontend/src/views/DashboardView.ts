@@ -18,6 +18,8 @@ import {
   setTextSize,
   getHighContrast,
   setHighContrast,
+  getGlass,
+  setGlass,
 } from "../lib/display";
 import { icon } from "../lib/icons";
 import { logoMark } from "../lib/logo";
@@ -214,6 +216,10 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
           </select>
         </div>
         <div class="field checkbox-row">
+          <input id="a11y-glass" type="checkbox" ${getGlass() ? "checked" : ""} />
+          <label for="a11y-glass" style="margin:0">${t("uveg_hatas")}</label>
+        </div>
+        <div class="field checkbox-row">
           <input id="a11y-contrast" type="checkbox" ${getHighContrast() ? "checked" : ""} />
           <label for="a11y-contrast" style="margin:0">${t("nagy_kontrasztu_mod")}</label>
         </div>
@@ -232,6 +238,9 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       });
       wrap.querySelector<HTMLSelectElement>("#a11y-size")!.onchange = (e) => {
         setTextSize((e.target as HTMLSelectElement).value as ReturnType<typeof getTextSize>);
+      };
+      wrap.querySelector<HTMLInputElement>("#a11y-glass")!.onchange = (e) => {
+        setGlass((e.target as HTMLInputElement).checked);
       };
       wrap.querySelector<HTMLInputElement>("#a11y-contrast")!.onchange = (e) => {
         setHighContrast((e.target as HTMLInputElement).checked);

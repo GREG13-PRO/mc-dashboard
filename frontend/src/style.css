@@ -41,6 +41,11 @@
   --accent-hover: #7a2ceb;
   --accent-press: #6a1fd6;
   --accent-dim: rgba(139, 61, 255, 0.1);
+  /* Accent tuned for text on --accent-dim, not for a button fill. Measured:
+     the plain accent on that tint is 3.9:1, which fails on the most-used
+     control in the app - the selected sidebar row. Icons keep the plain accent;
+     they are graphics and clear the 3:1 they need. */
+  --accent-text: #6b21a8;
   --accent-glow: rgba(139, 61, 255, 0.3);
   --on-accent: #ffffff;
 
@@ -69,6 +74,15 @@
   --dur-fast: 150ms;
   --dur: 200ms;
   --dur-slow: 250ms;
+
+  /* Glass. One set per theme, because the highlight that reads as a lit edge on
+     a dark panel reads as a smear on a light one. Only floating surfaces use
+     these - see the note above .glass. */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(70, 35, 115, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-sheen: rgba(139, 61, 255, 0.06);
+  --glass-blur: 28px;
 
   --sidebar-tint: rgba(248, 245, 253, 0.78);
   --toolbar-tint: rgba(248, 245, 253, 0.76);
@@ -115,6 +129,7 @@
     --accent-hover: #bb7bff;
     --accent-press: #8b3dff;
     --accent-dim: rgba(168, 85, 247, 0.16);
+    --accent-text: #d8b4fe;
     --accent-glow: rgba(168, 85, 247, 0.42);
     --green: #34d399;
     --red: #f87171;
@@ -122,6 +137,11 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.55);
     --shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.7);
+    --glass-bg: rgba(22, 16, 32, 0.58);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-highlight: rgba(255, 255, 255, 0.14);
+    --glass-sheen: rgba(168, 85, 247, 0.1);
+    --glass-blur: 28px;
     --sidebar-tint: rgba(12, 8, 17, 0.82);
     --toolbar-tint: rgba(12, 8, 17, 0.72);
 
@@ -161,6 +181,7 @@
   --accent-hover: #7a2ceb;
   --accent-press: #6a1fd6;
   --accent-dim: rgba(139, 61, 255, 0.1);
+  --accent-text: #6b21a8;
   --accent-glow: rgba(139, 61, 255, 0.3);
   --green: #16a34a;
   --red: #dc2626;
@@ -168,6 +189,14 @@
   --shadow-sm: 0 1px 2px rgba(45, 20, 80, 0.06), 0 0 0 0.5px rgba(45, 20, 80, 0.04);
   --shadow-md: 0 6px 20px rgba(45, 20, 80, 0.1), 0 0 0 0.5px rgba(45, 20, 80, 0.05);
   --shadow-lg: 0 18px 56px rgba(45, 20, 80, 0.16), 0 0 0 0.5px rgba(45, 20, 80, 0.06);
+  /* Glass. One set per theme, because the highlight that reads as a lit edge on
+     a dark panel reads as a smear on a light one. Only floating surfaces use
+     these - see the note above .glass. */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(70, 35, 115, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-sheen: rgba(139, 61, 255, 0.06);
+  --glass-blur: 28px;
   --sidebar-tint: rgba(248, 245, 253, 0.78);
   --toolbar-tint: rgba(248, 245, 253, 0.76);
 
@@ -206,6 +235,7 @@
   --accent-hover: #bb7bff;
   --accent-press: #8b3dff;
   --accent-dim: rgba(168, 85, 247, 0.16);
+  --accent-text: #d8b4fe;
   --accent-glow: rgba(168, 85, 247, 0.42);
   --green: #34d399;
   --red: #f87171;
@@ -213,6 +243,11 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.55);
   --shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.7);
+  --glass-bg: rgba(22, 16, 32, 0.58);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.14);
+  --glass-sheen: rgba(168, 85, 247, 0.1);
+  --glass-blur: 28px;
   --sidebar-tint: rgba(12, 8, 17, 0.82);
   --toolbar-tint: rgba(12, 8, 17, 0.72);
 
@@ -667,7 +702,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .nav-item.active {
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 500;
 }
 
@@ -2704,7 +2739,7 @@ table.file-table tr.file-row:hover {
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 10px;
   font-weight: 500;
   white-space: nowrap;
@@ -3469,4 +3504,105 @@ table.file-table tr.file-row:hover {
   color: var(--red);
   font-size: 12px;
   line-height: 1.45;
+}
+
+/* ============================================================ liquid glass */
+
+/*
+ * Real glass on the surfaces that float, and nowhere else.
+ *
+ * Four things together make it read as glass rather than as "a see-through
+ * box": a strong blur, saturation so colour bleeds through instead of grey, a
+ * one-pixel lit edge along the top, and a faint diagonal sheen that catches the
+ * eye when the surface moves. Any one of them alone looks like a mistake.
+ *
+ * The sheen is a layered background-image rather than a ::before, because a
+ * positioned pseudo-element on a container paints above its non-positioned
+ * children - it would have needed a z-index on everything inside these panels.
+ * A second background layer is painted behind content by definition.
+ *
+ * Content cards - .ov-card, .prop-group, .gr-group, .sc-card, .finding - are
+ * deliberately left solid. They hold long text and log output, and the whole
+ * measured contrast of this palette exists to keep that readable.
+ *
+ * Declared after the rules it overrides, so no !important is needed.
+ */
+.sidebar,
+.topbar,
+.server-view-header,
+.page-head,
+.modal-panel,
+.toast,
+.file-editor-panel,
+.lp-panel {
+  background-color: var(--glass-bg);
+  background-image: linear-gradient(
+    135deg,
+    var(--glass-sheen) 0%,
+    transparent 42%,
+    transparent 58%,
+    var(--glass-sheen) 100%
+  );
+  border-color: var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(185%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(185%);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-md);
+}
+
+/* The two full-screen panels keep their deeper shadow: they sit over the whole
+   page and need to separate from it further than a header does. */
+.file-editor-panel,
+.lp-panel,
+.modal-panel {
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow-lg);
+}
+
+/*
+ * Off.
+ *
+ * Three ways to land here, and all three mean the same thing - do not make me
+ * read text through a blur: the user turned it off, they asked for high
+ * contrast, or the system says reduce transparency. The blur is also the most
+ * expensive thing on the page, so a phone that struggles has a way out.
+ */
+:root[data-glass="off"] .sidebar,
+:root[data-glass="off"] .topbar,
+:root[data-glass="off"] .server-view-header,
+:root[data-glass="off"] .page-head,
+:root[data-glass="off"] .modal-panel,
+:root[data-glass="off"] .toast,
+:root[data-glass="off"] .file-editor-panel,
+:root[data-glass="off"] .lp-panel,
+:root[data-contrast="high"] .sidebar,
+:root[data-contrast="high"] .topbar,
+:root[data-contrast="high"] .server-view-header,
+:root[data-contrast="high"] .page-head,
+:root[data-contrast="high"] .modal-panel,
+:root[data-contrast="high"] .toast,
+:root[data-contrast="high"] .file-editor-panel,
+:root[data-contrast="high"] .lp-panel {
+  background-color: var(--bg-card);
+  background-image: none;
+  border-color: var(--border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: var(--shadow-md);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .sidebar,
+  .topbar,
+  .server-view-header,
+  .page-head,
+  .modal-panel,
+  .toast,
+  .file-editor-panel,
+  .lp-panel {
+    background-color: var(--bg-card);
+    background-image: none;
+    border-color: var(--border);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: var(--shadow-md);
+  }
 }
