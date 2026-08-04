@@ -54,6 +54,7 @@ import type {
   UserInput,
   UserPublic,
   ServerProperties,
+  ServerMotd,
 } from "./types";
 
 class ApiError extends Error {
@@ -737,6 +738,33 @@ export const api = {
       `/servers/${serverId}/properties`,
       { method: "PUT", body: JSON.stringify({ values }) }
     );
+  },
+  async getMotd(serverId: string): Promise<ServerMotd> {
+    return request<ServerMotd>(`/servers/${serverId}/motd`);
+  },
+  async saveMotd(serverId: string, motd: string): Promise<{ motd: string }> {
+    return request<{ motd: string }>(`/servers/${serverId}/motd`, {
+      method: "PUT",
+      body: JSON.stringify({ motd }),
+    });
+  },
+  async uploadServerIcon(serverId: string, file: File): Promise<void> {
+    const form = new FormData();
+    form.append("file", file);
+    // Sent with fetch rather than request(): the JSON content-type request()
+    // sets would stop the browser writing the multipart boundary.
+    const res = await fetch(`/api/servers/${encodeURIComponent(serverId)}/icon`, {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, body.error ?? res.statusText);
+    }
+  },
+  async deleteServerIcon(serverId: string): Promise<void> {
+    await request(`/servers/${serverId}/icon`, { method: "DELETE" });
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

@@ -15,6 +15,7 @@ import { isAdmin, permissionsFor } from "../auth-state";
 import type { AntiCheatStatus, ConfigSnapshot, NetworkReport } from "../types";
 import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatus } from "../types";
 import { renderPropertiesEditor } from "../components/PropertiesEditor";
+import { renderMotdEditor } from "../components/MotdEditor";
 
 type Tab =
   | "console"
@@ -33,7 +34,8 @@ type Tab =
   | "worlds"
   | "security"
   | "settings"
-  | "properties";
+  | "properties"
+  | "motd";
 /**
  * The tabs, grouped.
  *
@@ -57,7 +59,7 @@ const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
     tabs: ["timeline", "performance", "macros", "stats"],
   },
   { id: "security", label: () => t("biztonsag"), tabs: ["security"] },
-  { id: "settings", label: () => t("beallitasok"), tabs: ["settings", "properties"] },
+  { id: "settings", label: () => t("beallitasok"), tabs: ["settings", "properties", "motd"] },
 ];
 
 const ALL_TABS: Tab[] = [
@@ -78,6 +80,7 @@ const ALL_TABS: Tab[] = [
   "security",
   "settings",
   "properties",
+  "motd",
 ];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
@@ -99,7 +102,7 @@ export function renderServerView(
         ? "settings"
       : tab === "macros"
         ? "console"
-        : tab === "stats" || tab === "properties"
+        : tab === "stats" || tab === "properties" || tab === "motd"
           ? "settings"
       : tab === "access"
         ? "players"
@@ -433,6 +436,7 @@ export function renderServerView(
       worlds: t("vilagok"),
       settings: t("beallitasok"),
       properties: "server.properties",
+      motd: "MOTD",
     }[tab];
   }
 
@@ -493,6 +497,10 @@ export function renderServerView(
       renderSettings(content);
     } else if (activeTab === "properties") {
       renderPropertiesEditor(content, serverId);
+    } else if (activeTab === "motd") {
+      // The preview draws the server list row, and the row's first line is the
+      // server's name - so the editor needs it, not just the id.
+      renderMotdEditor(content, serverId, server?.name ?? serverId);
     }
   }
 

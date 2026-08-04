@@ -36,9 +36,24 @@ export function readProperties(propsPath: string): Record<string, string> {
   return out;
 }
 
+/**
+ * Redoes the one piece of Java escaping that matters on the way out.
+ *
+ * A real newline in a value would end the line and turn the rest into a second,
+ * bogus property - and the MOTD is legitimately two lines, so this is not a
+ * theoretical case. Java writes it as a backslash-n pair, which `unescapeValue`
+ * above turns back into a newline on read, so the two are inverses.
+ *
+ * Nothing else is escaped: only the first separator on a line is significant,
+ * so a colon or an equals sign inside a value is already safe.
+ */
+function escapeValue(value: string): string {
+  return value.replace(/\r?\n/g, "\\n");
+}
+
 export function upsertProperty(lines: string[], key: string, value: string): string[] {
   const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
-  const line = `${key}=${value}`;
+  const line = `${key}=${escapeValue(value)}`;
   if (idx >= 0) {
     lines[idx] = line;
     return lines;

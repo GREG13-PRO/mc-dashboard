@@ -5,6 +5,17 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { readProperties, writeProperties } from "./properties";
 import {
+  readMotd,
+  writeMotd,
+  hasProperties,
+  hasIcon,
+  iconPath,
+  saveIcon,
+  removeIcon,
+  MotdError,
+  MAX_MOTD_LENGTH,
+} from "./motd";
+import {
   allDefinitions as allPropertyDefinitions,
   definitionFor as propertyDefinition,
   validate as validatePropertyValue,
@@ -614,6 +625,88 @@ serversRouter.get("/:id/network", requirePermission("settings"), async (req, res
     alerts: connectionAlerts(entry.id),
     ips: await analyseIps(entry),
   });
+});
+
+// 64x64 PNG is a few kilobytes; the cap is only here so a mistaken upload
+// cannot be a large one.
+const iconUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+
+serversRouter.get("/:id/motd", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (!hasProperties(entry)) {
+    res.status(409).json({ error: "Ennek a szervernek nincs server.properties fájlja (proxy?)." });
+    return;
+  }
+  res.json({ motd: readMotd(entry), hasIcon: hasIcon(entry), maxLength: MAX_MOTD_LENGTH });
+});
+
+serversRouter.put("/:id/motd", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (!hasProperties(entry)) {
+    res.status(409).json({ error: "Ennek a szervernek nincs server.properties fájlja (proxy?)." });
+    return;
+  }
+  try {
+    await snapshotConfigs(entry, "MOTD szerkesztés", req.user?.username ?? null).catch(() => null);
+    writeMotd(entry, String((req.body ?? {}).motd ?? ""));
+    res.json({ motd: readMotd(entry) });
+  } catch (err) {
+    res.status(err instanceof MotdError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * Serves the icon back so the editor can show what is actually on disk rather
+ * than what was just uploaded - if the server has an icon this dashboard did
+ * not put there, that is the one players see.
+ */
+serversRouter.get("/:id/icon", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry || !hasIcon(entry)) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  res.setHeader("Content-Type", "image/png");
+  // The filename never changes, so without this the browser would keep showing
+  // the previous icon after an upload.
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(iconPath(entry));
+});
+
+serversRouter.post("/:id/icon", requirePermission("settings"), iconUpload.single("file"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+  try {
+    saveIcon(entry, req.file.buffer);
+    res.status(201).json({ hasIcon: true });
+  } catch (err) {
+    res.status(err instanceof MotdError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/icon", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  removeIcon(entry);
+  res.json({ hasIcon: false });
 });
 
 /**

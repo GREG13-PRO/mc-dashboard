@@ -687,3 +687,10 @@ export interface ServerProperties {
   /** Keys present in the file that the schema does not describe. */
   unknown: string[];
 }
+
+export interface ServerMotd {
+  motd: string;
+  hasIcon: boolean;
+  /** Minecraft's own cap, sent rather than duplicated in the browser. */
+  maxLength: number;
+}
