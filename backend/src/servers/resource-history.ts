@@ -1,10 +1,13 @@
 import { serverRegistry } from "./registry";
 import { getResourceUsageMap } from "./process-manager";
+import { getCachedPlayers } from "./rcon-poller";
 
 export interface ResourceSample {
   at: string;
   cpuPercent: number;
   memoryMb: number;
+  /** Null when RCON is off, so the chart can show a gap rather than zero. */
+  playersOnline: number | null;
 }
 
 const SAMPLE_INTERVAL_MS = 5_000;
@@ -47,7 +50,12 @@ async function sampleAll(): Promise<void> {
     // chart shows a gap for downtime instead of implying idle-but-running.
     if (!current) continue;
     const series = history.get(entry.id) ?? [];
-    series.push({ at, cpuPercent: current.cpuPercent, memoryMb: current.memoryMb });
+    series.push({
+      at,
+      cpuPercent: current.cpuPercent,
+      memoryMb: current.memoryMb,
+      playersOnline: getCachedPlayers(entry.id)?.online ?? null,
+    });
     if (series.length > MAX_SAMPLES) series.splice(0, series.length - MAX_SAMPLES);
     history.set(entry.id, series);
   }

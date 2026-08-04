@@ -3156,3 +3156,93 @@ table.file-table tr.file-row:hover {
     width: 100%;
   }
 }
+
+/* --------------------------------------------------------------- overview */
+
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--gap-md);
+  padding: var(--gap-lg) var(--gap-xl) var(--gap-xl);
+}
+
+.ov-card {
+  padding: var(--gap-md);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-bottom: var(--gap-sm);
+}
+
+.ov-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.ov-head h4 {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* The number the card exists for, big enough to read across the room. */
+.ov-big {
+  margin-bottom: 4px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.ov-note {
+  margin-top: 4px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.ov-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-md);
+  padding: 5px 0;
+  font-size: 12.5px;
+}
+
+.ov-row + .ov-row {
+  border-top: 0.5px solid var(--border);
+}
+
+.ov-row span {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* Values can be long - a seed, a CPU model - so they wrap rather than pushing
+   the label off the card. */
+.ov-row strong {
+  font-weight: 500;
+  text-align: right;
+  min-width: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 620px) {
+  .ov-grid {
+    padding: var(--gap-md);
+  }
+}

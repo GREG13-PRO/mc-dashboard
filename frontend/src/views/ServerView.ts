@@ -18,6 +18,7 @@ import { renderPropertiesEditor } from "../components/PropertiesEditor";
 import { renderMotdEditor } from "../components/MotdEditor";
 import { renderGameRules } from "../components/GameRules";
 import { renderSchedules } from "../components/Schedules";
+import { renderOverview } from "../components/Overview";
 
 type Tab =
   | "console"
@@ -39,7 +40,8 @@ type Tab =
   | "properties"
   | "motd"
   | "gamerules"
-  | "schedules";
+  | "schedules"
+  | "overview";
 /**
  * The tabs, grouped.
  *
@@ -50,6 +52,7 @@ type Tab =
  * stay a single click.
  */
 const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
+  { id: "overview", label: () => t("attekintes"), tabs: ["overview"] },
   { id: "console", label: () => t("konzol"), tabs: ["console"] },
   { id: "players", label: () => t("jatekosok"), tabs: ["players", "access", "luckperms"] },
   {
@@ -67,6 +70,7 @@ const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
 ];
 
 const ALL_TABS: Tab[] = [
+  "overview",
   "console",
   "files",
   "plugins",
@@ -112,7 +116,9 @@ export function renderServerView(
           ? "settings"
       : tab === "access"
         ? "players"
-        : tab === "luckperms" || tab === "timeline" || tab === "performance" || tab === "schedules"
+        : tab === "overview"
+        ? "console"
+      : tab === "luckperms" || tab === "timeline" || tab === "performance" || tab === "schedules"
           ? "settings"
           : tab;
   const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
@@ -445,6 +451,7 @@ export function renderServerView(
       motd: "MOTD",
       gamerules: t("jatekszabalyok"),
       schedules: t("utemezesek"),
+      overview: t("attekintes"),
     }[tab];
   }
 
@@ -458,7 +465,19 @@ export function renderServerView(
     }
   }
 
+  /**
+   * Cleanup for whichever tab is showing, if it needs any.
+   *
+   * The console had its own teardown and everything else was fire-and-forget,
+   * which was fine until a tab started polling: without this, leaving the
+   * overview would leave its timer running for as long as the page was open.
+   */
+  let disposeTab: (() => void) | null = null;
+
   function renderTabContent() {
+    disposeTab?.();
+    disposeTab = null;
+
     const content = root.querySelector<HTMLDivElement>("#tab-content")!;
     if (activeTab === "console") {
       content.innerHTML = `
@@ -505,6 +524,8 @@ export function renderServerView(
       renderSettings(content);
     } else if (activeTab === "properties") {
       renderPropertiesEditor(content, serverId);
+    } else if (activeTab === "overview") {
+      disposeTab = renderOverview(content, serverId);
     } else if (activeTab === "schedules") {
       renderSchedules(content, serverId);
     } else if (activeTab === "gamerules") {
@@ -2799,6 +2820,7 @@ export function renderServerView(
     mapHandle = null;
     if (statsTimer) clearInterval(statsTimer);
     statsTimer = null;
+    disposeTab?.();
     teardownConsole();
   };
 }

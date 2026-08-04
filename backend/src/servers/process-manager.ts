@@ -343,6 +343,32 @@ function readCpuTicks(pid: number): number | null {
   }
 }
 
+/**
+ * How long a process has been running, in seconds.
+ *
+ * Field 22 of /proc/<pid>/stat is the start time in clock ticks since boot, so
+ * subtracting it from the machine's uptime gives the process's own. Taken from
+ * the kernel rather than remembered when the dashboard started it: a server
+ * that was already up when the dashboard restarted still has an uptime, and it
+ * is not "since the dashboard noticed".
+ */
+function readUptimeSeconds(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf-8");
+    const afterComm = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    // Field 22 in proc(5) is starttime; index 19 counting from after the comm.
+    const startTicks = Number(afterComm[19]);
+    if (!Number.isFinite(startTicks)) return null;
+    const bootUptime = Number(readFileSync("/proc/uptime", "utf-8").split(" ")[0]);
+    if (!Number.isFinite(bootUptime)) return null;
+    return Math.max(0, Math.round(bootUptime - startTicks / CLOCK_TICKS_PER_SEC));
+  } catch {
+    // No /proc: this machine is not Linux, and the direct-spawn path knows its
+    // own start time instead.
+    return null;
+  }
+}
+
 function instantaneousCpuPercent(pid: number, fallback: number): number {
   const ticks = readCpuTicks(pid);
   const now = Date.now();
@@ -413,6 +439,7 @@ export async function getResourceUsageMap(entries: ServerEntry[]): Promise<Map<s
         result.set(entry.id, {
           cpuPercent: instantaneousCpuPercent(javaProc.pid, javaProc.cpu),
           memoryMb: Math.round(javaProc.rssKb / 1024),
+          uptimeSeconds: readUptimeSeconds(javaProc.pid),
         });
         break;
       }

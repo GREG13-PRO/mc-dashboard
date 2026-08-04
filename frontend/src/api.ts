@@ -57,6 +57,7 @@ import type {
   ServerMotd,
   GameRuleState,
   Schedule,
+  ServerOverview,
 } from "./types";
 
 class ApiError extends Error {
@@ -796,6 +797,9 @@ export const api = {
     await request(`/servers/${serverId}/schedules/${encodeURIComponent(scheduleId)}`, {
       method: "DELETE",
     });
+  },
+  async getOverview(serverId: string): Promise<ServerOverview> {
+    return request<ServerOverview>(`/servers/${serverId}/overview`);
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

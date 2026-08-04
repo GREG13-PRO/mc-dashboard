@@ -53,12 +53,16 @@ export interface PlayersSnapshot {
 export interface ResourceUsage {
   cpuPercent: number;
   memoryMb: number;
+  /** Null where /proc is unavailable. */
+  uptimeSeconds: number | null;
 }
 
 export interface ResourceSample {
   at: string;
   cpuPercent: number;
   memoryMb: number;
+  /** Null when RCON is off. */
+  playersOnline: number | null;
 }
 
 export interface ServerWithStatus extends ServerEntry {
@@ -728,4 +732,49 @@ export interface Schedule {
   createdAt: string;
   lastRunAt: string | null;
   lastResult: string | null;
+}
+
+export interface ServerOverview {
+  running: boolean;
+  resources: ResourceUsage | null;
+  players: { online: number; max: number } | null;
+  history: ResourceSample[];
+  server: {
+    version: string | null;
+    port: number | null;
+    ip: string | null;
+    maxPlayers: number | null;
+    onlineMode: boolean | null;
+    motd: string | null;
+  };
+  world: {
+    name: string;
+    seed: string | null;
+    sizeBytes: number | null;
+    lastPlayed: string | null;
+    type: string | null;
+  } | null;
+  system: {
+    hostname: string;
+    platform: string;
+    release: string;
+    cpuModel: string | null;
+    cpuCount: number;
+    totalMemoryMb: number;
+    freeMemoryMb: number;
+    loadAverage: number[];
+    uptimeSeconds: number;
+    diskTotalMb: number | null;
+    diskFreeMb: number | null;
+  };
+  game: {
+    difficulty: string | null;
+    gamemode: string | null;
+    pvp: boolean | null;
+    whitelist: boolean | null;
+    hardcore: boolean | null;
+    viewDistance: number | null;
+    simulationDistance: number | null;
+  };
+  nextSchedule: { name: string; action: string; when: string } | null;
 }

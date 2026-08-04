@@ -54,6 +54,8 @@ export interface ServerEntryInput {
 export interface ResourceUsage {
   cpuPercent: number;
   memoryMb: number;
+  /** Null where /proc is unavailable. */
+  uptimeSeconds: number | null;
 }
 
 export interface BackupInfo {

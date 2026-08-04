@@ -5,6 +5,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { readProperties, writeProperties } from "./properties";
 import { readGameRules, setGameRule, GameRuleError } from "./gamerules";
+import { serverOverview } from "./overview";
 import {
   listSchedules,
   saveSchedule,
@@ -640,6 +641,15 @@ serversRouter.get("/:id/network", requirePermission("settings"), async (req, res
   });
 });
 
+
+serversRouter.get("/:id/overview", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json(await serverOverview(entry));
+});
 
 serversRouter.get("/:id/schedules", requirePermission("settings"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
