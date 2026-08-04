@@ -645,4 +645,12 @@ export const zhCN: Partial<Locale> = {
   halado_mod_leiras: "全部字段，并用同样的建议值预先填好。",
   adj_nevet_a_szervernek: "给服务器起个名字，其余会自动填好。",
   barmikor_modosithato: "这些之后都可以在设置标签页里更改。",
+  megnyitas_fulon: "在新标签页打开",
+  szerkeszto_betoltese: "正在加载编辑器…",
+  lp_beagyazas_sikertelen: "编辑器无法在此窗口中加载。它由 LuckPerms 托管，可能拒绝被嵌入；请在新标签页中打开。",
+  lp_alkalmazas_leiras: "在编辑器里保存后会给你一个代码。把它粘贴到这里，更改就会应用到服务器上 —— 不必打开控制台。",
+  lp_kod_helye: "编辑器给出的代码",
+  modositasok_alkalmazasa: "应用更改",
+  modositasok_alkalmazva: "更改已应用",
+  alkalmazas_folyamatban: "正在应用…",
 };

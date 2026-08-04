@@ -644,4 +644,12 @@ export const en = {
   halado_mod_leiras: "Every field, pre-filled with the same suggestions.",
   adj_nevet_a_szervernek: "Give the server a name and the rest is filled in.",
   barmikor_modosithato: "All of this can be changed later on the settings tabs.",
+  megnyitas_fulon: "Open in a tab",
+  szerkeszto_betoltese: "Loading the editor…",
+  lp_beagyazas_sikertelen: "The editor would not load in this window. LuckPerms hosts it, and it can refuse to be embedded; open it in a tab instead.",
+  lp_alkalmazas_leiras: "When you press Save in the editor it gives you a code. Paste it here and the change is applied on the server - no console needed.",
+  lp_kod_helye: "Code from the editor",
+  modositasok_alkalmazasa: "Apply changes",
+  modositasok_alkalmazva: "Changes applied",
+  alkalmazas_folyamatban: "Applying…",
 };

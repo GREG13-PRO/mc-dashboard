@@ -646,4 +646,12 @@ export const hu: typeof en = {
   halado_mod_leiras: "Minden mező, ugyanazokkal a javaslatokkal előre kitöltve.",
   adj_nevet_a_szervernek: "Adj nevet a szervernek, a többi magától kitöltődik.",
   barmikor_modosithato: "Ezek mind módosíthatók később a beállítások füleken.",
+  megnyitas_fulon: "Megnyitás fülön",
+  szerkeszto_betoltese: "Szerkesztő betöltése…",
+  lp_beagyazas_sikertelen: "A szerkesztő nem töltődött be ebben az ablakban. A LuckPerms üzemelteti, és megtagadhatja a beágyazást — nyisd meg egy fülön.",
+  lp_alkalmazas_leiras: "Amikor a szerkesztőben mentesz, kapsz egy kódot. Illeszd be ide, és a módosítás életbe lép a szerveren — konzol nélkül.",
+  lp_kod_helye: "A szerkesztő adta kód",
+  modositasok_alkalmazasa: "Módosítások alkalmazása",
+  modositasok_alkalmazva: "Módosítások alkalmazva",
+  alkalmazas_folyamatban: "Alkalmazás folyamatban…",
 };

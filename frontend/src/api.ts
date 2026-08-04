@@ -676,9 +676,11 @@ export const api = {
     const { installed } = await request<{ installed: boolean }>(`/servers/${serverId}/luckperms`);
     return installed;
   },
-  async createLuckPermsEditor(serverId: string): Promise<string> {
-    const { url } = await request<{ url: string }>(`/servers/${serverId}/luckperms/editor`, { method: "POST" });
-    return url;
+  async createLuckPermsEditor(serverId: string): Promise<{ url: string; embeddable: boolean }> {
+    return request<{ url: string; embeddable: boolean }>(
+      `/servers/${serverId}/luckperms/editor`,
+      { method: "POST" }
+    );
   },
 
   async getAccessLists(serverId: string): Promise<AccessLists> {
@@ -804,6 +806,12 @@ export const api = {
   },
   async installDefaults(name: string): Promise<InstallDefaults> {
     return request<InstallDefaults>(`/install-server/defaults?name=${encodeURIComponent(name)}`);
+  },
+  async applyLuckPermsEdits(serverId: string, code: string): Promise<{ reply: string }> {
+    return request<{ reply: string }>(`/servers/${serverId}/luckperms/apply`, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

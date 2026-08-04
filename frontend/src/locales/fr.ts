@@ -645,4 +645,12 @@ export const fr: Partial<Locale> = {
   halado_mod_leiras: "Tous les champs, pré-remplis avec les mêmes suggestions.",
   adj_nevet_a_szervernek: "Donne un nom au serveur et le reste se remplit tout seul.",
   barmikor_modosithato: "Tout cela peut être modifié plus tard dans les onglets de réglages.",
+  megnyitas_fulon: "Ouvrir dans un onglet",
+  szerkeszto_betoltese: "Chargement de l’éditeur…",
+  lp_beagyazas_sikertelen: "L’éditeur n’a pas pu se charger dans cette fenêtre. LuckPerms l’héberge et peut refuser d’être intégré ; ouvre-le dans un onglet.",
+  lp_alkalmazas_leiras: "Quand tu enregistres dans l’éditeur, il te donne un code. Colle-le ici et la modification est appliquée sur le serveur — sans passer par la console.",
+  lp_kod_helye: "Code donné par l’éditeur",
+  modositasok_alkalmazasa: "Appliquer les modifications",
+  modositasok_alkalmazva: "Modifications appliquées",
+  alkalmazas_folyamatban: "Application…",
 };

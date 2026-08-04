@@ -645,4 +645,12 @@ export const ru: Partial<Locale> = {
   halado_mod_leiras: "Все поля, заполненные теми же предложениями.",
   adj_nevet_a_szervernek: "Дайте серверу имя, остальное заполнится само.",
   barmikor_modosithato: "Всё это можно изменить позже на вкладках настроек.",
+  megnyitas_fulon: "Открыть во вкладке",
+  szerkeszto_betoltese: "Загрузка редактора…",
+  lp_beagyazas_sikertelen: "Редактор не загрузился в этом окне. Его размещает LuckPerms, и он может отказаться встраиваться; откройте его во вкладке.",
+  lp_alkalmazas_leiras: "Когда вы сохраняете в редакторе, он выдаёт код. Вставьте его сюда — и изменение применится на сервере, без консоли.",
+  lp_kod_helye: "Код из редактора",
+  modositasok_alkalmazasa: "Применить изменения",
+  modositasok_alkalmazva: "Изменения применены",
+  alkalmazas_folyamatban: "Применение…",
 };

@@ -19,6 +19,7 @@ import { renderMotdEditor } from "../components/MotdEditor";
 import { renderGameRules } from "../components/GameRules";
 import { renderSchedules } from "../components/Schedules";
 import { renderOverview } from "../components/Overview";
+import { openLuckPermsEditor } from "../components/LuckPermsEditor";
 
 type Tab =
   | "console"
@@ -2324,6 +2325,9 @@ export function renderServerView(
     }
   }
 
+  /** The editor overlay lives on <body>, so it outlives this view unless closed. */
+  let disposeLuckPerms: (() => void) | null = null;
+
   function renderLuckPerms(content: HTMLElement) {
     const running = server?.running ?? false;
     content.innerHTML = `
@@ -2342,13 +2346,12 @@ export function renderServerView(
       btn.textContent = t("link_kerese");
       resultEl.innerHTML = "";
       try {
-        const url = await api.createLuckPermsEditor(serverId);
-        // Opened rather than embedded: the editor sets its own headers and is
-        // meant to run on its own origin.
-        window.open(url, "_blank", "noopener,noreferrer");
-        resultEl.innerHTML = `
-          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">${t("ha_nem_nyilt_meg_magatol_itt_a_link_egyszer_hasz")}</div>
-          <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+        const { url, embeddable } = await api.createLuckPermsEditor(serverId);
+        // Opened inside the dashboard rather than in a new tab. The overlay
+        // owns the fallback to a real tab if the frame will not load.
+        disposeLuckPerms?.();
+        disposeLuckPerms = openLuckPermsEditor(serverId, url, embeddable);
+        resultEl.innerHTML = "";
       } catch (err) {
         resultEl.innerHTML = `<div class="error-text">${escapeHtml(
           err instanceof ApiError ? err.message : t("nem_sikerult_megnyitni_a_szerkesztot")
@@ -2820,6 +2823,7 @@ export function renderServerView(
     mapHandle = null;
     if (statsTimer) clearInterval(statsTimer);
     statsTimer = null;
+    disposeLuckPerms?.();
     disposeTab?.();
     teardownConsole();
   };

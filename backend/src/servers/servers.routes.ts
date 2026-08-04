@@ -46,7 +46,13 @@ import { getCachedPlayers } from "./rcon-poller";
 import { createBackup, listBackups, restoreBackup, deleteBackup, resolveBackupPath } from "./backup-manager";
 import { readAccessLists, setWhitelistEnforced } from "./access-manager";
 import { listArchivedLogs, readArchivedLog, deleteArchivedLog } from "./console-archive";
-import { hasLuckPerms, createEditorSession, LuckPermsError } from "./luckperms";
+import {
+  hasLuckPerms,
+  createEditorSession,
+  applyEdits,
+  isEmbeddable,
+  LuckPermsError,
+} from "./luckperms";
 import { runWorldAction, WORLD_ACTIONS, WorldControlError } from "./world-control";
 import { detectConflicts, diagnoseLag, recommendJvmFlags, applyJvmScript } from "./performance";
 import {
@@ -1498,10 +1504,27 @@ serversRouter.post("/:id/luckperms/editor", requirePermission("settings"), async
     return;
   }
   try {
-    res.json({ url: await createEditorSession(entry) });
+    const url = await createEditorSession(entry);
+    // Asked once per session rather than cached: it is one HEAD against a page
+    // we are about to load anyway, and a cached "yes" that went stale would
+    // show a blank frame with no way back.
+    res.json({ url, embeddable: await isEmbeddable(url) });
   } catch (err) {
     const status = err instanceof LuckPermsError ? 409 : 500;
     res.status(status).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/luckperms/apply", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ reply: await applyEdits(entry, String((req.body ?? {}).code ?? "").trim()) });
+  } catch (err) {
+    res.status(err instanceof LuckPermsError ? 400 : 500).json({ error: (err as Error).message });
   }
 });
 
