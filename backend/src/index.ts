@@ -8,7 +8,7 @@ import { apiRouter } from "./routes";
 import { publicPackRouter } from "./servers/servers.routes";
 import { setupConsoleWebSocket } from "./ws/console-ws";
 import { startRconPoller } from "./servers/rcon-poller";
-import { startRestartScheduler } from "./servers/restart-scheduler";
+import { startScheduler } from "./servers/scheduler";
 import { startCrashMonitor } from "./servers/crash-monitor";
 import { startResourceHistory } from "./servers/resource-history";
 import { startConnectionMonitor } from "./servers/connection-monitor";
@@ -47,7 +47,7 @@ async function main() {
   const httpServer = http.createServer(app);
   setupConsoleWebSocket(httpServer);
   startRconPoller();
-  startRestartScheduler();
+  startScheduler();
   startCrashMonitor();
   startResourceHistory();
   startConnectionMonitor();

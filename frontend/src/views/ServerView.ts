@@ -17,6 +17,7 @@ import { PLAYER_ACTIONS, type MacroStep, type PlayerAction, type ServerWithStatu
 import { renderPropertiesEditor } from "../components/PropertiesEditor";
 import { renderMotdEditor } from "../components/MotdEditor";
 import { renderGameRules } from "../components/GameRules";
+import { renderSchedules } from "../components/Schedules";
 
 type Tab =
   | "console"
@@ -37,7 +38,8 @@ type Tab =
   | "settings"
   | "properties"
   | "motd"
-  | "gamerules";
+  | "gamerules"
+  | "schedules";
 /**
  * The tabs, grouped.
  *
@@ -58,7 +60,7 @@ const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
   {
     id: "maintenance",
     label: () => t("karbantartas"),
-    tabs: ["timeline", "performance", "macros", "stats"],
+    tabs: ["timeline", "performance", "macros", "schedules", "stats"],
   },
   { id: "security", label: () => t("biztonsag"), tabs: ["security"] },
   { id: "settings", label: () => t("beallitasok"), tabs: ["settings", "properties", "motd", "gamerules"] },
@@ -84,6 +86,7 @@ const ALL_TABS: Tab[] = [
   "properties",
   "motd",
   "gamerules",
+  "schedules",
 ];
 
 // Tabs map onto the four server capabilities; the plugin browser writes jars
@@ -109,7 +112,7 @@ export function renderServerView(
           ? "settings"
       : tab === "access"
         ? "players"
-        : tab === "luckperms" || tab === "timeline" || tab === "performance"
+        : tab === "luckperms" || tab === "timeline" || tab === "performance" || tab === "schedules"
           ? "settings"
           : tab;
   const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
@@ -441,6 +444,7 @@ export function renderServerView(
       properties: "server.properties",
       motd: "MOTD",
       gamerules: t("jatekszabalyok"),
+      schedules: t("utemezesek"),
     }[tab];
   }
 
@@ -501,6 +505,8 @@ export function renderServerView(
       renderSettings(content);
     } else if (activeTab === "properties") {
       renderPropertiesEditor(content, serverId);
+    } else if (activeTab === "schedules") {
+      renderSchedules(content, serverId);
     } else if (activeTab === "gamerules") {
       renderGameRules(content, serverId);
     } else if (activeTab === "motd") {

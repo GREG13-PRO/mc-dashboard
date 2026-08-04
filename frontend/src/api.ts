@@ -56,6 +56,7 @@ import type {
   ServerProperties,
   ServerMotd,
   GameRuleState,
+  Schedule,
 } from "./types";
 
 class ApiError extends Error {
@@ -779,6 +780,22 @@ export const api = {
       `/servers/${serverId}/gamerules/${encodeURIComponent(rule)}`,
       { method: "PUT", body: JSON.stringify({ value }) }
     );
+  },
+  async listSchedules(serverId: string): Promise<Schedule[]> {
+    const { schedules } = await request<{ schedules: Schedule[] }>(`/servers/${serverId}/schedules`);
+    return schedules;
+  },
+  async saveSchedule(serverId: string, schedule: Partial<Schedule>): Promise<Schedule> {
+    const saved = await request<{ schedule: Schedule }>(`/servers/${serverId}/schedules`, {
+      method: "PUT",
+      body: JSON.stringify(schedule),
+    });
+    return saved.schedule;
+  },
+  async deleteSchedule(serverId: string, scheduleId: string): Promise<void> {
+    await request(`/servers/${serverId}/schedules/${encodeURIComponent(scheduleId)}`, {
+      method: "DELETE",
+    });
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

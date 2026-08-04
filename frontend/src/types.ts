@@ -710,3 +710,22 @@ export interface GameRuleState {
   running: boolean;
   warning?: string;
 }
+
+export type ScheduleAction = "restart" | "start" | "stop" | "backup" | "snapshot" | "command";
+
+export interface Schedule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  action: ScheduleAction;
+  command: string;
+  kind: "daily" | "weekly" | "interval";
+  time: string;
+  days: number[];
+  intervalMinutes: number;
+  warnMinutes: number;
+  warnMessage: string;
+  createdAt: string;
+  lastRunAt: string | null;
+  lastResult: string | null;
+}

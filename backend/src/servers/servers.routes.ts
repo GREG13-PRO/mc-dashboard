@@ -5,6 +5,14 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { readProperties, writeProperties } from "./properties";
 import { readGameRules, setGameRule, GameRuleError } from "./gamerules";
+import {
+  listSchedules,
+  saveSchedule,
+  deleteSchedule,
+  deleteAllSchedules,
+  SCHEDULE_ACTIONS,
+  ScheduleError,
+} from "./schedules";
 import { RconError } from "./rcon";
 import {
   readMotd,
@@ -240,6 +248,9 @@ serversRouter.delete("/:id", requireAdmin, async (req, res) => {
   }
   try {
     serverRegistry.remove(req.params.id);
+    // Its schedules would otherwise sit in the data directory forever, keyed by
+    // an id nothing can look up any more.
+    await deleteAllSchedules(entry).catch(() => undefined);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
@@ -627,6 +638,40 @@ serversRouter.get("/:id/network", requirePermission("settings"), async (req, res
     alerts: connectionAlerts(entry.id),
     ips: await analyseIps(entry),
   });
+});
+
+
+serversRouter.get("/:id/schedules", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ schedules: await listSchedules(entry), actions: SCHEDULE_ACTIONS });
+});
+
+serversRouter.put("/:id/schedules", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const schedule = await saveSchedule(entry, req.body ?? {});
+    res.json({ schedule, schedules: await listSchedules(entry) });
+  } catch (err) {
+    res.status(err instanceof ScheduleError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.delete("/:id/schedules/:scheduleId", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  await deleteSchedule(entry, req.params.scheduleId);
+  res.json({ schedules: await listSchedules(entry) });
 });
 
 serversRouter.get("/:id/gamerules", requirePermission("settings"), async (req, res) => {

@@ -100,14 +100,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       <label for="f-rcon-password">RCON jelszó ${existing ? t("uresen_hagyva_nem_valtozik") : ""}</label>
       <input id="f-rcon-password" type="password" />
     </div>
-    <div class="field checkbox-row">
-      <input id="f-restart-enabled" type="checkbox" ${existing?.scheduledRestart.enabled ? "checked" : ""} />
-      <label for="f-restart-enabled" style="margin:0">${t("utemezett_napi_ujrainditas")}</label>
-    </div>
-    <div class="field">
-      <label for="f-restart-time">${t("idopont_ha_fut_a_szerver_akkor")}</label>
-      <input id="f-restart-time" type="time" value="${existing?.scheduledRestart.time ?? "04:00"}" />
-    </div>
+    <p class="finding-advice" style="margin:0 0 12px;">${t("utemezett_ujrainditas_athelyezve")}</p>
     <div class="field checkbox-row">
       <input id="f-crash-enabled" type="checkbox" ${existing?.crashRestart?.enabled ? "checked" : ""} />
       <label for="f-crash-enabled" style="margin:0">${t("automatikus_ujrainditas_osszeomlas_utan")}</label>
@@ -236,17 +229,11 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     const rconHost = form.querySelector<HTMLInputElement>("#f-rcon-host")!.value.trim();
     const rconPort = Number(form.querySelector<HTMLInputElement>("#f-rcon-port")!.value);
     const rconPassword = form.querySelector<HTMLInputElement>("#f-rcon-password")!.value;
-    const restartEnabled = form.querySelector<HTMLInputElement>("#f-restart-enabled")!.checked;
-    const restartTime = form.querySelector<HTMLInputElement>("#f-restart-time")!.value;
     const crashEnabled = form.querySelector<HTMLInputElement>("#f-crash-enabled")!.checked;
     const crashAttempts = Number(form.querySelector<HTMLInputElement>("#f-crash-attempts")!.value);
 
     if (!name || !folder || !startScript) {
       errorEl.textContent = t("nev_mappa_es_start_script_megadasa_kotelezo");
-      return;
-    }
-    if (restartEnabled && !restartTime) {
-      errorEl.textContent = t("add_meg_az_utemezett_ujrainditas_idopontjat");
       return;
     }
 
@@ -261,10 +248,6 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
         port: rconPort,
         // Left blank on edit -> backend keeps the previously stored password.
         password: rconPassword,
-      },
-      scheduledRestart: {
-        enabled: restartEnabled,
-        time: restartTime || "04:00",
       },
       crashRestart: {
         enabled: crashEnabled,
