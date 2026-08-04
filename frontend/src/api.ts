@@ -55,6 +55,7 @@ import type {
   UserPublic,
   ServerProperties,
   ServerMotd,
+  GameRuleState,
 } from "./types";
 
 class ApiError extends Error {
@@ -765,6 +766,19 @@ export const api = {
   },
   async deleteServerIcon(serverId: string): Promise<void> {
     await request(`/servers/${serverId}/icon`, { method: "DELETE" });
+  },
+  async getGameRules(serverId: string): Promise<GameRuleState> {
+    return request<GameRuleState>(`/servers/${serverId}/gamerules`);
+  },
+  async setGameRule(
+    serverId: string,
+    rule: string,
+    value: string
+  ): Promise<{ rule: string; value: string }> {
+    return request<{ rule: string; value: string }>(
+      `/servers/${serverId}/gamerules/${encodeURIComponent(rule)}`,
+      { method: "PUT", body: JSON.stringify({ value }) }
+    );
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

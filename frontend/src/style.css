@@ -2980,3 +2980,80 @@ table.file-table tr.file-row:hover {
   gap: var(--gap-sm);
   flex-wrap: wrap;
 }
+
+/* ------------------------------------------------------------- game rules */
+
+.gr-group {
+  margin-bottom: var(--gap-lg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.gr-group h4 {
+  padding: 9px var(--gap-md);
+  border-bottom: 0.5px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.gr-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  padding: 9px var(--gap-md);
+}
+
+.gr-row + .gr-row {
+  border-top: 0.5px solid var(--border);
+}
+
+/* A rule that is mid-flight is not a rule you should click again. */
+.gr-row.busy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.gr-label {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.gr-name {
+  font-size: 13px;
+}
+
+.gr-label code {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.gr-wiki {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-faint);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.gr-wiki:hover {
+  color: var(--accent);
+}
+
+.gr-control {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.gr-control input[type="number"] {
+  width: 110px;
+}

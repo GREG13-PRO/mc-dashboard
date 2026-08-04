@@ -37,8 +37,19 @@ const TAG_LONG_ARRAY = 12;
 
 class NbtReader {
   private offset = 0;
+  /** Name of a compound whose children's tag ids should be recorded, if any. */
+  private capture: string | null = null;
+  private captureDepth = 0;
+  private capturedTypes = new Map<string, number>();
 
-  constructor(private readonly buf: Buffer) {}
+  constructor(private readonly buf: Buffer, capture?: string) {
+    this.capture = capture ?? null;
+  }
+
+  /** Only meaningful after read(), and only for the captured compound. */
+  typesOf(): Map<string, number> {
+    return this.capturedTypes;
+  }
 
   private u8(): number {
     return this.buf.readUInt8(this.offset++);
@@ -107,7 +118,15 @@ class NbtReader {
           const t = this.u8();
           if (t === TAG_END) break;
           const name = this.str();
+          // Inside the captured compound, remember each child's tag id. The
+          // values on their own cannot tell a boolean from a number: a game
+          // rule stored as byte 0 and one stored as int 0 both arrive as 0,
+          // and the difference decides whether it gets a switch or a field.
+          if (this.captureDepth > 0) this.capturedTypes.set(name, t);
+          const entering = name === this.capture && t === TAG_COMPOUND;
+          if (entering) this.captureDepth++;
           out[name] = this.payload(t);
+          if (entering) this.captureDepth--;
         }
         return out;
       }
@@ -346,6 +365,16 @@ export async function readSpawn(levelDat: string): Promise<{ x: number; z: numbe
     const nbt = new NbtReader(raw[0] === 0x1f ? zlib.gunzipSync(raw) : raw).read();
     const data = nbt.Data as { [key: string]: NbtValue } | undefined;
     if (!data) return null;
+
+    // 1.21.9 replaced SpawnX/SpawnY/SpawnZ with a `spawn` compound holding an
+    // int array. Reading only the old keys meant every modern world opened the
+    // map at 0,0 instead of at its spawn.
+    const spawn = data.spawn as { [key: string]: NbtValue } | undefined;
+    const pos = spawn?.pos;
+    if (pos instanceof Int32Array && pos.length >= 3) {
+      return { x: pos[0], z: pos[2] };
+    }
+
     const x = data.SpawnX;
     const z = data.SpawnZ;
     if (typeof x !== "number" || typeof z !== "number") return null;
@@ -387,6 +416,72 @@ export async function readWorldInfo(levelDat: string): Promise<WorldInfo | null>
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Game rules out of level.dat.
+ *
+ * NBT stores every rule as a string, including the numeric ones - `randomTickSpeed`
+ * is "3", not 3 - so they come back as written and the caller decides what each
+ * one means. Synchronous because the callers already have the world folder and
+ * this is one small gzipped file.
+ */
+export interface RawGameRule {
+  /** Without the minecraft: prefix, which is also how the command takes it. */
+  name: string;
+  value: string;
+  type: "bool" | "int";
+}
+
+/**
+ * Game rules out of level.dat, as the file itself describes them.
+ *
+ * The names are read rather than assumed, because Minecraft renamed every one
+ * of them: through 1.21.8 they were a `GameRules` compound of camelCase keys
+ * with string values (`keepInventory` = "false"), and from 1.21.9 they are a
+ * `game_rules` compound of namespaced snake_case keys with typed values
+ * (`minecraft:keep_inventory` = byte 0). Some were also split or replaced -
+ * `doFireTick` is gone and `spawn_monsters` is new - so a hardcoded list would
+ * be wrong on one version or the other, and inventing entries for rules a
+ * server does not have is worse than showing fewer.
+ */
+export function readGameRules(levelDat: string): RawGameRule[] {
+  try {
+    const raw = fs.readFileSync(levelDat);
+    const reader = new NbtReader(raw[0] === 0x1f ? zlib.gunzipSync(raw) : raw, "game_rules");
+    const nbt = reader.read();
+    const data = nbt.Data as { [key: string]: NbtValue } | undefined;
+    if (!data) return [];
+
+    const modern = data.game_rules as { [key: string]: NbtValue } | undefined;
+    if (modern) {
+      const types = reader.typesOf();
+      return Object.entries(modern).map(([key, value]) => {
+        const bool = types.get(key) === TAG_BYTE;
+        return {
+          name: key.replace(/^minecraft:/, ""),
+          value: bool ? String(value === 1) : String(value),
+          type: bool ? ("bool" as const) : ("int" as const),
+        };
+      });
+    }
+
+    const legacy = data.GameRules as { [key: string]: NbtValue } | undefined;
+    if (legacy) {
+      // Everything is a string here, so the value is the only clue to the type.
+      return Object.entries(legacy)
+        .filter((pair): pair is [string, string] => typeof pair[1] === "string")
+        .map(([name, value]) => ({
+          name,
+          value,
+          type: value === "true" || value === "false" ? ("bool" as const) : ("int" as const),
+        }));
+    }
+    return [];
+  } catch {
+    // An unreadable level.dat is a world that has never been started.
+    return [];
   }
 }
 

@@ -694,3 +694,19 @@ export interface ServerMotd {
   /** Minecraft's own cap, sent rather than duplicated in the browser. */
   maxLength: number;
 }
+
+export interface GameRuleDef {
+  /** As the server itself names it, minecraft: prefix already stripped. */
+  name: string;
+  value: string;
+  type: "bool" | "int";
+  category: "world" | "players" | "mobs" | "drops" | "messages" | "misc";
+}
+
+export interface GameRuleState {
+  rules: GameRuleDef[];
+  /** Live over RCON, or the last state written to level.dat. */
+  source: "rcon" | "level.dat";
+  running: boolean;
+  warning?: string;
+}

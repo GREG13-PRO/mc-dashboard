@@ -4,6 +4,8 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { readProperties, writeProperties } from "./properties";
+import { readGameRules, setGameRule, GameRuleError } from "./gamerules";
+import { RconError } from "./rcon";
 import {
   readMotd,
   writeMotd,
@@ -625,6 +627,31 @@ serversRouter.get("/:id/network", requirePermission("settings"), async (req, res
     alerts: connectionAlerts(entry.id),
     ips: await analyseIps(entry),
   });
+});
+
+serversRouter.get("/:id/gamerules", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json(await readGameRules(entry));
+});
+
+serversRouter.put("/:id/gamerules/:rule", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const value = await setGameRule(entry, req.params.rule, String((req.body ?? {}).value ?? ""));
+    res.json({ rule: req.params.rule, value });
+  } catch (err) {
+    res
+      .status(err instanceof GameRuleError || err instanceof RconError ? 400 : 500)
+      .json({ error: (err as Error).message });
+  }
 });
 
 // 64x64 PNG is a few kilobytes; the cap is only here so a mistaken upload
