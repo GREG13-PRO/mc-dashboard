@@ -25,7 +25,13 @@ const backend = path.join(repo, "backend");
 const staging = path.join(desktop, "backend-bundle");
 
 function run(command, args, cwd) {
-  execFileSync(command, args, { cwd, stdio: "inherit" });
+  // A .cmd needs a shell on Windows. Node refuses to spawn one directly since
+  // the 2024 fix for CVE-2024-27980 - it throws EINVAL rather than running it -
+  // and a shell is the supported way through. Safe here because every argument
+  // below is a fixed literal: nothing user-supplied is being interpolated into
+  // a command line.
+  const shell = process.platform === "win32" && command.endsWith(".cmd");
+  execFileSync(command, args, { cwd, stdio: "inherit", shell });
 }
 
 /**
@@ -34,7 +40,8 @@ function run(command, args, cwd) {
  * On Windows the executable is npm.cmd; the extensionless `npm` is a shell
  * script that exists for Git Bash and that CreateProcess cannot run. Without
  * this, execFileSync fails with a bare ENOENT on `npm` - which reads like npm
- * is missing rather than like it is spelled differently here.
+ * is missing rather than like it is spelled differently here. See run() for
+ * why naming it correctly is still not quite enough.
  */
 const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 
