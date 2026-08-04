@@ -406,6 +406,37 @@ export interface SecurityFinding {
   title: string;
   detail: string;
   advice: string;
+  /** Set when the dashboard can make the repair itself. */
+  fix?: SecurityFixId;
+  /** Tab to open when the repair needs a person. */
+  goTo?: string;
+  /** ISO instant, null for permanent, undefined when not dismissed. */
+  dismissedUntil?: string | null;
+}
+
+export type SecurityFixId =
+  | "online-mode"
+  | "whitelist"
+  | "rcon-password"
+  | "command-blocks"
+  | "properties-perms"
+  | "backup";
+
+export interface SecurityFixPreview {
+  id: SecurityFixId;
+  changes: { label: string; from: string; to: string }[];
+  needsRestart: boolean;
+  /** Set only where applying the fix can lock real players out. */
+  danger?: string;
+}
+
+export interface SecurityDismissal {
+  findingId: string;
+  /** ISO instant, or null for permanent. */
+  until: string | null;
+  reason: string;
+  by: string | null;
+  at: string;
 }
 
 export interface SecurityReport {

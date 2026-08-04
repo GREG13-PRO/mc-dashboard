@@ -1114,10 +1114,16 @@ export function renderServerView(
     }
     if (disposed) return;
 
-    const counts = { critical: 0, warning: 0, info: 0 };
-    for (const f of report.findings) counts[f.severity]++;
+    // Dismissed findings are not counted and not mixed in with the live ones:
+    // the number at the top has to mean "things wanting attention", or it stops
+    // being read at all.
+    const active = report.findings.filter((f) => f.dismissedUntil === undefined);
+    const dismissed = report.findings.filter((f) => f.dismissedUntil !== undefined);
 
-    const rows = report.findings
+    const counts = { critical: 0, warning: 0, info: 0 };
+    for (const f of active) counts[f.severity]++;
+
+    const rows = active
       .map(
         (f) => `
         <div class="finding finding-${f.severity}">
@@ -1127,6 +1133,36 @@ export function renderServerView(
           </div>
           <p class="finding-detail">${escapeHtml(f.detail)}</p>
           <p class="finding-advice">${escapeHtml(f.advice)}</p>
+          <div class="finding-actions">
+            ${
+              f.fix
+                ? `<button class="btn btn-primary" data-fix="${escapeHtml(f.fix)}">${t("megoldas")}</button>`
+                : f.goTo
+                  ? `<button class="btn" data-goto="${escapeHtml(f.goTo)}">${t("odavisz")}</button>`
+                  : ""
+            }
+            <button class="btn" data-dismiss="${escapeHtml(f.id)}">${t("figyelmen_kivul_hagyas")}</button>
+          </div>
+        </div>`
+      )
+      .join("");
+
+    const dismissedRows = dismissed
+      .map(
+        (f) => `
+        <div class="finding finding-dismissed">
+          <div class="finding-head">
+            <span class="finding-badge">${t(`sev_${f.severity}`)}</span>
+            <strong>${escapeHtml(f.title)}</strong>
+          </div>
+          <p class="finding-detail">${
+            f.dismissedUntil === null
+              ? t("veglegesen_mellozve")
+              : `${t("mellozve_eddig")}: ${new Date(f.dismissedUntil!).toLocaleDateString()}`
+          }</p>
+          <div class="finding-actions">
+            <button class="btn" data-undismiss="${escapeHtml(f.id)}">${t("visszahozas")}</button>
+          </div>
         </div>`
       )
       .join("");
@@ -1160,10 +1196,12 @@ export function renderServerView(
             )
             .join("")}
         </div>
+        ${active.length === 0 ? `<div class="empty-state">${t("nincs_talalat_biztonsag")}</div>` : rows}
         ${
-          report.findings.length === 0
-            ? `<div class="empty-state">${t("nincs_talalat_biztonsag")}</div>`
-            : rows
+          dismissed.length === 0
+            ? ""
+            : `<h3 class="finding-section-title">${t("mellozott_leletek")} (${dismissed.length})</h3>
+               ${dismissedRows}`
         }
         ${
           report.loginsChecked
@@ -1176,6 +1214,122 @@ export function renderServerView(
         ${network ? renderNetwork(network) : ""}
       </div>
     `;
+
+    /**
+     * Shows the change before making it.
+     *
+     * Read fresh from the server rather than from the finding: the report may
+     * be a minute old, and a preview describing a value somebody has since
+     * changed by hand would be worse than none.
+     */
+    content.querySelectorAll<HTMLButtonElement>("[data-fix]").forEach((button) => {
+      button.onclick = async () => {
+        const fixId = button.dataset.fix!;
+        let preview;
+        try {
+          preview = await api.previewSecurityFix(serverId, fixId);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+          return;
+        }
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `
+          <h3>${t("megoldas")}</h3>
+          <div class="fix-changes">
+            ${preview.changes
+              .map(
+                (c) => `<div class="fix-change">
+                  <code>${escapeHtml(c.label)}</code>
+                  <span class="fix-from">${escapeHtml(c.from)}</span>
+                  <span class="fix-arrow">→</span>
+                  <strong>${escapeHtml(c.to)}</strong>
+                </div>`
+              )
+              .join("")}
+          </div>
+          ${preview.needsRestart ? `<p class="fix-note">${t("ujrainditas_utan_lep_eletbe")}</p>` : ""}
+          ${preview.danger ? `<p class="fix-danger">${escapeHtml(preview.danger)}</p>` : ""}
+          <div class="modal-actions">
+            <button class="btn" id="fix-cancel">${t("megse")}</button>
+            <button class="btn btn-primary" id="fix-go">${t("vegrehajtas")}</button>
+          </div>`;
+        const close = openModal(wrap);
+        wrap.querySelector<HTMLButtonElement>("#fix-cancel")!.onclick = () => close();
+        wrap.querySelector<HTMLButtonElement>("#fix-go")!.onclick = async () => {
+          const go = wrap.querySelector<HTMLButtonElement>("#fix-go")!;
+          go.disabled = true;
+          go.textContent = t("keszul");
+          try {
+            const { result } = await api.applySecurityFix(serverId, fixId);
+            close();
+            showToast(result);
+            void renderSecurity(content);
+          } catch (err) {
+            showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+            go.disabled = false;
+            go.textContent = t("vegrehajtas");
+          }
+        };
+      };
+    });
+
+    content.querySelectorAll<HTMLButtonElement>("[data-goto]").forEach((button) => {
+      button.onclick = () => goToTab(button.dataset.goto as Tab);
+    });
+
+    content.querySelectorAll<HTMLButtonElement>("[data-dismiss]").forEach((button) => {
+      button.onclick = () => {
+        const findingId = button.dataset.dismiss!;
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `
+          <h3>${t("figyelmen_kivul_hagyas")}</h3>
+          <p class="fix-note">${t("mellozes_leiras")}</p>
+          <div class="field">
+            <label for="dis-days">${t("meddig")}</label>
+            <select id="dis-days">
+              <option value="30">${t("harminc_nap")}</option>
+              <option value="90">${t("kilencven_nap")}</option>
+              <option value="">${t("veglegesen")}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="dis-reason">${t("indoklas")}</label>
+            <input id="dis-reason" placeholder="${t("pl_szandekos_cracked")}" />
+          </div>
+          <div class="modal-actions">
+            <button class="btn" id="dis-cancel">${t("megse")}</button>
+            <button class="btn btn-primary" id="dis-go">${t("figyelmen_kivul_hagyas")}</button>
+          </div>`;
+        const close = openModal(wrap);
+        wrap.querySelector<HTMLButtonElement>("#dis-cancel")!.onclick = () => close();
+        wrap.querySelector<HTMLButtonElement>("#dis-go")!.onclick = async () => {
+          const raw = wrap.querySelector<HTMLSelectElement>("#dis-days")!.value;
+          try {
+            await api.dismissFinding(
+              serverId,
+              findingId,
+              raw === "" ? null : Number(raw),
+              wrap.querySelector<HTMLInputElement>("#dis-reason")!.value
+            );
+            close();
+            void renderSecurity(content);
+          } catch (err) {
+            showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+          }
+        };
+      };
+    });
+
+    content.querySelectorAll<HTMLButtonElement>("[data-undismiss]").forEach((button) => {
+      button.onclick = async () => {
+        try {
+          await api.undismissFinding(serverId, button.dataset.undismiss!);
+          void renderSecurity(content);
+        } catch (err) {
+          showToast(err instanceof ApiError ? err.message : t("nem_sikerult"), "error");
+        }
+      };
+    });
 
     content.querySelector<HTMLButtonElement>("#guard-install")?.addEventListener("click", async () => {
       try {

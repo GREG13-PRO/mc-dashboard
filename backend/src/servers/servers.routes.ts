@@ -77,7 +77,15 @@ import {
   type Dimension,
 } from "./map-service";
 import { playerPositions } from "./map-players";
+import { recordAudit } from "../audit/audit-log";
 import { securityReport } from "./security";
+import { previewFix, applyFix, FixError, type FixId } from "./security-fixes";
+import {
+  dismiss,
+  undismiss,
+  listDismissals,
+  deleteAllDismissals,
+} from "./security-dismissals";
 import { connectionHistory, connectionAlerts } from "./connection-monitor";
 import { analyseIps } from "./ip-analysis";
 import { runLoadTest, LoadTestError } from "./load-test";
@@ -258,6 +266,7 @@ serversRouter.delete("/:id", requireAdmin, async (req, res) => {
     // Its schedules would otherwise sit in the data directory forever, keyed by
     // an id nothing can look up any more.
     await deleteAllSchedules(entry).catch(() => undefined);
+    await deleteAllDismissals(entry).catch(() => undefined);
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
@@ -1086,6 +1095,111 @@ serversRouter.delete("/:id/worlds/:name", requirePermission("settings"), async (
   } catch (err) {
     res.status(err instanceof WorldError ? 400 : 500).json({ error: (err as Error).message });
   }
+});
+
+/**
+ * What a fix would change. Separate from applying it because the whole design
+ * of this screen is that nothing is written before it has been shown.
+ */
+serversRouter.get("/:id/security/fix/:fixId", requirePermission("settings"), (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json(previewFix(entry, req.params.fixId as FixId));
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/security/fix/:fixId", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const result = await applyFix(entry, req.params.fixId as FixId);
+    recordAudit({
+      actor: req.user?.username ?? "?",
+      actorId: req.user?.id ?? null,
+      action: `Biztonsági javítás: ${req.params.fixId}`,
+      serverId: entry.id,
+      serverName: entry.name,
+      detail: result,
+      ip: req.ip ?? null,
+      ok: true,
+    });
+    res.json({ result, report: await securityReport(entry) });
+  } catch (err) {
+    res.status(err instanceof FixError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/security/dismissals", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  res.json({ dismissals: await listDismissals(entry) });
+});
+
+serversRouter.put("/:id/security/dismiss/:findingId", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const body = req.body ?? {};
+  // null means permanent; anything else has to be one of the offered windows,
+  // so a dismissal cannot be quietly set to a century.
+  const days = body.days === null ? null : Number(body.days);
+  if (days !== null && ![30, 90].includes(days)) {
+    res.status(400).json({ error: "days must be 30, 90 or null" });
+    return;
+  }
+  const record = await dismiss(
+    entry,
+    req.params.findingId,
+    days,
+    String(body.reason ?? ""),
+    req.user?.username ?? null
+  );
+  // Dismissing is a security decision, so it is logged like one.
+  recordAudit({
+    actor: req.user?.username ?? "?",
+    actorId: req.user?.id ?? null,
+    action: `Biztonsági lelet mellőzve: ${req.params.findingId}`,
+    serverId: entry.id,
+    serverName: entry.name,
+    detail: days === null ? `véglegesen — ${record.reason}` : `${days} napra — ${record.reason}`,
+    ip: req.ip ?? null,
+    ok: true,
+  });
+  res.json({ dismissal: record, report: await securityReport(entry) });
+});
+
+serversRouter.delete("/:id/security/dismiss/:findingId", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  await undismiss(entry, req.params.findingId);
+  recordAudit({
+    actor: req.user?.username ?? "?",
+    actorId: req.user?.id ?? null,
+    action: `Biztonsági lelet visszahozva: ${req.params.findingId}`,
+    serverId: entry.id,
+    serverName: entry.name,
+    detail: null,
+    ip: req.ip ?? null,
+    ok: true,
+  });
+  res.json({ report: await securityReport(entry) });
 });
 
 serversRouter.get("/:id/security", requirePermission("settings"), async (req, res) => {

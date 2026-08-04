@@ -59,6 +59,7 @@ import type {
   Schedule,
   ServerOverview,
   InstallDefaults,
+  SecurityFixPreview,
 } from "./types";
 
 class ApiError extends Error {
@@ -812,6 +813,35 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ code }),
     });
+  },
+  async previewSecurityFix(serverId: string, fixId: string): Promise<SecurityFixPreview> {
+    return request<SecurityFixPreview>(`/servers/${serverId}/security/fix/${fixId}`);
+  },
+  async applySecurityFix(
+    serverId: string,
+    fixId: string
+  ): Promise<{ result: string; report: SecurityReport }> {
+    return request<{ result: string; report: SecurityReport }>(
+      `/servers/${serverId}/security/fix/${fixId}`,
+      { method: "POST" }
+    );
+  },
+  async dismissFinding(
+    serverId: string,
+    findingId: string,
+    days: number | null,
+    reason: string
+  ): Promise<{ report: SecurityReport }> {
+    return request<{ report: SecurityReport }>(
+      `/servers/${serverId}/security/dismiss/${encodeURIComponent(findingId)}`,
+      { method: "PUT", body: JSON.stringify({ days, reason }) }
+    );
+  },
+  async undismissFinding(serverId: string, findingId: string): Promise<{ report: SecurityReport }> {
+    return request<{ report: SecurityReport }>(
+      `/servers/${serverId}/security/dismiss/${encodeURIComponent(findingId)}`,
+      { method: "DELETE" }
+    );
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

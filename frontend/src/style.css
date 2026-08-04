@@ -3393,3 +3393,80 @@ table.file-table tr.file-row:hover {
     border-radius: 0;
   }
 }
+
+/* ------------------------------------------------- security finding actions */
+
+.finding-actions {
+  display: flex;
+  gap: var(--gap-sm);
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* A dismissed finding is faded, not hidden: it is a decision somebody made,
+   and it has to stay findable to be reversible. */
+.finding-dismissed {
+  opacity: 0.6;
+  border-left-color: var(--border-strong);
+}
+
+.finding-section-title {
+  margin: 22px 0 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The preview is the point of the whole feature, so it is laid out as a
+   sentence - key, old value, arrow, new value - rather than as prose. */
+.fix-changes {
+  margin: var(--gap-sm) 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+
+.fix-change {
+  display: flex;
+  align-items: baseline;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+
+.fix-change + .fix-change {
+  margin-top: 6px;
+}
+
+.fix-change code {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.fix-from {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+.fix-arrow {
+  color: var(--text-faint);
+}
+
+.fix-note {
+  margin-top: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.fix-danger {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.45;
+}

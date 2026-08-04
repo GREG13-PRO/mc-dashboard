@@ -5,6 +5,8 @@ import path from "node:path";
 import { listBackups } from "./backup-manager";
 import { readProperties } from "./properties";
 import { readPluginManifest } from "./plugin-manager";
+import { dismissedUntil } from "./security-dismissals";
+import type { FixId } from "./security-fixes";
 import type { ServerEntry } from "../types";
 
 /**
@@ -28,6 +30,17 @@ export interface Finding {
   detail: string;
   /** One line on what to do about it. */
   advice: string;
+  /**
+   * Set when the dashboard can make the repair itself. Declared by the check
+   * rather than looked up by id, because the same id can mean different things:
+   * offline mode with no login plugin is fixable, offline mode guarded by
+   * AuthMe is a decision and flipping it would lock the server's players out.
+   */
+  fix?: FixId;
+  /** Tab to open when the repair needs a person. */
+  goTo?: string;
+  /** ISO instant, null for permanent, undefined when not dismissed. */
+  dismissedUntil?: string | null;
 }
 
 export interface SecurityReport {
@@ -93,6 +106,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
             detail: `A szerver nem ellenőrzi a Mojang-fiókot, és nem találtam proxy-továbbítást sem, viszont fut rajta a(z) ${loginPlugin}. Így egy név átvételéhez a jelszó kell - de a fiókok biztonsága innentől ezen a bővítményen és a játékosok jelszavain múlik.`,
             advice:
               "Tartsd frissen a bejelentkeztető bővítményt, és nézd meg, hogy az adminok jelszavai erősek-e.",
+            goTo: "plugins",
           }
         : {
             id: "online-mode",
@@ -102,6 +116,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
               "A szerver nem ellenőrzi a Mojang-fiókot, és nem találtam BungeeCord- vagy Velocity-továbbítást, sem bejelentkeztető bővítményt. Így bárki bejelentkezhet bármelyik játékos - köztük egy admin - nevében.",
             advice:
               "Kapcsold be az online-mode-ot, tedd proxy mögé, vagy tegyél fel bejelentkeztető bővítményt.",
+            fix: "online-mode",
           }
     );
   }
@@ -115,6 +130,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
       title: "Nyitott szerver whitelist nélkül",
       detail: "Az online-mode ki van kapcsolva, és a whitelist sincs bekapcsolva.",
       advice: "Amíg az online-mode ki van kapcsolva, a whitelist az egyetlen belépési korlát.",
+      fix: "whitelist",
     });
   }
 
@@ -127,6 +143,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
         title: "Az RCON jelszó üres",
         detail: "Az RCON be van kapcsolva, de nincs hozzá jelszó - aki eléri a portot, konzolparancsot futtathat.",
         advice: "Adj neki hosszú, véletlen jelszót, és frissítsd a szerver beállításait a dashboardban is.",
+        fix: "rcon-password",
       });
     } else if (password.length < 12) {
       findings.push({
@@ -135,6 +152,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
         title: "Rövid RCON jelszó",
         detail: `Az RCON jelszó ${password.length} karakter. Az RCON-nak nincs sebességkorlátja, tehát a rövid jelszó végigpróbálható.`,
         advice: "Legalább 16 karakteres véletlen jelszót használj.",
+        fix: "rcon-password",
       });
     }
     if (!props["server-ip"]) {
@@ -145,6 +163,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
         detail:
           "A server-ip üres, így az RCON-port nem csak a localhoston érhető el. A dashboardnak ehhez elég a localhost.",
         advice: "Zárd le az RCON-portot tűzfallal, vagy kösd a szervert 127.0.0.1-re, ha nem kell kívülről.",
+        goTo: "properties",
       });
     }
   }
@@ -157,6 +176,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
       detail:
         "Parancsblokkal az OP-jog gyakorlatilag továbbadható: aki elhelyezhet egyet, tetszőleges konzolparancsot futtathat.",
       advice: "Kapcsold ki, ha a szerver nem épít rá.",
+      fix: "command-blocks",
     });
   }
 
@@ -169,6 +189,7 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
         title: "A server.properties más felhasználók számára is olvasható",
         detail: `A fájl jogosultsága ${mode.toString(8)}, és RCON-jelszót tartalmaz. A gép minden felhasználója kiolvashatja.`,
         advice: "chmod 600 a server.properties fájlra.",
+        fix: "properties-perms",
       });
     }
   } catch {
@@ -200,6 +221,7 @@ function checkOps(entry: ServerEntry, findings: Finding[]): void {
       title: `${full.length} teljes jogú OP van a szerveren`,
       detail: `Level 4 OP: ${full.map((o) => o.name ?? "?").join(", ")}. Ezek bármilyen konzolparancsot futtathatnak, a stop és az op is beleértve.`,
       advice: "Vedd le az OP-t azokról, akiknek nem kell, és adj helyette LuckPerms-jogot.",
+      goTo: "files",
     });
   }
 }
@@ -213,6 +235,7 @@ async function checkBackups(entry: ServerEntry, findings: Finding[]): Promise<vo
       title: "Nincs egyetlen mentés sem",
       detail: "Ehhez a szerverhez nem készült mentés a dashboardból.",
       advice: "Készíts egyet a Beállítások fülön - kompromittálódás után ez az egyetlen tiszta visszaút.",
+      fix: "backup",
     });
     return;
   }
@@ -227,6 +250,7 @@ async function checkBackups(entry: ServerEntry, findings: Finding[]): Promise<vo
       title: `A legfrissebb mentés ${Math.round(days)} napos`,
       detail: "Egy régi mentésből való visszaállás sok munkát dob el.",
       advice: "Készíts friss mentést.",
+      fix: "backup",
     });
   }
 }
@@ -272,6 +296,7 @@ async function checkPlugins(entry: ServerEntry, findings: Finding[]): Promise<vo
       title: `${changed.length} plugin jar megváltozott a telepítése óta`,
       detail: `A dashboard telepítette, de a fájl tartalma már nem az, ami letöltéskor volt: ${changed.join(", ")}.`,
       advice: "Töltsd le újra a bővítményt a Bővítmények fülön, és nézd meg, ki és mikor írta felül.",
+      goTo: "plugins",
     });
   }
 
@@ -283,6 +308,7 @@ async function checkPlugins(entry: ServerEntry, findings: Finding[]): Promise<vo
       detail: `Nem a dashboardon keresztül kerültek a plugins mappába, így nincs róluk forrás: ${unknown.join(", ")}.`,
       advice:
         "Ahol van rá Modrinth- vagy Hangar-kiadás, telepítsd újra a Bővítmények fülről; a többinél ellenőrizd, honnan származik.",
+      goTo: "plugins",
     });
   }
 }
@@ -329,6 +355,7 @@ function checkLogins(entry: ServerEntry, findings: Finding[]): boolean {
       detail: roaming.map(([name, ips]) => `${name}: ${ips.size} cím`).join(", "),
       advice:
         "Mobilnetről ez normális. Ha admin-fiókról van szó és az online-mode ki van kapcsolva, érdemes utánanézni.",
+      goTo: "access",
     });
   }
 
@@ -340,6 +367,7 @@ function checkLogins(entry: ServerEntry, findings: Finding[]): boolean {
       title: `${shared.length} IP-címről négynél több különböző fiók lépett be`,
       detail: shared.map(([ip, names]) => `${ip}: ${[...names].join(", ")}`).join(" | "),
       advice: "Ez tipikusan alt-fiókos kikerülés egy ban után. Ellenőrizd, majd IP-t is tilthatsz.",
+      goTo: "access",
     });
   }
 
@@ -367,5 +395,12 @@ export async function securityReport(entry: ServerEntry): Promise<SecurityReport
   const loginsChecked = checkLogins(entry, findings);
 
   findings.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+
+  // Marked, not filtered. Which findings are hidden is the caller's decision,
+  // and an expired dismissal comes back on its own because this is re-read
+  // every time rather than cached.
+  for (const finding of findings) {
+    finding.dismissedUntil = await dismissedUntil(entry, finding.id);
+  }
   return { generatedAt: new Date().toISOString(), findings, loginsChecked };
 }
