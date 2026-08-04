@@ -1,6 +1,14 @@
 import { execFile } from "node:child_process";
 import { promises as fs, readFileSync } from "node:fs";
 import { promisify } from "node:util";
+import {
+  startDirect,
+  sendCommandDirect,
+  killDirect,
+  isRunningDirect,
+  runningIdsDirect,
+  pidsDirect,
+} from "./process-direct";
 import type { ResourceUsage, ServerEntry } from "../types";
 
 const execFileAsync = promisify(execFile);
@@ -42,6 +50,25 @@ export class ScreenNotInstalledError extends Error {
 
 let screenAvailabilityChecked = false;
 
+/**
+ * Whether this machine can run servers under screen.
+ *
+ * Decided once and cached: the answer cannot change while the process is
+ * running, and every start, stop and status check would otherwise spawn a
+ * `screen -v`.
+ */
+let screenAvailable: boolean | null = null;
+
+export async function hasScreen(): Promise<boolean> {
+  if (screenAvailable === null) {
+    screenAvailable = await execFileAsync("screen", ["-v"]).then(
+      () => true,
+      () => false
+    );
+  }
+  return screenAvailable;
+}
+
 export async function assertScreenInstalled(): Promise<void> {
   if (screenAvailabilityChecked) return;
   try {
@@ -59,6 +86,19 @@ export async function assertScreenInstalled(): Promise<void> {
  * returns just the name part after the dot.
  */
 export async function listScreenSessionNames(): Promise<Set<string>> {
+  // Callers use this to answer "which of these servers are up"; without screen
+  // the answer comes from the child processes this dashboard is holding, keyed
+  // by screen name so every caller keeps working unchanged.
+  if (!(await hasScreen())) {
+    const ids = runningIdsDirect();
+    const { serverRegistry } = await import("./registry");
+    return new Set(
+      serverRegistry
+        .list()
+        .filter((e) => ids.has(e.id))
+        .map((e) => e.screenName)
+    );
+  }
   const stdout = await rawScreenList();
   const names = new Set<string>();
   for (const match of stdout.matchAll(SCREEN_LIST_RE)) {
@@ -69,6 +109,16 @@ export async function listScreenSessionNames(): Promise<Set<string>> {
 
 /** Same as listScreenSessionNames, but keyed by name to the screen manager's own PID. */
 export async function listScreenPids(): Promise<Map<string, number>> {
+  if (!(await hasScreen())) {
+    const byId = pidsDirect();
+    const { serverRegistry } = await import("./registry");
+    const out = new Map<string, number>();
+    for (const entry of serverRegistry.list()) {
+      const pid = byId.get(entry.id);
+      if (pid !== undefined) out.set(entry.screenName, pid);
+    }
+    return out;
+  }
   const stdout = await rawScreenList();
   const pids = new Map<string, number>();
   for (const match of stdout.matchAll(SCREEN_LIST_RE)) {
@@ -78,6 +128,7 @@ export async function listScreenPids(): Promise<Map<string, number>> {
 }
 
 export async function isServerRunning(entry: ServerEntry): Promise<boolean> {
+  if (!(await hasScreen())) return isRunningDirect(entry);
   const names = await listScreenSessionNames();
   return names.has(entry.screenName);
 }
@@ -120,7 +171,8 @@ async function notify(event: string, message: string): Promise<void> {
 }
 
 export async function startServer(entry: ServerEntry): Promise<void> {
-  await assertScreenInstalled();
+  const useScreen = await hasScreen();
+  if (useScreen) await assertScreenInstalled();
   // Starting it is the clearest possible statement that it should be up.
   intentionallyStopped.delete(entry.id);
   if (await isServerRunning(entry)) {
@@ -143,6 +195,14 @@ export async function startServer(entry: ServerEntry): Promise<void> {
   // arrives, so the logfile - and the tailed console - stays near-real-time.
   // Stdin is unaffected: it still goes straight to the script/JVM on the left
   // of the pipe, so `sendCommand`'s `screen -X stuff` keeps working the same.
+  if (!useScreen) {
+    // No screen means the dashboard owns the process itself - see
+    // process-direct for what that costs and why it is right there.
+    startDirect(entry, logFile);
+    void notify("server.started", `${entry.name} elindult.`);
+    return;
+  }
+
   const command = `cd "${entry.folder}" && bash "${entry.startScript}" 2>&1 | tee "${logFile}"`;
   await execFileAsync(
     "screen",
@@ -161,6 +221,10 @@ export async function startServer(entry: ServerEntry): Promise<void> {
  * the console. Independent of whether a console-stream viewer is attached.
  */
 export async function sendCommand(entry: ServerEntry, command: string): Promise<void> {
+  if (!(await hasScreen())) {
+    sendCommandDirect(entry, command);
+    return;
+  }
   await execFileAsync("screen", ["-S", entry.screenName, "-X", "stuff", `${command}\n`]);
 }
 
@@ -180,9 +244,13 @@ export async function stopServer(entry: ServerEntry, timeoutMs = 30_000): Promis
     }
   }
 
-  // Graceful stop timed out - kill the whole screen session (and whatever
-  // process tree it holds) rather than leaving it to fight a restart loop.
-  await execFileAsync("screen", ["-S", entry.screenName, "-X", "quit"]).catch(() => undefined);
+  // Graceful stop timed out - kill the whole process tree rather than leaving
+  // it to fight a restart loop.
+  if (await hasScreen()) {
+    await execFileAsync("screen", ["-S", entry.screenName, "-X", "quit"]).catch(() => undefined);
+  } else {
+    await killDirect(entry);
+  }
   void notify("server.stopped", `${entry.name} leállt (a türelmi idő letelte után kilőve).`);
 }
 
@@ -200,6 +268,10 @@ export async function restartServer(entry: ServerEntry): Promise<void> {
 export async function killServer(entry: ServerEntry): Promise<void> {
   markIntentionalStop(entry.id);
   if (!(await isServerRunning(entry))) {
+    return;
+  }
+  if (!(await hasScreen())) {
+    await killDirect(entry);
     return;
   }
   await execFileAsync("screen", ["-S", entry.screenName, "-X", "quit"]).catch(() => undefined);
