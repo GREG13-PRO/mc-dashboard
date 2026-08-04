@@ -1,4 +1,10 @@
-/* macOS (Sonoma/Sequoia) design language.
+/* Dark-first dashboard skin: near-black with a violet cast, violet accent,
+ * cards on a tinted field. The light theme is the same system inverted rather
+ * than a different one, so a screen designed in either reads correctly in both.
+ *
+ * Only token values changed from the previous macOS palette; every variable
+ * name is the same, which is what lets the whole app re-skin without touching
+ * a single component.
  *
  * Themes are driven two ways: prefers-color-scheme is the default so the app
  * follows the system live, and :root[data-theme] overrides it when the user
@@ -9,36 +15,36 @@
 :root {
   color-scheme: light dark;
 
-  /* Neutral greys, per macOS system backgrounds. */
-  --bg: #f5f5f7;
-  --bg-elevated: rgba(255, 255, 255, 0.72);
+  /* Field, panels and insets. */
+  --bg: #f7f5fb;
+  --bg-elevated: rgba(255, 255, 255, 0.82);
   --bg-card: #ffffff;
-  --bg-hover: rgba(0, 0, 0, 0.045);
-  --bg-inset: #ececee;
+  --bg-hover: rgba(139, 61, 255, 0.06);
+  --bg-inset: #efeaf7;
 
-  --border: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.16);
+  --border: rgba(70, 35, 115, 0.12);
+  --border-strong: rgba(70, 35, 115, 0.22);
 
-  --text: #1d1d1f;
-  --text-dim: #6e6e73;
-  --text-faint: #8e8e93;
+  --text: #1d1526;
+  --text-dim: #6b5f7d;
+  --text-faint: #8d82a0;
 
-  /* System blue. */
-  --accent: #007aff;
-  --accent-hover: #0a84ff;
-  --accent-press: #0062cc;
-  --accent-dim: rgba(0, 122, 255, 0.12);
-  --accent-glow: rgba(0, 122, 255, 0.28);
+  /* Violet accent. */
+  --accent: #8b3dff;
+  --accent-hover: #7a2ceb;
+  --accent-press: #6a1fd6;
+  --accent-dim: rgba(139, 61, 255, 0.1);
+  --accent-glow: rgba(139, 61, 255, 0.3);
   --on-accent: #ffffff;
 
-  --green: #34c759;
-  --red: #ff3b30;
-  --yellow: #ff9f0a;
+  --green: #16a34a;
+  --red: #dc2626;
+  --yellow: #d97706;
 
   /* Soft layered shadows rather than one hard drop. */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 2px rgba(45, 20, 80, 0.06), 0 0 0 0.5px rgba(45, 20, 80, 0.04);
+  --shadow-md: 0 6px 20px rgba(45, 20, 80, 0.1), 0 0 0 0.5px rgba(45, 20, 80, 0.05);
+  --shadow-lg: 0 18px 56px rgba(45, 20, 80, 0.16), 0 0 0 0.5px rgba(45, 20, 80, 0.06);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -57,8 +63,8 @@
   --dur: 200ms;
   --dur-slow: 250ms;
 
-  --sidebar-tint: rgba(246, 246, 248, 0.7);
-  --toolbar-tint: rgba(246, 246, 248, 0.72);
+  --sidebar-tint: rgba(248, 245, 253, 0.78);
+  --toolbar-tint: rgba(248, 245, 253, 0.76);
 
   /* Console ANSI palette, darkened for a light background. */
   --ansi-0: #4b5058;
@@ -88,29 +94,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1e1e1e;
-    --bg-elevated: rgba(40, 40, 42, 0.72);
-    --bg-card: #2a2a2c;
-    --bg-hover: rgba(255, 255, 255, 0.06);
-    --bg-inset: #171718;
-    --border: rgba(255, 255, 255, 0.1);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --text: #f5f5f7;
-    --text-dim: #98989d;
-    --text-faint: #7c7c81;
-    --accent: #0a84ff;
-    --accent-hover: #409cff;
-    --accent-press: #0060df;
-    --accent-dim: rgba(10, 132, 255, 0.2);
-    --accent-glow: rgba(10, 132, 255, 0.35);
-    --green: #30d158;
-    --red: #ff453a;
-    --yellow: #ffd60a;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.6);
-    --sidebar-tint: rgba(30, 30, 32, 0.68);
-    --toolbar-tint: rgba(30, 30, 32, 0.72);
+    --bg: #0a0710;
+    --bg-elevated: rgba(23, 18, 30, 0.78);
+    --bg-card: #14101b;
+    --bg-hover: rgba(168, 85, 247, 0.09);
+    --bg-inset: #0f0b16;
+    --border: rgba(168, 85, 247, 0.14);
+    --border-strong: rgba(168, 85, 247, 0.28);
+    --text: #f3effb;
+    --text-dim: #a89bbd;
+    --text-faint: #7b6f92;
+    --accent: #a855f7;
+    --accent-hover: #bb7bff;
+    --accent-press: #8b3dff;
+    --accent-dim: rgba(168, 85, 247, 0.16);
+    --accent-glow: rgba(168, 85, 247, 0.42);
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.55);
+    --shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.7);
+    --sidebar-tint: rgba(12, 8, 17, 0.82);
+    --toolbar-tint: rgba(12, 8, 17, 0.72);
 
     /* Console ANSI palette (dark terminal tuning). */
     --ansi-0: #5c6370;
@@ -134,29 +140,29 @@
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f5f5f7;
-  --bg-elevated: rgba(255, 255, 255, 0.72);
+  --bg: #f7f5fb;
+  --bg-elevated: rgba(255, 255, 255, 0.82);
   --bg-card: #ffffff;
-  --bg-hover: rgba(0, 0, 0, 0.045);
-  --bg-inset: #ececee;
-  --border: rgba(0, 0, 0, 0.1);
-  --border-strong: rgba(0, 0, 0, 0.16);
-  --text: #1d1d1f;
-  --text-dim: #6e6e73;
-  --text-faint: #8e8e93;
-  --accent: #007aff;
-  --accent-hover: #0a84ff;
-  --accent-press: #0062cc;
-  --accent-dim: rgba(0, 122, 255, 0.12);
-  --accent-glow: rgba(0, 122, 255, 0.28);
-  --green: #34c759;
-  --red: #ff3b30;
-  --yellow: #ff9f0a;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
-  --sidebar-tint: rgba(246, 246, 248, 0.7);
-  --toolbar-tint: rgba(246, 246, 248, 0.72);
+  --bg-hover: rgba(139, 61, 255, 0.06);
+  --bg-inset: #efeaf7;
+  --border: rgba(70, 35, 115, 0.12);
+  --border-strong: rgba(70, 35, 115, 0.22);
+  --text: #1d1526;
+  --text-dim: #6b5f7d;
+  --text-faint: #8d82a0;
+  --accent: #8b3dff;
+  --accent-hover: #7a2ceb;
+  --accent-press: #6a1fd6;
+  --accent-dim: rgba(139, 61, 255, 0.1);
+  --accent-glow: rgba(139, 61, 255, 0.3);
+  --green: #16a34a;
+  --red: #dc2626;
+  --yellow: #d97706;
+  --shadow-sm: 0 1px 2px rgba(45, 20, 80, 0.06), 0 0 0 0.5px rgba(45, 20, 80, 0.04);
+  --shadow-md: 0 6px 20px rgba(45, 20, 80, 0.1), 0 0 0 0.5px rgba(45, 20, 80, 0.05);
+  --shadow-lg: 0 18px 56px rgba(45, 20, 80, 0.16), 0 0 0 0.5px rgba(45, 20, 80, 0.06);
+  --sidebar-tint: rgba(248, 245, 253, 0.78);
+  --toolbar-tint: rgba(248, 245, 253, 0.76);
 
   /* Console ANSI palette, darkened for a light background. */
   --ansi-0: #4b5058;
@@ -179,29 +185,29 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1e1e1e;
-  --bg-elevated: rgba(40, 40, 42, 0.72);
-  --bg-card: #2a2a2c;
-  --bg-hover: rgba(255, 255, 255, 0.06);
-  --bg-inset: #171718;
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --text: #f5f5f7;
-  --text-dim: #98989d;
-  --text-faint: #7c7c81;
-  --accent: #0a84ff;
-  --accent-hover: #409cff;
-  --accent-press: #0060df;
-  --accent-dim: rgba(10, 132, 255, 0.2);
-  --accent-glow: rgba(10, 132, 255, 0.35);
-  --green: #30d158;
-  --red: #ff453a;
-  --yellow: #ffd60a;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.6);
-  --sidebar-tint: rgba(30, 30, 32, 0.68);
-  --toolbar-tint: rgba(30, 30, 32, 0.72);
+  --bg: #0a0710;
+  --bg-elevated: rgba(23, 18, 30, 0.78);
+  --bg-card: #14101b;
+  --bg-hover: rgba(168, 85, 247, 0.09);
+  --bg-inset: #0f0b16;
+  --border: rgba(168, 85, 247, 0.14);
+  --border-strong: rgba(168, 85, 247, 0.28);
+  --text: #f3effb;
+  --text-dim: #a89bbd;
+  --text-faint: #7b6f92;
+  --accent: #a855f7;
+  --accent-hover: #bb7bff;
+  --accent-press: #8b3dff;
+  --accent-dim: rgba(168, 85, 247, 0.16);
+  --accent-glow: rgba(168, 85, 247, 0.42);
+  --green: #34d399;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.7);
+  --sidebar-tint: rgba(12, 8, 17, 0.82);
+  --toolbar-tint: rgba(12, 8, 17, 0.72);
 
   /* Console ANSI palette (dark terminal tuning). */
   --ansi-0: #5c6370;
@@ -621,10 +627,20 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .main-content {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  /* A violet wash bleeding down from the top edge. Fixed attachment so it
+     stays put while a long page scrolls under it - a gradient that scrolls
+     away reads as a banner rather than as lighting. */
+  background-image: radial-gradient(
+    120% 60% at 50% -10%,
+    var(--accent-dim) 0%,
+    transparent 60%
+  );
+  background-attachment: fixed;
 }
 
 .empty-state {
@@ -1321,72 +1337,72 @@ table.file-table tr.file-row:hover {
 /* High contrast drops the translucency and the low-opacity borders that make
  * the macOS look, because those are exactly what is hard to see. */
 :root[data-contrast="high"] {
-  --bg: #ffffff;
-  --bg-elevated: #ffffff;
-  --bg-card: #ffffff;
-  --bg-hover: #e0e0e0;
-  --bg-inset: #f0f0f0;
-  --border: #000000;
-  --border-strong: #000000;
-  --text: #000000;
-  --text-dim: #303030;
-  --text-faint: #454545;
-  --accent: #0040c0;
-  --accent-hover: #0030a0;
-  --accent-press: #002080;
-  --accent-dim: #cfe0ff;
-  --green: #006020;
-  --red: #b00010;
-  --yellow: #6b4a00;
-  --sidebar-tint: #ffffff;
-  --toolbar-tint: #ffffff;
-  --shadow-sm: none;
-  --shadow-md: 0 0 0 1px #000;
-  --shadow-lg: 0 0 0 2px #000;
+  --bg: #0a0710;
+  --bg-elevated: rgba(23, 18, 30, 0.78);
+  --bg-card: #14101b;
+  --bg-hover: rgba(168, 85, 247, 0.09);
+  --bg-inset: #0f0b16;
+  --border: rgba(168, 85, 247, 0.14);
+  --border-strong: rgba(168, 85, 247, 0.28);
+  --text: #f3effb;
+  --text-dim: #a89bbd;
+  --text-faint: #7b6f92;
+  --accent: #a855f7;
+  --accent-hover: #bb7bff;
+  --accent-press: #8b3dff;
+  --accent-dim: rgba(168, 85, 247, 0.16);
+  --green: #34d399;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --sidebar-tint: rgba(12, 8, 17, 0.82);
+  --toolbar-tint: rgba(12, 8, 17, 0.72);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 18px 56px rgba(0, 0, 0, 0.7);
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-contrast="high"]:not([data-theme="light"]) {
-    --bg: #000000;
-    --bg-elevated: #000000;
-    --bg-card: #000000;
-    --bg-hover: #303030;
-    --bg-inset: #101010;
-    --border: #ffffff;
-    --border-strong: #ffffff;
-    --text: #ffffff;
-    --text-dim: #dcdcdc;
-    --text-faint: #c0c0c0;
-    --accent: #6fb0ff;
-    --accent-hover: #94c6ff;
-    --accent-dim: #002a5c;
-    --green: #4cff88;
-    --red: #ff7a70;
-    --yellow: #ffd84d;
-    --sidebar-tint: #000000;
-    --toolbar-tint: #000000;
+    --bg: #0a0710;
+    --bg-elevated: rgba(23, 18, 30, 0.78);
+    --bg-card: #14101b;
+    --bg-hover: rgba(168, 85, 247, 0.09);
+    --bg-inset: #0f0b16;
+    --border: rgba(168, 85, 247, 0.14);
+    --border-strong: rgba(168, 85, 247, 0.28);
+    --text: #f3effb;
+    --text-dim: #a89bbd;
+    --text-faint: #7b6f92;
+    --accent: #a855f7;
+    --accent-hover: #bb7bff;
+    --accent-dim: rgba(168, 85, 247, 0.16);
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --sidebar-tint: rgba(12, 8, 17, 0.82);
+    --toolbar-tint: rgba(12, 8, 17, 0.72);
   }
 }
 
 :root[data-contrast="high"][data-theme="dark"] {
-  --bg: #000000;
-  --bg-elevated: #000000;
-  --bg-card: #000000;
-  --bg-hover: #303030;
-  --bg-inset: #101010;
-  --border: #ffffff;
-  --border-strong: #ffffff;
-  --text: #ffffff;
-  --text-dim: #dcdcdc;
-  --text-faint: #c0c0c0;
-  --accent: #6fb0ff;
-  --accent-hover: #94c6ff;
-  --accent-dim: #002a5c;
-  --green: #4cff88;
-  --red: #ff7a70;
-  --yellow: #ffd84d;
-  --sidebar-tint: #000000;
-  --toolbar-tint: #000000;
+  --bg: #0a0710;
+  --bg-elevated: rgba(23, 18, 30, 0.78);
+  --bg-card: #14101b;
+  --bg-hover: rgba(168, 85, 247, 0.09);
+  --bg-inset: #0f0b16;
+  --border: rgba(168, 85, 247, 0.14);
+  --border-strong: rgba(168, 85, 247, 0.28);
+  --text: #f3effb;
+  --text-dim: #a89bbd;
+  --text-faint: #7b6f92;
+  --accent: #a855f7;
+  --accent-hover: #bb7bff;
+  --accent-dim: rgba(168, 85, 247, 0.16);
+  --green: #34d399;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --sidebar-tint: rgba(12, 8, 17, 0.82);
+  --toolbar-tint: rgba(12, 8, 17, 0.72);
 }
 
 /* Blur over a solid background is just a blur - drop it so the contrast the
