@@ -1517,7 +1517,7 @@ table.file-table tr.file-row:hover {
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(6px) scale(0.99);
+    transform: translateY(10px) scale(0.96);
   }
   to {
     opacity: 1;
@@ -1561,7 +1561,13 @@ table.file-table tr.file-row:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
+  /* The pseudo-element selectors are not decoration. `*` matches elements and
+     not ::before / ::after, so without them the pulsing ring on a running
+     server's status dot - which is drawn entirely in ::after - kept animating
+     at full speed with the setting on. Measured: 2000ms, unaffected. */
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -2598,14 +2604,46 @@ table.file-table tr.file-row:hover {
   box-shadow: none;
 }
 
+/* Direction matters: content arriving from the side you came from says which
+   way you moved, where a fade says only that something changed. */
 .tab-content > * {
   animation: tab-content-in 180ms var(--ease);
+}
+
+.tab-content[data-dir="fwd"] > * {
+  animation-name: tab-in-fwd;
+}
+
+.tab-content[data-dir="back"] > * {
+  animation-name: tab-in-back;
 }
 
 @keyframes tab-content-in {
   from {
     opacity: 0;
     transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tab-in-fwd {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tab-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
   }
   to {
     opacity: 1;
@@ -3605,4 +3643,120 @@ table.file-table tr.file-row:hover {
     -webkit-backdrop-filter: none;
     box-shadow: var(--shadow-md);
   }
+}
+
+/* ============================================================== animations */
+
+/*
+ * Everything here moves transform and opacity only. Those are the two
+ * properties a browser can animate on the compositor without laying the page
+ * out again, which is what keeps a list of forty rows from stuttering.
+ *
+ * All of it sits under the prefers-reduced-motion block near the top of this
+ * file, which zeroes every duration in one rule. The two animations driven from
+ * JavaScript - the counting numbers and the list stagger - check the same
+ * setting themselves, because a media query cannot stop a script.
+ */
+
+/* Rows arriving. The delay is set per row from JS, so a list comes in as a
+   sequence rather than all at once. */
+.enter {
+  animation: row-enter 260ms var(--ease) both;
+  animation-delay: var(--enter-delay, 0ms);
+}
+
+@keyframes row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Closing plays the entrance backwards. The panel is removed only after this
+   finishes - see components/Modal.ts - because an element removed on click
+   cannot animate its own exit. */
+.modal-overlay.closing {
+  animation: fade-out 140ms var(--ease) forwards;
+}
+
+.modal-overlay.closing .modal-panel {
+  animation: sink-out 140ms var(--ease) forwards;
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sink-out {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+
+/* A switch is a physical thing being thrown, so the thumb overshoots slightly
+   and settles rather than sliding at a constant rate. */
+.switch-thumb {
+  transition: transform var(--dur-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Press feedback. Small enough to feel rather than to watch. */
+.btn:active:not(:disabled),
+.segment:active,
+.sc-day:active,
+.motd-swatch:active {
+  transform: scale(0.97);
+}
+
+.btn {
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    transform 90ms var(--ease);
+}
+
+/* The primary button carries a light that sweeps once on press - the one place
+   worth a flourish, because it is the button that commits something. */
+.btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.35) 50%, transparent 80%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.btn-primary:active:not(:disabled)::after {
+  animation: sweep 520ms var(--ease);
+}
+
+@keyframes sweep {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* Rows that can be acted on lift very slightly, so the pointer has somewhere
+   to land rather than only a colour change. */
+.finding,
+.sc-card,
+.ov-card {
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.finding:hover,
+.sc-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }

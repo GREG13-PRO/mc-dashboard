@@ -24,6 +24,7 @@ import {
 import { icon } from "../lib/icons";
 import { logoMark } from "../lib/logo";
 import { escapeHtml } from "../lib/escape";
+import { staggerIn } from "../lib/motion";
 import type { LocaleKey } from "../lib/i18n";
 import type { ServerWithStatus } from "../types";
 
@@ -67,6 +68,12 @@ function parseServerIdFromHash(): string | null {
 
 export function renderDashboard(root: HTMLElement, onLogout: () => void): () => void {
   let servers: ServerWithStatus[] = [];
+  /**
+   * Which server rows have already been on screen. The list rewrites itself
+   * every five seconds; without this it would replay its entrance animation on
+   * a timer, which is unreadable. Only a genuinely new server moves.
+   */
+  const seenServers = new Set<string>();
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let disposeServerView: (() => void) | null = null;
 
@@ -360,6 +367,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       .join("");
 
     const cards = [...listEl.querySelectorAll<HTMLDivElement>(".server-card")];
+    staggerIn(cards, seenServers, (el) => el.dataset.id ?? "");
     cards.forEach((card, index) => {
       const open = () => {
         location.hash = `#/server/${encodeURIComponent(card.dataset.id!)}`;

@@ -3,6 +3,7 @@ import { escapeHtml } from "../lib/escape";
 import { t } from "../lib/i18n";
 import { icon } from "../lib/icons";
 import { sparklineSvg } from "./Sparkline";
+import { countUp } from "../lib/motion";
 import type { ServerOverview } from "../types";
 
 /**
@@ -69,6 +70,15 @@ function card(iconName: string, title: string, body: string, extraClass = ""): s
 export function renderOverview(root: HTMLElement, serverId: string): () => void {
   let timer: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
+  /**
+   * The previous reading of each big figure.
+   *
+   * The card is redrawn whole every five seconds, so without remembering the
+   * old value there is nothing to count from. A CPU number jumping 3 -> 47 -> 5
+   * reads as flicker; the same values walked over a third of a second read as a
+   * measurement moving.
+   */
+  const lastBig = new Map<string, number>();
 
   function draw(data: ServerOverview) {
     const cpuSeries = data.history.map((s) => s.cpuPercent);
@@ -87,14 +97,14 @@ export function renderOverview(root: HTMLElement, serverId: string): () => void 
         ${card(
           "gauge",
           "CPU",
-          `<div class="ov-big">${data.resources ? `${data.resources.cpuPercent.toFixed(0)}%` : "—"}</div>
+          `<div class="ov-big" data-big="cpu">${data.resources ? `${data.resources.cpuPercent.toFixed(0)}%` : "—"}</div>
            ${sparklineSvg({ values: cpuSeries, color: accent, width: 300, height: 52 })}
            <p class="ov-note">${t("utolso_5_perc")}</p>`
         )}
         ${card(
           "server",
           t("memoria"),
-          `<div class="ov-big">${data.resources ? mb(data.resources.memoryMb) : "—"}</div>
+          `<div class="ov-big" data-big="mem">${data.resources ? mb(data.resources.memoryMb) : "—"}</div>
            ${sparklineSvg({ values: memSeries, color: yellow, width: 300, height: 52 })}
            <p class="ov-note">${t("utolso_5_perc")}</p>`
         )}
@@ -201,6 +211,21 @@ export function renderOverview(root: HTMLElement, serverId: string): () => void 
         )}
       </div>
     `;
+
+    // Walked, not snapped. Only the two that move continuously - the player
+    // count steps in whole players and reads better changing outright.
+    const walk = (key: string, value: number | null, format: (n: number) => string) => {
+      const el = root.querySelector<HTMLElement>(`[data-big="${key}"]`);
+      if (!el || value === null) {
+        lastBig.delete(key);
+        return;
+      }
+      const from = lastBig.get(key);
+      if (from !== undefined) countUp(el, from, value, format);
+      lastBig.set(key, value);
+    };
+    walk("cpu", data.resources?.cpuPercent ?? null, (n) => `${n.toFixed(0)}%`);
+    walk("mem", data.resources?.memoryMb ?? null, (n) => mb(Math.round(n)));
   }
 
   async function load() {

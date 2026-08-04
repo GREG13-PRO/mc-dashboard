@@ -106,6 +106,8 @@ export function renderServerView(
   // The LuckPerms tab is additionally hidden unless the plugin is actually
   // installed, which is only known after the first load - see refreshLuckPerms.
   let luckPermsInstalled = false;
+  /** Set by goToTab, read once by the render that follows it. */
+  let tabDirection: "fwd" | "back" | null = null;
   const capabilityFor = (tab: Tab) =>
     tab === "plugins" || tab === "content" || tab === "schematics"
       ? "files"
@@ -300,6 +302,9 @@ export function renderServerView(
      */
     goToTab = (tab: Tab) => {
       if (tab === activeTab) return;
+      // Which way the content should come in from. ALL_TABS is the order the
+      // tabs are laid out in, so its indices are the direction the eye moved.
+      tabDirection = ALL_TABS.indexOf(tab) > ALL_TABS.indexOf(activeTab) ? "fwd" : "back";
       const previousGroup = currentGroupTabs();
       teardownConsole();
       mapHandle?.destroy();
@@ -478,6 +483,13 @@ export function renderServerView(
   function renderTabContent() {
     disposeTab?.();
     disposeTab = null;
+
+    const content0 = root.querySelector<HTMLDivElement>("#tab-content");
+    if (content0) {
+      if (tabDirection) content0.dataset.dir = tabDirection;
+      else delete content0.dataset.dir;
+      tabDirection = null;
+    }
 
     const content = root.querySelector<HTMLDivElement>("#tab-content")!;
     if (activeTab === "console") {

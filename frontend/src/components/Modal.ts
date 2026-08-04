@@ -1,4 +1,5 @@
 import { t } from "../lib/i18n";
+import { prefersReducedMotion } from "../lib/motion";
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -17,10 +18,26 @@ export function openModal(content: HTMLElement): () => void {
   // closing a dialog drops the caret back at the top of the document.
   const previouslyFocused = document.activeElement as HTMLElement | null;
 
+  let closing = false;
   const close = () => {
-    overlay.remove();
+    // An element removed on click never gets to animate its exit, so the
+    // removal waits for the animation. Guarded because a second Escape while it
+    // plays would otherwise queue another removal.
+    if (closing) return;
+    closing = true;
     document.removeEventListener("keydown", onKeydown, true);
     previouslyFocused?.focus?.();
+    if (prefersReducedMotion()) {
+      overlay.remove();
+      return;
+    }
+    overlay.classList.add("closing");
+    // The timeout is the safety net: animationend does not fire if the element
+    // is hidden or the animation is skipped, and a dialog that never leaves is
+    // worse than one that leaves abruptly.
+    const done = () => overlay.remove();
+    overlay.addEventListener("animationend", done, { once: true });
+    setTimeout(done, 260);
   };
 
   const onKeydown = (e: KeyboardEvent) => {
