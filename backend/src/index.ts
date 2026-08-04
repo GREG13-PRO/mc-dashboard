@@ -15,14 +15,18 @@ import { startConnectionMonitor } from "./servers/connection-monitor";
 import { startReleaseWatcher } from "./app-dist/github-sync";
 import { startTimeMachine } from "./servers/world-timeline";
 import { startStatsCollector } from "./servers/stats";
-import { assertScreenInstalled } from "./servers/process-manager";
+import { hasScreen } from "./servers/process-manager";
 
 async function main() {
-  try {
-    await assertScreenInstalled();
-  } catch (err) {
-    console.error((err as Error).message);
-    process.exit(1);
+  // Refusing to start without screen was right when screen was the only way to
+  // run a server. There is now a second way - the dashboard owning the process
+  // itself - which is what the desktop app uses on Windows, where screen does
+  // not exist at all. Absence is reported and carried on with rather than being
+  // fatal.
+  if (!(await hasScreen())) {
+    console.log(
+      "A 'screen' nincs telepítve - a szervereket ez a dashboard sajat gyermekfolyamatkent inditja."
+    );
   }
 
   const app = express();
@@ -51,7 +55,7 @@ async function main() {
   startTimeMachine();
   startStatsCollector();
 
-  httpServer.listen(env.port, () => {
+  httpServer.listen(env.port, env.host, () => {
     console.log(`mc-dashboard listening on http://localhost:${env.port}`);
   });
 }

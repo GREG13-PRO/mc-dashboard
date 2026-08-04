@@ -1,14 +1,15 @@
 {
   "name": "mc-dashboard-desktop",
   "private": true,
-  "version": "2.38.0",
-  "description": "Minecraft Dashboard asztali alkalmazás",
+  "version": "2.39.0",
+  "description": "Minecraft Dashboard asztali alkalmaz\u00e1s",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "dist": "electron-builder --mac --win"
+    "dist:mac": "npm run prepare:backend && electron-builder --mac",
+    "dist:win": "npm run prepare:backend && electron-builder --win",
+    "dist": "electron-builder --mac --win",
+    "prepare:backend": "node scripts/prepare-backend.js"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -25,7 +26,8 @@
       "profiles.js",
       "monitor.js",
       "updater.js",
-      "build/icon.*"
+      "build/icon.*",
+      "local-server.js"
     ],
     "directories": {
       "output": "release"
@@ -56,6 +58,12 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false
-    }
+    },
+    "extraResources": [
+      {
+        "from": "backend-bundle",
+        "to": "backend"
+      }
+    ]
   }
 }

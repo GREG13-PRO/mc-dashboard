@@ -165,11 +165,82 @@
       .status.ok {
         color: var(--green);
       }
+      /* The two answers on the first screen. Buttons rather than links: they
+         do something rather than go somewhere. */
+      .choice {
+        display: block;
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 14px;
+        text-align: left;
+        border: 0.5px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg-card);
+        color: var(--text);
+        cursor: pointer;
+        transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+      }
+
+      .choice:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-lg);
+      }
+
+      .choice strong {
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      .choice span {
+        color: var(--text-dim);
+        font-size: 12px;
+      }
+
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .row input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .secondary {
+        width: auto;
+        flex: 0 0 auto;
+        padding: 0 12px;
+        background: var(--bg-inset);
+        color: var(--text);
+      }
+
+      .link {
+        margin-top: 8px;
+        background: none;
+        color: var(--text-dim);
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
-    <div class="card">
+    <!-- Three screens in one file: the choice, and one form for each answer.
+         Separate windows would mean three of everything for a decision that is
+         made once. -->
+    <div class="card" id="screen-choose">
       <h1>Minecraft Dashboard</h1>
+      <p class="sub">Mit szeretnél?</p>
+      <button class="choice" id="pick-existing">
+        <strong>Csatlakozás meglévő szerverhez</strong>
+        <span>Már fut valahol a dashboard - csak a címét add meg.</span>
+      </button>
+      <button class="choice" id="pick-local">
+        <strong>Saját szerver létrehozása</strong>
+        <span>Ezen a gépen indítja a panelt. Válassz mappát, portot és jelszót.</span>
+      </button>
+    </div>
+
+    <div class="card" id="screen-existing" hidden>
+      <h1>Csatlakozás</h1>
       <p class="sub">Add meg, hol fut a dashboard szolgáltatás.</p>
 
       <div class="field">
@@ -183,24 +254,63 @@
       </div>
 
       <button id="connect">Csatlakozás</button>
+      <button class="link" data-back>Vissza</button>
       <div class="status" id="status"></div>
     </div>
 
+    <div class="card" id="screen-local" hidden>
+      <h1>Saját szerver</h1>
+      <p class="sub">A panel ezen a gépen fog futni, csak innen elérhetően.</p>
+
+      <div class="field">
+        <label for="folder">Mappa az adatoknak</label>
+        <div class="row">
+          <input id="folder" placeholder="válassz mappát" readonly />
+          <button class="secondary" id="browse">Tallózás</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="local-port">Port</label>
+        <input id="local-port" type="number" value="3000" />
+      </div>
+
+      <div class="field">
+        <label for="password">Admin jelszó (legalább 8 karakter)</label>
+        <input id="password" type="password" autocomplete="new-password" />
+      </div>
+
+      <button id="create">Létrehozás és indítás</button>
+      <button class="link" data-back>Vissza</button>
+      <div class="status" id="local-status"></div>
+    </div>
+
     <script>
+      const screens = {
+        choose: document.getElementById("screen-choose"),
+        existing: document.getElementById("screen-existing"),
+        local: document.getElementById("screen-local"),
+      };
+      function show(name) {
+        for (const [key, el] of Object.entries(screens)) el.hidden = key !== name;
+      }
+      document.getElementById("pick-existing").onclick = () => show("existing");
+      document.getElementById("pick-local").onclick = () => show("local");
+      for (const b of document.querySelectorAll("[data-back]")) b.onclick = () => show("choose");
+
       const hostEl = document.getElementById("host");
       const portEl = document.getElementById("port");
       const btn = document.getElementById("connect");
       const status = document.getElementById("status");
 
-      // Pre-fill when reopened from the menu to change an existing address.
+      // Reopened from the menu to change an existing address: skip the choice
+      // and go straight to the form that is already filled in.
       window.setupApi.getConnection().then((c) => {
         if (c) {
           hostEl.value = c.host;
           portEl.value = c.port;
+          show("existing");
         }
-        hostEl.focus();
-      });
-
       async function connect() {
         const host = hostEl.value.trim();
         const port = Number(portEl.value);
@@ -232,6 +342,34 @@
       }
 
       btn.onclick = connect;
+
+      const folderEl = document.getElementById("folder");
+      const localPortEl = document.getElementById("local-port");
+      const passwordEl = document.getElementById("password");
+      const createBtn = document.getElementById("create");
+      const localStatus = document.getElementById("local-status");
+
+      document.getElementById("browse").onclick = async () => {
+        const chosen = await window.setupApi.pickFolder();
+        if (chosen) folderEl.value = chosen;
+      };
+
+      createBtn.onclick = async () => {
+        createBtn.disabled = true;
+        localStatus.textContent = "Indítás...";
+        try {
+          await window.setupApi.createLocal({
+            dataDir: folderEl.value,
+            port: Number(localPortEl.value),
+            password: passwordEl.value,
+          });
+          // On success the main process swaps the window over to the panel;
+          // nothing more happens here.
+        } catch (err) {
+          localStatus.textContent = String(err && err.message ? err.message : err);
+          createBtn.disabled = false;
+        }
+      };
       for (const el of [hostEl, portEl]) {
         el.addEventListener("keydown", (e) => {
           if (e.key === "Enter") connect();

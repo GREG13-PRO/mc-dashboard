@@ -3,6 +3,7 @@ const path = require("node:path");
 const profiles = require("./profiles");
 const monitor = require("./monitor");
 const updater = require("./updater");
+const localServer = require("./local-server");
 
 /**
  * The desktop app is a shell around the dashboard that already runs on the
@@ -56,12 +57,37 @@ function createWindow() {
     }
   });
 
+  // A local backend has to be running before the window points at it; it is
+  // otherwise an ordinary profile on 127.0.0.1, so nothing downstream changes.
+  if (localServer.isConfigured()) {
+    startLocalAndLoad().catch((err) => {
+      dialog.showMessageBox({
+        type: "error",
+        title: "Beépített szerver",
+        message: "A saját szerver nem indult el.",
+        detail: String(err && err.message ? err.message : err),
+      });
+      win.loadFile(path.join(__dirname, "setup.html"));
+    });
+    return;
+  }
+
   const active = profiles.activeProfile(app);
   if (active) {
     loadDashboard(active);
   } else {
     win.loadFile(path.join(__dirname, "setup.html"));
   }
+}
+
+async function startLocalAndLoad() {
+  const config = localServer.start();
+  await localServer.waitUntilReady(config.port);
+  loadDashboard(profiles.upsert(app, {
+    name: "Saját szerver",
+    host: "127.0.0.1",
+    port: config.port,
+  }));
 }
 
 function loadDashboard(profile) {
@@ -106,6 +132,28 @@ ipcMain.handle("test-connection", async (_event, { host, port }) => {
 ipcMain.handle("save-connection", (_event, connection) => {
   const profile = profiles.upsert(app, connection);
   loadDashboard(profile);
+  return { ok: true };
+});
+
+ipcMain.handle("pick-folder", async () => {
+  const result = await dialog.showOpenDialog(win, {
+    title: "Mappa a szerver adatainak",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+
+ipcMain.handle("create-local", async (_event, options) => {
+  localServer.configure(options);
+  try {
+    await startLocalAndLoad();
+  } catch (err) {
+    // A half-configured local server would try to start again on every launch
+    // and fail the same way, so the configuration goes with the failure.
+    localServer.stop();
+    localServer.clearConfig();
+    throw err;
+  }
   return { ok: true };
 });
 
@@ -261,6 +309,9 @@ app.whenReady().then(() => {
 app.on("before-quit", () => {
   quitting = true;
   monitor.stop();
+  // The backend is a child of this process; leaving it behind would hold the
+  // port and keep the Minecraft servers running with nothing watching them.
+  localServer.stop();
 });
 
 // Never quits on window close: the tray is the app's resting state.
