@@ -3,6 +3,7 @@ import { t } from "../lib/i18n";
 import { escapeHtml } from "../lib/escape";
 import { currentUsername } from "../auth-state";
 import type { AdminXp } from "../types";
+import { pageHead } from "../components/PageHead";
 
 export function renderXpView(root: HTMLElement): () => void {
   let disposed = false;
@@ -27,10 +28,12 @@ export function renderXpView(root: HTMLElement): () => void {
     const me = currentUsername();
 
     root.innerHTML = `
-      <div class="server-view-header">
-        <h2>${t("admin_szintek")}</h2>
-        <div class="server-actions"><button class="btn" id="xp-refresh">${t("frissites")}</button></div>
-      </div>
+      ${pageHead({
+        icon: "star",
+        title: t("admin_szintek"),
+        description: t("hub_xp"),
+        actions: `<button class="btn" id="xp-refresh">${t("frissites")}</button>`,
+      })}
       <div class="tab-content">
         <p style="max-width:640px;color:var(--text-dim);font-size:12px;margin-top:0;">${t("a_pontok_az_auditnaplobol_szamolodnak_visszameno")}</p>
 

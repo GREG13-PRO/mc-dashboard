@@ -1,11 +1,13 @@
 import { api, ApiError } from "../api";
 import { t } from "../lib/i18n";
 import { setCurrentUser } from "../auth-state";
+import { logoMark } from "../lib/logo";
 
 export function renderLoginView(root: HTMLElement, onSuccess: () => void) {
   root.innerHTML = `
     <div class="login-screen">
       <div class="login-card">
+        <div class="login-brand">${logoMark(44)}</div>
         <h1>Minecraft Dashboard</h1>
         <div class="field">
           <label for="username">${t("felhasznalonev")}</label>

@@ -4,10 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#12151a" />
+    <meta name="theme-color" content="#0a0710" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- SVG first: the mark is three polygons, so a vector stays crisp on a
+         retina tab strip where a 192px raster does not. The PNG stays as the
+         fallback for anything that ignores the first line. -->
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Minecraft Dashboard</title>

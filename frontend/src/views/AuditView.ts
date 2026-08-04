@@ -2,6 +2,7 @@ import { api, ApiError } from "../api";
 import { t } from "../lib/i18n";
 import { escapeHtml } from "../lib/escape";
 import type { AuditRecord } from "../types";
+import { pageHead } from "../components/PageHead";
 
 export function renderAuditView(root: HTMLElement): () => void {
   let disposed = false;
@@ -24,15 +25,15 @@ export function renderAuditView(root: HTMLElement): () => void {
 
   function render() {
     root.innerHTML = `
-      <div class="server-view-header">
-        <h2>${t("auditnaplo")}</h2>
-        <div class="server-actions">
-          <input id="audit-filter" placeholder="${t("szures_nev_muvelet_szerver")}" style="max-width:260px;" value="${escapeHtml(
-            filter
-          )}" />
-          <button class="btn" id="audit-refresh">${t("frissites")}</button>
-        </div>
-      </div>
+      ${pageHead({
+        icon: "clipboard",
+        title: t("auditnaplo"),
+        description: t("hub_audit"),
+        actions: `<input id="audit-filter" placeholder="${t(
+          "szures_nev_muvelet_szerver"
+        )}" style="max-width:240px;" value="${escapeHtml(filter)}" />
+          <button class="btn" id="audit-refresh">${t("frissites")}</button>`,
+      })}
       <div class="tab-content"><div id="audit-list"></div></div>
     `;
 

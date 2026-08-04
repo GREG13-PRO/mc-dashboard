@@ -8,7 +8,13 @@
  * reach the server" instead of the browser's error page.
  */
 
-const CACHE = "mc-dashboard-shell-v1";
+/**
+ * Bumped when a cached asset changes name-for-name. Hashed bundles look after
+ * themselves, but the icons and the logo do not carry a hash, so replacing the
+ * mark without this leaves every installed copy showing the old one - the
+ * activate handler below deletes every cache that is not this one.
+ */
+const CACHE = "mc-dashboard-shell-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.add("/index.html")));

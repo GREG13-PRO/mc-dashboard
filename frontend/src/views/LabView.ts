@@ -5,6 +5,7 @@ import { t } from "../lib/i18n";
 import { confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import type { LabProject, LabToolchain, ServerWithStatus } from "../types";
+import { pageHead } from "../components/PageHead";
 
 /**
  * Write a plugin, compile it, put it on a test server.
@@ -50,9 +51,7 @@ export function renderLabView(root: HTMLElement): () => void {
     const project = projects.find((p) => p.name === current) ?? null;
 
     root.innerHTML = `
-      <div class="server-view-header">
-        <h2>${t("plugin_labor")}</h2>
-      </div>
+      ${pageHead({ icon: "flask", title: t("plugin_labor"), description: t("hub_labor") })}
       <div class="section" style="padding:16px;">
         <p class="finding-advice" style="margin:0 0 10px;">${t("plugin_labor_leiras")}</p>
         ${

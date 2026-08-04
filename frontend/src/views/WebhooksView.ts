@@ -4,6 +4,7 @@ import { t } from "../lib/i18n";
 import { confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import type { WebhooksResponse } from "../types";
+import { pageHead } from "../components/PageHead";
 
 /**
  * Outgoing webhooks and how they are being received.
@@ -31,9 +32,7 @@ export function renderWebhooksView(root: HTMLElement): () => void {
     const limitFor = (id: string) => data.rateLimits.find((r) => r.webhookId === id);
 
     root.innerHTML = `
-      <div class="server-view-header">
-        <h2>${t("webhookok")}</h2>
-      </div>
+      ${pageHead({ icon: "bell", title: t("webhookok"), description: t("hub_webhookok") })}
       <div class="section" style="padding:16px;">
         <p class="finding-advice" style="margin:0 0 12px;">${t("webhookok_leiras")}</p>
 

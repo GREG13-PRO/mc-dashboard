@@ -4,6 +4,7 @@ import { openModal, confirmModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { getCurrentUser } from "../auth-state";
 import type { ServerPermissions, ServerWithStatus, UserInput, UserPublic } from "../types";
+import { pageHead } from "../components/PageHead";
 
 const CAPABILITIES: { key: keyof ServerPermissions; label: string }[] = [
   { key: "console", label: "Konzol" },
@@ -33,12 +34,12 @@ export function renderUsersView(root: HTMLElement): () => void {
 
   function render() {
     root.innerHTML = `
-      <div class="server-view-header">
-        <h2>${t("felhasznalok")}</h2>
-        <div class="server-actions">
-          <button class="btn btn-primary" id="add-user-btn">${t("uj_felhasznalo")}</button>
-        </div>
-      </div>
+      ${pageHead({
+        icon: "users",
+        title: t("felhasznalok"),
+        description: t("hub_felhasznalok"),
+        actions: `<button class="btn btn-primary" id="add-user-btn">${t("uj_felhasznalo")}</button>`,
+      })}
       <div id="users-list"></div>
     `;
 

@@ -1,4 +1,9 @@
+import { t } from "./i18n";
+
 export type ThemeChoice = "auto" | "light" | "dark";
+
+/** In the order they are offered as a segmented control. */
+export const THEME_CHOICES: ThemeChoice[] = ["auto", "light", "dark"];
 
 const STORAGE_KEY = "mc-dashboard-theme";
 
@@ -32,7 +37,7 @@ export function nextTheme(choice: ThemeChoice): ThemeChoice {
 }
 
 export function themeLabel(choice: ThemeChoice): string {
-  return { auto: "Rendszer", light: "Világos", dark: "Sötét" }[choice];
+  return t(({ auto: "tema_rendszer", light: "tema_vilagos", dark: "tema_sotet" } as const)[choice]);
 }
 
 export function themeIcon(choice: ThemeChoice): string {

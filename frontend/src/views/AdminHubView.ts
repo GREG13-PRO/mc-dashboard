@@ -1,4 +1,6 @@
 import { t } from "../lib/i18n";
+import { icon } from "../lib/icons";
+import { pageHead } from "../components/PageHead";
 
 /**
  * One entry in the sidebar instead of six.
@@ -13,29 +15,29 @@ import { t } from "../lib/i18n";
  */
 interface HubEntry {
   hash: string;
+  icon: string;
   label: string;
   description: string;
 }
 
 export function renderAdminHubView(root: HTMLElement): () => void {
   const entries: HubEntry[] = [
-    { hash: "#/users", label: t("felhasznalok"), description: t("hub_felhasznalok") },
-    { hash: "#/audit", label: t("auditnaplo"), description: t("hub_audit") },
-    { hash: "#/app", label: t("alkalmazasok"), description: t("hub_alkalmazasok") },
-    { hash: "#/lab", label: t("plugin_labor"), description: t("hub_labor") },
-    { hash: "#/webhooks", label: t("webhookok"), description: t("hub_webhookok") },
+    { hash: "#/users", icon: "users", label: t("felhasznalok"), description: t("hub_felhasznalok") },
+    { hash: "#/audit", icon: "clipboard", label: t("auditnaplo"), description: t("hub_audit") },
+    { hash: "#/app", icon: "download", label: t("alkalmazasok"), description: t("hub_alkalmazasok") },
+    { hash: "#/lab", icon: "flask", label: t("plugin_labor"), description: t("hub_labor") },
+    { hash: "#/webhooks", icon: "bell", label: t("webhookok"), description: t("hub_webhookok") },
   ];
 
   root.innerHTML = `
-    <div class="server-view-header">
-      <h2>${t("kezeles")}</h2>
-    </div>
+    ${pageHead({ icon: "sliders", title: t("kezeles"), description: t("kezeles_leiras") })}
     <div class="section" style="padding:16px;">
       <div class="hub-grid">
         ${entries
           .map(
             (entry) => `
           <a class="hub-card" href="${entry.hash}">
+            <span class="hub-icon">${icon(entry.icon, 18)}</span>
             <strong>${entry.label}</strong>
             <span>${entry.description}</span>
           </a>`

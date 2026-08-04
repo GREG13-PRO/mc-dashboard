@@ -4,6 +4,7 @@ import { t } from "../lib/i18n";
 import { confirmModal, promptModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import type { AppPlatform, GithubSyncStatus, PublishedBuild } from "../types";
+import { pageHead } from "../components/PageHead";
 
 /**
  * Publishes the installable apps to the machines that use this dashboard.
@@ -97,9 +98,7 @@ export function renderAppDistView(root: HTMLElement): () => void {
     }).join("");
 
     root.innerHTML = `
-      <div class="server-view-header">
-        <h2>${t("alkalmazasok")}</h2>
-      </div>
+      ${pageHead({ icon: "download", title: t("alkalmazasok"), description: t("hub_alkalmazasok") })}
       <div class="section" style="padding:16px;">
         <p class="finding-detail">${t("alkalmazasok_leiras")}</p>
         ${rows}

@@ -14,7 +14,14 @@ backend/data/*
 # Local Claude Code settings may contain secrets (SSH hosts, passwords) — never commit
 .claude/
 desktop/release/
-desktop/build/
+# The app icon has to be tracked: electron-builder reads it from the build
+# resources directory, so a CI machine that never gets this file ships
+# installers wearing Electron's default icon. Git cannot re-include a file whose
+# parent directory is excluded - and `build/` on line 3 excludes this one - so
+# the directory is un-ignored first, then its contents, then the one exception.
+!desktop/build/
+desktop/build/*
+!desktop/build/icon.png
 
 # Android build output
 android/.gradle/
