@@ -29,6 +29,16 @@ function run(command, args, cwd) {
 }
 
 /**
+ * npm, by the name this platform can actually spawn.
+ *
+ * On Windows the executable is npm.cmd; the extensionless `npm` is a shell
+ * script that exists for Git Bash and that CreateProcess cannot run. Without
+ * this, execFileSync fails with a bare ENOENT on `npm` - which reads like npm
+ * is missing rather than like it is spelled differently here.
+ */
+const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
+
+/**
  * The TypeScript compiler this repository actually installed.
  *
  * `npx tsc` is not it: in a workspaces monorepo typescript hoists to the root,
@@ -83,7 +93,7 @@ fs.writeFileSync(
 );
 
 console.log("[prepare-backend] függőségek telepítése a stagingbe");
-run("npm", ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-package-lock"], staging);
+run(NPM, ["install", "--omit=dev", "--no-audit", "--no-fund", "--no-package-lock"], staging);
 
 const entry = path.join(staging, "dist", "index.js");
 const modules = path.join(staging, "node_modules");
