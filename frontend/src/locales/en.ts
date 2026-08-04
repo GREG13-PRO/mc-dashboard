@@ -638,4 +638,10 @@ export const en = {
   nap_rovid: "d",
   ora_rovid: "h",
   perc_rovid: "m",
+  egyszeru_mod: "Simple",
+  halado_mod: "Advanced",
+  egyszeru_mod_leiras: "Pick a server type, a version and a name. Everything else - folder, a free port, RCON, memory - is chosen for you and can be changed afterwards.",
+  halado_mod_leiras: "Every field, pre-filled with the same suggestions.",
+  adj_nevet_a_szervernek: "Give the server a name and the rest is filled in.",
+  barmikor_modosithato: "All of this can be changed later on the settings tabs.",
 };

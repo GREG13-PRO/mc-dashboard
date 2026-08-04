@@ -3246,3 +3246,22 @@ table.file-table tr.file-row:hover {
     padding: var(--gap-md);
   }
 }
+
+/* What simple mode decided on your behalf, shown rather than hidden - the
+   point is to ask fewer questions, not to be mysterious about the answers. */
+.simple-summary {
+  padding: 10px 12px;
+  margin-bottom: var(--gap-md);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+
+.simple-summary .ov-row {
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.simple-summary .ov-row + .ov-row {
+  border-top: 0;
+}

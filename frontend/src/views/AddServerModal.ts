@@ -2,12 +2,48 @@ import { api, ApiError } from "../api";
 import { t } from "../lib/i18n";
 import { openModal } from "../components/Modal";
 import { showToast } from "../components/Toast";
-import type { ServerEntry, ServerEntryInput, ServerInstallSettings, ServerInstallType } from "../types";
+import { escapeHtml } from "../lib/escape";
+import type {
+  InstallDefaults,
+  ServerEntry,
+  ServerEntryInput,
+  ServerInstallSettings,
+  ServerInstallType,
+} from "../types";
 
+/**
+ * Two ways in.
+ *
+ * Simple asks three things - what kind of server, which version, what to call
+ * it - and works the rest out: where to put it, a free port, RCON on with a
+ * generated password, four gigabytes, vanilla game settings. Every one of the
+ * other eleven fields has a right answer that somebody installing their first
+ * server cannot be expected to know, and getting the port wrong is how you end
+ * up with two servers fighting over 25565.
+ *
+ * Advanced is the form as it was, with those same answers pre-filled rather
+ * than blank. Editing an existing server always uses it: by then every field
+ * describes something real.
+ */
 export function openAddServerModal(onCreated: () => void, existing?: ServerEntry) {
   const form = document.createElement("div");
+  // Simple only makes sense for a new install; there is nothing to simplify
+  // about editing a server that already exists.
+  let simple = !existing;
+
   form.innerHTML = `
     <h3>${existing ? t("szerver_szerkesztese") : t("szerver_hozzaadasa")}</h3>
+    ${
+      existing
+        ? ""
+        : `
+    <div class="segmented" id="mode-seg" style="margin-bottom:14px;">
+      <button type="button" class="segment active" data-mode="simple">${t("egyszeru_mod")}</button>
+      <button type="button" class="segment" data-mode="advanced">${t("halado_mod")}</button>
+    </div>
+    <p class="finding-advice" id="mode-hint" style="margin:0 0 12px;">${t("egyszeru_mod_leiras")}</p>
+    <div id="simple-summary" class="simple-summary"></div>`
+    }
     ${
       existing
         ? ""
@@ -140,6 +176,10 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
         opt.textContent = option.label;
         installTypeSelect.appendChild(opt);
       }
+      // Re-applied now the options exist. On the first pass the list was still
+      // loading, so simple mode had nothing to switch to and sat on "manual" -
+      // which is exactly the mode that shows a start script and a stop command.
+      applyMode();
     });
 
     installTypeSelect.onchange = () => {
@@ -174,12 +214,132 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
     };
   }
 
+
+  /**
+   * Fields that only mean something once you already know what they do.
+   *
+   * Hidden rather than removed, so the advanced form is the same form with the
+   * same ids - the save path reads them either way and gets the suggested value
+   * when simple mode never showed the field.
+   */
+  const ADVANCED_ONLY = [
+    "#f-folder",
+    "#f-rcon-enabled",
+    "#f-rcon-host",
+    "#f-rcon-port",
+    "#f-rcon-password",
+    "#f-crash-enabled",
+    "#f-crash-attempts",
+    "#f-port",
+    "#f-motd",
+    "#f-difficulty",
+    "#f-gamemode",
+    "#f-max-players",
+  ];
+
+  let defaults: InstallDefaults | null = null;
+  let defaultsFor = "";
+
+  const modeSeg = form.querySelector<HTMLElement>("#mode-seg");
+  const summary = form.querySelector<HTMLElement>("#simple-summary");
+  const modeHint = form.querySelector<HTMLElement>("#mode-hint");
+  const nameInput = form.querySelector<HTMLInputElement>("#f-name")!;
+  const folderInput = form.querySelector<HTMLInputElement>("#f-folder")!;
+
+  function applyMode() {
+    for (const selector of ADVANCED_ONLY) {
+      const field = form.querySelector<HTMLElement>(selector)?.closest<HTMLElement>(".field");
+      if (field) field.style.display = simple ? "none" : "";
+    }
+    // The scheduled-restart note is advice about the advanced form.
+    form.querySelectorAll<HTMLElement>(".finding-advice").forEach((el) => {
+      if (el.id !== "mode-hint") el.style.display = simple ? "none" : "";
+    });
+    if (summary) summary.style.display = simple ? "" : "none";
+    if (modeHint) modeHint.textContent = simple ? t("egyszeru_mod_leiras") : t("halado_mod_leiras");
+    modeSeg?.querySelectorAll<HTMLElement>(".segment").forEach((btn) => {
+      btn.classList.toggle("active", (btn.dataset.mode === "simple") === simple);
+    });
+    // Manual adoption of an existing folder is the definition of advanced, so
+    // simple mode neither offers it nor can be left sitting on it.
+    if (installTypeSelect) {
+      const manual = installTypeSelect.querySelector<HTMLOptionElement>('option[value="manual"]');
+      if (manual) manual.hidden = simple;
+      if (simple && installTypeSelect.value === "manual") {
+        installTypeSelect.value = installTypeSelect.options[1]?.value ?? "manual";
+        installTypeSelect.onchange?.(new Event("change"));
+      }
+    }
+    renderSummary();
+  }
+
+  function renderSummary() {
+    if (!summary || !simple) return;
+    if (!defaults) {
+      summary.innerHTML = `<p class="ov-note">${t("adj_nevet_a_szervernek")}</p>`;
+      return;
+    }
+    summary.innerHTML = `
+      <div class="ov-row"><span>${t("mappa")}</span><strong>${escapeHtml(defaults.folder)}</strong></div>
+      <div class="ov-row"><span>${t("port")}</span><strong>${defaults.port}</strong></div>
+      <div class="ov-row"><span>RCON</span><strong>${t("bekapcsolva")} (${defaults.rconPort})</strong></div>
+      <p class="ov-note">${t("barmikor_modosithato")}</p>`;
+  }
+
+  /**
+   * Asks the server what to use, once the name has settled.
+   *
+   * Server-side because the browser cannot know which ports are free on that
+   * machine or where the other servers live - and those are exactly the two
+   * things a beginner would get wrong.
+   */
+  let defaultsTimer: ReturnType<typeof setTimeout> | null = null;
+  async function refreshDefaults() {
+    const name = nameInput.value.trim();
+    if (!name || name === defaultsFor) return;
+    try {
+      defaults = await api.installDefaults(name);
+      defaultsFor = name;
+      // The advanced form is pre-filled from the same suggestion, so switching
+      // across does not present an empty folder box.
+      if (!folderInput.value.trim() || folderInput.dataset.suggested === "1") {
+        folderInput.value = defaults.folder;
+        folderInput.dataset.suggested = "1";
+      }
+      renderSummary();
+    } catch {
+      // Leave the previous suggestion in place; the save path falls back to
+      // whatever is in the folder field.
+    }
+  }
+
+  if (!existing) {
+    nameInput.addEventListener("input", () => {
+      if (defaultsTimer) clearTimeout(defaultsTimer);
+      defaultsTimer = setTimeout(() => void refreshDefaults(), 400);
+    });
+    folderInput.addEventListener("input", () => {
+      // Once it is typed in by hand it stops being a suggestion.
+      folderInput.dataset.suggested = "0";
+    });
+    modeSeg?.querySelectorAll<HTMLButtonElement>(".segment").forEach((btn) => {
+      btn.onclick = () => {
+        simple = btn.dataset.mode === "simple";
+        applyMode();
+      };
+    });
+    applyMode();
+  }
+
   form.querySelector<HTMLButtonElement>("#save-btn")!.onclick = async () => {
     const errorEl = form.querySelector<HTMLDivElement>("#form-error")!;
     errorEl.textContent = "";
 
     const name = form.querySelector<HTMLInputElement>("#f-name")!.value.trim();
-    const folder = form.querySelector<HTMLInputElement>("#f-folder")!.value.trim();
+    // In simple mode the name is the only thing typed, so the suggestion has to
+    // be current before it is used - the debounce may not have fired yet.
+    if (simple && !existing) await refreshDefaults();
+    const folder = simple && defaults ? defaults.folder : form.querySelector<HTMLInputElement>("#f-folder")!.value.trim();
     const installType = installTypeSelect?.value ?? "manual";
 
     if (installType !== "manual") {
@@ -196,13 +356,36 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       const settings: ServerInstallSettings = {
         memoryMb: Number(form.querySelector<HTMLSelectElement>("#f-memory")!.value),
       };
-      if (typeKinds.get(installType) !== "proxy") {
-        settings.port = Number(form.querySelector<HTMLInputElement>("#f-port")!.value);
-        settings.motd = form.querySelector<HTMLInputElement>("#f-motd")!.value.trim();
-        settings.difficulty = form.querySelector<HTMLSelectElement>("#f-difficulty")!.value;
-        settings.gamemode = form.querySelector<HTMLSelectElement>("#f-gamemode")!.value;
-        settings.maxPlayers = Number(form.querySelector<HTMLInputElement>("#f-max-players")!.value);
+      const isProxy = typeKinds.get(installType) === "proxy";
+      if (!isProxy) {
+        // Simple mode never showed these, so it uses the free port the server
+        // picked, the server's own name as the MOTD, and vanilla's defaults for
+        // the rest. All of it is editable afterwards on the settings tabs.
+        settings.port = simple && defaults
+          ? defaults.port
+          : Number(form.querySelector<HTMLInputElement>("#f-port")!.value);
+        settings.motd = simple
+          ? name
+          : form.querySelector<HTMLInputElement>("#f-motd")!.value.trim();
+        settings.difficulty = simple
+          ? "normal"
+          : form.querySelector<HTMLSelectElement>("#f-difficulty")!.value;
+        settings.gamemode = simple
+          ? "survival"
+          : form.querySelector<HTMLSelectElement>("#f-gamemode")!.value;
+        settings.maxPlayers = simple
+          ? 20
+          : Number(form.querySelector<HTMLInputElement>("#f-max-players")!.value);
       }
+
+      // RCON on by default in simple mode: the player list, the map's player
+      // markers and the game rules screen all need it, and it is not something
+      // a first-time user knows to look for. The password is the generated one,
+      // never typed.
+      const rcon =
+        !isProxy && simple && defaults
+          ? { enabled: true, port: defaults.rconPort, password: defaults.rconPassword }
+          : undefined;
 
       const saveBtn = form.querySelector<HTMLButtonElement>("#save-btn")!;
       const originalLabel = saveBtn.textContent;
@@ -211,7 +394,14 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       // this can legitimately take a couple of minutes.
       saveBtn.textContent = t("telepites_eltarthat_par_percig");
       try {
-        await api.installServer({ name, folder, type: installType as ServerInstallType, version, settings });
+        await api.installServer({
+          name,
+          folder,
+          type: installType as ServerInstallType,
+          version,
+          settings,
+          rcon,
+        });
         showToast(t("szerver_telepitve"));
         close();
         onCreated();

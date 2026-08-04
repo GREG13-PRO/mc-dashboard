@@ -58,6 +58,7 @@ import type {
   GameRuleState,
   Schedule,
   ServerOverview,
+  InstallDefaults,
 } from "./types";
 
 class ApiError extends Error {
@@ -800,6 +801,9 @@ export const api = {
   },
   async getOverview(serverId: string): Promise<ServerOverview> {
     return request<ServerOverview>(`/servers/${serverId}/overview`);
+  },
+  async installDefaults(name: string): Promise<InstallDefaults> {
+    return request<InstallDefaults>(`/install-server/defaults?name=${encodeURIComponent(name)}`);
   },
   async deletePlugin(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/plugins/${encodeURIComponent(filename)}`, { method: "DELETE" });

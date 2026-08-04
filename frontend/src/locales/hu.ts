@@ -640,4 +640,10 @@ export const hu: typeof en = {
   nap_rovid: "nap",
   ora_rovid: "óra",
   perc_rovid: "perc",
+  egyszeru_mod: "Egyszerű mód",
+  halado_mod: "Haladó mód",
+  egyszeru_mod_leiras: "Válassz szervertípust, verziót és nevet. A többit - mappa, szabad port, RCON, memória - kitaláljuk, és utólag bármi módosítható.",
+  halado_mod_leiras: "Minden mező, ugyanazokkal a javaslatokkal előre kitöltve.",
+  adj_nevet_a_szervernek: "Adj nevet a szervernek, a többi magától kitöltődik.",
+  barmikor_modosithato: "Ezek mind módosíthatók később a beállítások füleken.",
 };

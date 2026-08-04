@@ -130,6 +130,7 @@ export interface ServerInstallSettings {
 export interface ServerInstallInput {
   name: string;
   folder: string;
+  rcon?: { enabled: boolean; port: number; password: string };
   type: ServerInstallType;
   version: string;
   settings?: ServerInstallSettings;
