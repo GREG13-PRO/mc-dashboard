@@ -182,8 +182,29 @@ function applyServerProperties(folder: string, settings: ServerInstallSettings):
   writeProperties(path.join(folder, "server.properties"), values);
 }
 
-function startScript(jarName: string, memoryMb: number, nogui: boolean): string {
-  return `java -Xmx${memoryMb}M -jar ${jarName}${nogui ? " -nogui" : ""}\n`;
+/**
+ * Writes the launch script this platform can actually run, and returns its
+ * name for the registry entry.
+ *
+ * A .sh is useless on Windows and a .bat is useless everywhere else, so the
+ * installer has to pick - it is the only place that knows a server is being
+ * created rather than adopted. CRLF and `@echo off` because cmd.exe wants
+ * both: LF-only batch files misbehave, and without the echo suppression every
+ * line of the script is printed into the console the dashboard is tailing.
+ */
+async function writeLaunchScript(
+  folder: string,
+  jarName: string,
+  memoryMb: number,
+  nogui: boolean
+): Promise<string> {
+  const command = `java -Xmx${memoryMb}M -jar ${jarName}${nogui ? " -nogui" : ""}`;
+  if (process.platform === "win32") {
+    await fsp.writeFile(path.join(folder, "start.bat"), `@echo off\r\n${command}\r\n`);
+    return "start.bat";
+  }
+  await fsp.writeFile(path.join(folder, "start.sh"), `${command}\n`);
+  return "start.sh";
 }
 
 /**
@@ -233,9 +254,9 @@ async function installJarAndScript(
       if (!versions.includes(version)) throw new Error(`Unknown ${project} version: ${version}`);
       const jar = type === "paper" ? "server.jar" : "velocity.jar";
       await downloadFile(await paperMcDownloadUrl(project, version), path.join(folder, jar));
-      await fsp.writeFile(path.join(folder, "start.sh"), startScript(jar, memoryMb, type === "paper"));
+      const launchScript = await writeLaunchScript(folder, jar, memoryMb, type === "paper");
       // Velocity's console shutdown command is "shutdown", not BungeeCord's "end".
-      return { startScript: "start.sh", stopCommand: type === "paper" ? "stop" : "shutdown" };
+      return { startScript: launchScript, stopCommand: type === "paper" ? "stop" : "shutdown" };
     }
     case "purpur": {
       const versions = await listVersions("purpur");
@@ -244,8 +265,8 @@ async function installJarAndScript(
         `https://api.purpurmc.org/v2/purpur/${encodeURIComponent(version)}/latest/download`,
         path.join(folder, "server.jar")
       );
-      await fsp.writeFile(path.join(folder, "start.sh"), startScript("server.jar", memoryMb, true));
-      return { startScript: "start.sh", stopCommand: "stop" };
+      const launchScript = await writeLaunchScript(folder, "server.jar", memoryMb, true);
+      return { startScript: launchScript, stopCommand: "stop"};
     }
     case "vanilla": {
       const manifest = await fetchJson<{ versions: { id: string; url: string }[] }>(
@@ -258,8 +279,8 @@ async function installJarAndScript(
         throw new Error(`Vanilla ${version} has no server download (too old?)`);
       }
       await downloadFile(versionMeta.downloads.server.url, path.join(folder, "server.jar"));
-      await fsp.writeFile(path.join(folder, "start.sh"), startScript("server.jar", memoryMb, true));
-      return { startScript: "start.sh", stopCommand: "stop" };
+      const launchScript = await writeLaunchScript(folder, "server.jar", memoryMb, true);
+      return { startScript: launchScript, stopCommand: "stop"};
     }
     case "fabric": {
       const gameVersions = await listVersions("fabric");
@@ -278,8 +299,8 @@ async function installJarAndScript(
         loaders[0].loader.version
       )}/${encodeURIComponent(installer.version)}/server/jar`;
       await downloadFile(url, path.join(folder, "server.jar"));
-      await fsp.writeFile(path.join(folder, "start.sh"), startScript("server.jar", memoryMb, true));
-      return { startScript: "start.sh", stopCommand: "stop" };
+      const launchScript = await writeLaunchScript(folder, "server.jar", memoryMb, true);
+      return { startScript: launchScript, stopCommand: "stop"};
     }
     case "quilt": {
       const gameVersions = await listVersions("quilt");
@@ -301,8 +322,8 @@ async function installJarAndScript(
       ]);
       await fsp.rm(installerJar, { force: true });
       const launch = await firstExisting(folder, ["quilt-server-launch.jar"]);
-      await fsp.writeFile(path.join(folder, "start.sh"), startScript(launch, memoryMb, true));
-      return { startScript: "start.sh", stopCommand: "stop" };
+      const launchScript = await writeLaunchScript(folder, launch, memoryMb, true);
+      return { startScript: launchScript, stopCommand: "stop"};
     }
     case "forge": {
       const promos = await fetchJson<{ promos: Record<string, string> }>(
@@ -339,8 +360,8 @@ async function installJarAndScript(
         "https://ci.md-5.net/job/BungeeCord/lastSuccessfulBuild/artifact/bootstrap/target/BungeeCord.jar",
         path.join(folder, "BungeeCord.jar")
       );
-      await fsp.writeFile(path.join(folder, "start.sh"), startScript("BungeeCord.jar", memoryMb, false));
-      return { startScript: "start.sh", stopCommand: "end" };
+      const launchScript = await writeLaunchScript(folder, "BungeeCord.jar", memoryMb, false);
+      return { startScript: launchScript, stopCommand: "end"};
     }
     default:
       throw new Error(`Unknown server type: ${type}`);
@@ -362,10 +383,16 @@ async function firstExisting(folder: string, candidates: string[]): Promise<stri
  * since it depends on the Minecraft version being installed.
  */
 async function finishModLoaderInstall(folder: string, memoryMb: number): Promise<InstallResult> {
-  if (fs.existsSync(path.join(folder, "run.sh"))) {
+  // The installer writes run.sh or run.bat depending on where it ran.
+  const runner = process.platform === "win32" ? "run.bat" : "run.sh";
+  if (fs.existsSync(path.join(folder, runner))) {
     await fsp.writeFile(path.join(folder, "user_jvm_args.txt"), `-Xmx${memoryMb}M\n`);
-    // run.sh forwards its arguments to the JVM launcher, and `nogui` is what
-    // suppresses the Swing server GUI on a headless box.
+    // The runner forwards its arguments to the JVM launcher, and `nogui` is
+    // what suppresses the Swing server GUI on a headless box.
+    if (process.platform === "win32") {
+      await fsp.writeFile(path.join(folder, "start.bat"), "@echo off\r\ncall run.bat nogui\r\n");
+      return { startScript: "start.bat", stopCommand: "stop" };
+    }
     await fsp.writeFile(path.join(folder, "start.sh"), "bash run.sh nogui\n");
     return { startScript: "start.sh", stopCommand: "stop" };
   }
@@ -374,6 +401,6 @@ async function finishModLoaderInstall(folder: string, memoryMb: number): Promise
   if (!jar) {
     throw new Error("Installer finished but produced neither run.sh nor a Forge/NeoForge server jar");
   }
-  await fsp.writeFile(path.join(folder, "start.sh"), startScript(jar, memoryMb, true));
-  return { startScript: "start.sh", stopCommand: "stop" };
+  const launchScript = await writeLaunchScript(folder, jar, memoryMb, true);
+  return { startScript: launchScript, stopCommand: "stop"};
 }
