@@ -720,4 +720,5 @@ export const de: Partial<Locale> = {
   eula_elfogadas: "Ich akzeptiere die Minecraft-Endbenutzer-Lizenzvereinbarung.",
   eula_link: "Nachlesen",
   eula_kotelezo: "Ohne Zustimmung zur EULA lässt sich kein Minecraft-Server anlegen.",
+  vissza_a_szerverekhez: "Alle Server",
 };

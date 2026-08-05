@@ -22,146 +22,42 @@ import { renderOverview } from "../components/Overview";
 import { openLuckPermsEditor } from "../components/LuckPermsEditor";
 import { getSimpleMode, setSimpleMode } from "../lib/display";
 import { onJump, takeJump } from "../lib/navigate";
+import {
+  ALL_TABS,
+  BEGINNER_TABS,
+  groupsWithTabs,
+  permittedTabs,
+  visibleTabs,
+  type Tab,
+  type TabVisibility,
+} from "../lib/server-tabs";
 
-type Tab =
-  | "console"
-  | "files"
-  | "plugins"
-  | "players"
-  | "access"
-  | "luckperms"
-  | "timeline"
-  | "performance"
-  | "content"
-  | "macros"
-  | "stats"
-  | "schematics"
-  | "map"
-  | "worlds"
-  | "security"
-  | "settings"
-  | "properties"
-  | "motd"
-  | "gamerules"
-  | "schedules"
-  | "overview";
-/**
- * The tabs, grouped by what you are trying to do.
- *
- * Sixteen of them in one scrolling strip meant the last few were only
- * reachable by dragging, so they were grouped - but grouped by where the data
- * happened to live rather than by what anyone came to do. "Content" ended up
- * holding files, plugins, schematics, packs, worlds and the map: six things
- * with nothing in common except that none of them fitted anywhere else. The
- * three world tabs were the worst of it, filed next to the file browser while
- * a person looking for their map had no reason to look under "Content" at all.
- *
- * So: the world and everything you do to it in one place, and the things you
- * install in another. Groups of one show no second row, so Console and
- * Security stay a single click.
- */
-const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
-  { id: "overview", label: () => t("attekintes"), tabs: ["overview"] },
-  { id: "console", label: () => t("konzol"), tabs: ["console"] },
-  { id: "players", label: () => t("jatekosok"), tabs: ["players", "access", "luckperms"] },
-  { id: "world", label: () => t("vilag"), tabs: ["map", "worlds", "schematics"] },
-  { id: "content", label: () => t("tartalom"), tabs: ["plugins", "content", "files"] },
-  {
-    id: "maintenance",
-    label: () => t("karbantartas"),
-    tabs: ["schedules", "macros", "timeline", "performance", "stats"],
-  },
-  { id: "security", label: () => t("biztonsag"), tabs: ["security"] },
-  { id: "settings", label: () => t("beallitasok"), tabs: ["settings", "properties", "motd", "gamerules"] },
-];
-
-/**
- * What a first server actually needs.
- *
- * Twenty-one tabs is the right answer for someone running four servers and the
- * wrong one for someone who has just made their first. Beginner mode is not a
- * different application - every tab here is the same tab - it just stops
- * showing the nineteen things that only matter once something has gone wrong.
- */
-const BEGINNER_TABS: Tab[] = ["overview", "console", "players", "map", "settings", "properties"];
-
-const ALL_TABS: Tab[] = [
-  "overview",
-  "console",
-  "files",
-  "plugins",
-  "players",
-  "access",
-  "luckperms",
-  "timeline",
-  "performance",
-  "content",
-  "macros",
-  "stats",
-  "schematics",
-  "map",
-  "worlds",
-  "security",
-  "settings",
-  "properties",
-  "motd",
-  "gamerules",
-  "schedules",
-];
-
-// Tabs map onto the four server capabilities; the plugin browser writes jars
-// into the server folder, so it rides on "files" rather than adding a fifth
-// permission that would have to be migrated into every existing user record.
 export function renderServerView(
   root: HTMLElement,
   serverId: string,
-  callbacks: { onDeleted: () => void; onChanged: () => void }
+  callbacks: {
+    onDeleted: () => void;
+    onChanged: () => void;
+    /**
+     * The menu lives in the sidebar now, so the view has to say when what the
+     * menu shows has changed - a tab switch, or LuckPerms turning out to be
+     * installed after the first load.
+     */
+    onTabsChanged?: (state: TabVisibility) => void;
+  }
 ): () => void {
-  const perms = permissionsFor(serverId);
   // The LuckPerms tab is additionally hidden unless the plugin is actually
   // installed, which is only known after the first load - see refreshLuckPerms.
   let luckPermsInstalled = false;
   /** Set by goToTab, read once by the render that follows it. */
   let tabDirection: "fwd" | "back" | null = null;
-  const capabilityFor = (tab: Tab) =>
-    tab === "plugins" || tab === "content" || tab === "schematics"
-      ? "files"
-      : tab === "map" || tab === "security" || tab === "worlds"
-        ? "settings"
-      : tab === "macros"
-        ? "console"
-        : tab === "stats" || tab === "properties" || tab === "motd" || tab === "gamerules"
-          ? "settings"
-      : tab === "access"
-        ? "players"
-        : tab === "overview"
-        ? "console"
-      : tab === "luckperms" || tab === "timeline" || tab === "performance" || tab === "schedules"
-          ? "settings"
-          : tab;
-  const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
-  const visibleTabs = () =>
-    permittedTabs.filter(
-      (tab) =>
-        (tab !== "luckperms" || luckPermsInstalled) &&
-        // A tab you are already looking at is never hidden underneath you: the
-        // switch can be thrown while an advanced tab is open, and dropping the
-        // content out from under the cursor is worse than one extra tab.
-        (!getSimpleMode() || BEGINNER_TABS.includes(tab) || tab === activeTab)
-    );
 
-  /** Groups that still have something in them after permissions are applied. */
-  const groupsWithTabs = (): [(typeof TAB_GROUPS)[number], Tab[]][] => {
-    const visible = visibleTabs();
-    return TAB_GROUPS.map(
-      (group) => [group, group.tabs.filter((tab) => visible.includes(tab))] as const
-    ).filter(([, tabs]) => tabs.length > 0) as [(typeof TAB_GROUPS)[number], Tab[]][];
-  };
+  const perms = permissionsFor(serverId);
 
-  const currentGroupTabs = (): Tab[] =>
-    groupsWithTabs().find(([, tabs]) => tabs.includes(activeTab))?.[1] ?? [];
-  const availableTabs = permittedTabs;
-  let activeTab: Tab = availableTabs[0] ?? "console";
+  /** What the sidebar needs to draw the same menu this view is showing. */
+  const tabState = (): TabVisibility => ({ luckPermsInstalled, activeTab });
+
+  let activeTab: Tab = visibleTabs(serverId, { luckPermsInstalled: false, activeTab: null })[0] ?? "console";
   let server: ServerWithStatus | null = null;
   let disposed = false;
 
@@ -191,10 +87,13 @@ export function renderServerView(
   async function load() {
     try {
       server = await api.getServer(serverId);
-      if (permittedTabs.includes("luckperms")) {
+      if (permittedTabs(serverId).includes("luckperms")) {
         luckPermsInstalled = await api.getLuckPermsStatus(serverId).catch(() => false);
       }
       renderShell();
+      // The menu is drawn by the sidebar, and until this point it did not know
+      // whether there is a LuckPerms tab to draw.
+      callbacks.onTabsChanged?.(tabState());
     } catch (err) {
       root.innerHTML = `<div class="empty-state">${
         err instanceof ApiError ? err.message : t("szerver_betoltese_sikertelen")
@@ -203,79 +102,10 @@ export function renderServerView(
   }
 
   /**
-   * Puts the sliding indicator under the active item of a strip.
-   *
-   * Read from the element's own box rather than tracked in state: the strips
-   * scroll horizontally and their items are sized by their text, so the only
-   * reliable source for where the marker belongs is where the item actually
-   * is.
+   * Switches tab. Set inside renderShell so it closes over the current shell,
+   * and read by the sidebar through the jump bus.
    */
-  /** Set by renderShell; bindSubtabs is defined outside its scope and needs it. */
   let goToTab: (tab: Tab) => void = () => {};
-
-  function moveIndicator(strip: HTMLElement | null, activeSelector: string, indicatorClass: string) {
-    if (!strip) return;
-    const active = strip.querySelector<HTMLElement>(activeSelector);
-    const indicator = strip.querySelector<HTMLElement>(`.${indicatorClass}`);
-    if (!active || !indicator) return;
-    indicator.style.width = `${active.offsetWidth}px`;
-    indicator.style.transform = `translateX(${active.offsetLeft}px)`;
-    indicator.style.opacity = "1";
-  }
-
-  function moveIndicators() {
-    moveIndicator(root.querySelector(".tabs"), ".tab.active", "tab-indicator");
-    moveIndicator(root.querySelector(".subtabs"), ".subtab.active", "subtab-indicator");
-  }
-
-  /** Rebuilds the second row when the group changes, and rebinds it. */
-  function renderSubtabs() {
-    const existing = root.querySelector<HTMLElement>(".subtabs");
-    const tabs = currentGroupTabs();
-    if (tabs.length <= 1) {
-      existing?.remove();
-      return;
-    }
-    const markup =
-      tabs
-        .map(
-          (tab) =>
-            `<div class="subtab ${tab === activeTab ? "active" : ""}" data-tab="${tab}"
-                  role="tab" tabindex="${tab === activeTab ? "0" : "-1"}"
-                  aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
-        )
-        .join("") + `<span class="subtab-indicator" aria-hidden="true"></span>`;
-
-    if (existing) {
-      existing.innerHTML = markup;
-    } else {
-      const row = document.createElement("div");
-      row.className = "subtabs";
-      row.setAttribute("role", "tablist");
-      row.innerHTML = markup;
-      root.querySelector(".tabs")?.after(row);
-    }
-    bindSubtabs();
-  }
-
-  /** Bound as its own function because the second row is rebuilt on group change. */
-  function bindSubtabs() {
-    const subEls = [...root.querySelectorAll<HTMLDivElement>(".subtab")];
-    subEls.forEach((subEl, index) => {
-      const select = () => goToTab(subEl.dataset.tab as Tab);
-      subEl.onclick = select;
-      subEl.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          select();
-        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-          e.preventDefault();
-          const step = e.key === "ArrowRight" ? 1 : -1;
-          subEls[(index + step + subEls.length) % subEls.length]?.focus();
-        }
-      };
-    });
-  }
 
   function renderShell() {
     if (!server) return;
@@ -297,122 +127,30 @@ export function renderServerView(
             : ""
         }
       </div>
-      <div class="tabs" role="tablist">
-        ${groupsWithTabs()
-          .map(([group, tabs]) => {
-            const active = tabs.includes(activeTab);
-            return `<div class="tab ${active ? "active" : ""}" data-group="${group.id}" role="tab"
-                    tabindex="${active ? "0" : "-1"}"
-                    aria-selected="${active}">${group.label()}</div>`;
-          })
-          .join("")}
-        <span class="tab-indicator" aria-hidden="true"></span>
-        <button class="mode-toggle ${getSimpleMode() ? "simple" : ""}" id="mode-toggle"
-                title="${escapeHtml(getSimpleMode() ? t("egyszeru_mod_ki_hint") : t("egyszeru_mod_be_hint"))}">
-          ${escapeHtml(getSimpleMode() ? t("egyszeru_mod") : t("teljes_mod"))}
-        </button>
-      </div>
-      ${
-        currentGroupTabs().length > 1
-          ? `<div class="subtabs" role="tablist">
-              ${currentGroupTabs()
-                .map(
-                  (tab) =>
-                    `<div class="subtab ${tab === activeTab ? "active" : ""}" data-tab="${tab}"
-                          role="tab" tabindex="${tab === activeTab ? "0" : "-1"}"
-                          aria-selected="${tab === activeTab}">${labelFor(tab)}</div>`
-                )
-                .join("")}
-              <span class="subtab-indicator" aria-hidden="true"></span>
-            </div>`
-          : ""
-      }
       <div id="resource-charts"></div>
       <div class="tab-content" id="tab-content"></div>
     `;
 
     /**
-     * Switches tab without rebuilding the strips.
+     * Switches tab.
      *
-     * The whole point of the sliding indicator is that it travels from where
-     * it was, and a strip that is thrown away and rebuilt has nowhere to
-     * travel from - the indicator would simply appear in its new place. So a
-     * tab change updates the classes, moves the indicators and re-renders only
-     * the content; renderShell stays for the initial paint and for changes to
-     * the server itself.
+     * Much smaller than it was: the two horizontal strips it used to keep in
+     * step are gone, so this tears down what the old tab owned, records which
+     * way the content should slide in from, and redraws the content. The menu
+     * itself is the sidebar's, and it is told afterwards.
      */
     goToTab = (tab: Tab) => {
       if (tab === activeTab) return;
-      // Which way the content should come in from. ALL_TABS is the order the
-      // tabs are laid out in, so its indices are the direction the eye moved.
+      // ALL_TABS is the order the menu lays them out in, so its indices are the
+      // direction the eye moved.
       tabDirection = ALL_TABS.indexOf(tab) > ALL_TABS.indexOf(activeTab) ? "fwd" : "back";
-      const previousGroup = currentGroupTabs();
       teardownConsole();
       mapHandle?.destroy();
       mapHandle = null;
       activeTab = tab;
-
-      groupEls.forEach((el) => {
-        const group = groupsWithTabs().find(([g]) => g.id === el.dataset.group);
-        const active = Boolean(group?.[1].includes(activeTab));
-        el.classList.toggle("active", active);
-        el.setAttribute("aria-selected", String(active));
-        el.tabIndex = active ? 0 : -1;
-      });
-
-      // A different group means a different second row, which has to be
-      // rebuilt - but the row above it stays, so its indicator still slides.
-      if (previousGroup.join() !== currentGroupTabs().join()) {
-        renderSubtabs();
-      } else {
-        root.querySelectorAll<HTMLDivElement>(".subtab").forEach((el) => {
-          const active = el.dataset.tab === activeTab;
-          el.classList.toggle("active", active);
-          el.setAttribute("aria-selected", String(active));
-          el.tabIndex = active ? 0 : -1;
-        });
-      }
-
-      moveIndicators();
       renderTabContent();
+      callbacks.onTabsChanged?.(tabState());
     };
-
-    const groupEls = [...root.querySelectorAll<HTMLDivElement>(".tab[data-group]")];
-    groupEls.forEach((groupEl, index) => {
-      // Picking a group lands on its first tab; the sub-row then shows where
-      // else that group can go.
-      const open = () => {
-        const group = groupsWithTabs().find(([g]) => g.id === groupEl.dataset.group);
-        if (group && !group[1].includes(activeTab)) goToTab(group[1][0]);
-      };
-      groupEl.onclick = open;
-      groupEl.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          open();
-        } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-          e.preventDefault();
-          const step = e.key === "ArrowRight" ? 1 : -1;
-          groupEls[(index + step + groupEls.length) % groupEls.length]?.focus();
-        }
-      };
-    });
-
-    root.querySelector<HTMLButtonElement>("#mode-toggle")?.addEventListener("click", () => {
-      setSimpleMode(!getSimpleMode());
-      // Redrawn whole rather than just re-labelled: the tab strip, the sub-row
-      // and the properties list all read the mode, and re-deriving them by hand
-      // is three chances to leave one behind.
-      renderShell();
-      renderTabContent();
-      showToast(getSimpleMode() ? t("egyszeru_mod_bekapcsolva") : t("teljes_mod_bekapcsolva"));
-    });
-
-    bindSubtabs();
-    // The strips have no geometry until they are laid out, so the first
-    // placement waits a frame; it is also the reason the indicator starts at
-    // opacity 0 rather than flashing at the left edge.
-    requestAnimationFrame(moveIndicators);
 
     root.querySelector<HTMLButtonElement>("#start-btn")?.addEventListener("click", () =>
       runAction(() => api.startServer(serverId))
@@ -3048,7 +2786,6 @@ export function renderServerView(
     // nothing would be worse than one that shows the tab it promised.
     if (getSimpleMode() && !BEGINNER_TABS.includes(jump.tab as Tab)) {
       setSimpleMode(false);
-      renderShell();
     }
     if (jump.tab === activeTab) renderTabContent();
     else goToTab(jump.tab as Tab);

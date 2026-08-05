@@ -719,4 +719,5 @@ export const en = {
   eula_elfogadas: "I accept the Minecraft End User Licence Agreement.",
   eula_link: "Read it",
   eula_kotelezo: "A Minecraft server cannot be created without accepting the EULA.",
+  vissza_a_szerverekhez: "All servers",
 };

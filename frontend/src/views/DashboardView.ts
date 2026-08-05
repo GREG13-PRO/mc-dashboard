@@ -26,7 +26,9 @@ import { logoMark } from "../lib/logo";
 import { escapeHtml } from "../lib/escape";
 import { staggerIn } from "../lib/motion";
 import { openCommandPalette } from "../components/CommandPalette";
-import { adoptSimpleForNewcomers } from "../lib/display";
+import { adoptSimpleForNewcomers, getSimpleMode, setSimpleMode } from "../lib/display";
+import { groupsWithTabs, tabLabel, type Tab, type TabVisibility } from "../lib/server-tabs";
+import { jumpTo } from "../lib/navigate";
 import type { LocaleKey } from "../lib/i18n";
 import type { ServerWithStatus } from "../types";
 
@@ -76,6 +78,14 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
    * a timer, which is unreadable. Only a genuinely new server moves.
    */
   const seenServers = new Set<string>();
+  /**
+   * What the server view is currently showing.
+   *
+   * The sidebar draws the menu but the view owns which tab is open, so this is
+   * the view's answer, cached. Reset when leaving a server so a stale active
+   * tab cannot light a row on the next one.
+   */
+  let serverTabState: TabVisibility = { luckPermsInstalled: false, activeTab: null };
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let disposeServerView: (() => void) | null = null;
 
@@ -94,7 +104,15 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
                   aria-expanded="true">${icon("chevronLeft", 16)}</button>
         </div>
 
-        <div class="sidebar-scroll">
+        <div class="sidebar-scroll" id="sidebar-scroll">
+          <!--
+            Two panels, one shown at a time. The menu is where you are: the
+            servers when you are choosing one, that server's screens once you
+            are inside it. Kept as two panels rather than one rebuilt list so
+            the server list keeps its own polling and its entrance animation.
+          -->
+          <div id="sidebar-server" hidden></div>
+          <div id="sidebar-home">
           <div class="nav-group">
             <div class="nav-label"><span>${t("menu")}</span></div>
             ${NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin())
@@ -119,6 +137,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
               }
             </div>
             <div class="server-list" id="server-list" role="list"></div>
+          </div>
           </div>
         </div>
 
@@ -285,6 +304,129 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   });
 
   /** Marks the sidebar row for wherever the hash currently points. */
+  /**
+   * The menu for the server you are inside, drawn in the sidebar.
+   *
+   * This is the whole point of the 3.0 layout: the two horizontal strips that
+   * used to sit above the content are gone, and their ~74px goes to the thing
+   * you came to look at. The left column was already there and already mostly
+   * empty below the server list.
+   *
+   * Groups and their tabs are one tree rather than two rows. Only the open
+   * group shows its children - twenty-one rows at once is a wall, and the tab
+   * you want is nearly always in the group you are already in.
+   */
+  function renderServerMenu() {
+    const panel = root.querySelector<HTMLElement>("#sidebar-server");
+    const home = root.querySelector<HTMLElement>("#sidebar-home");
+    const serverId = parseServerIdFromHash();
+    if (!panel || !home) return;
+
+    if (!serverId) {
+      panel.hidden = true;
+      panel.innerHTML = "";
+      home.hidden = false;
+      return;
+    }
+
+    const server = servers.find((s) => s.id === serverId);
+    const groups = groupsWithTabs(serverId, serverTabState);
+    const openGroup = groups.find(({ tabs }) => tabs.includes(serverTabState.activeTab as Tab));
+
+    panel.innerHTML = `
+      <a class="nav-item sidebar-back" href="#">
+        <span class="nav-icon">${icon("chevronLeft", 16)}</span>
+        <span class="nav-text">${escapeHtml(t("vissza_a_szerverekhez"))}</span>
+      </a>
+      <div class="sidebar-server-name" title="${escapeHtml(server?.name ?? "")}">
+        <span class="status-dot ${server?.running ? "running" : "stopped"}"></span>
+        <strong>${escapeHtml(server?.name ?? "")}</strong>
+      </div>
+      <div class="sidebar-tabs" role="tablist" aria-orientation="vertical">
+        ${groups
+          .map(({ group, tabs }) => {
+            const isOpen = group.id === openGroup?.group.id;
+            const single = tabs.length === 1;
+            const active = tabs.includes(serverTabState.activeTab as Tab);
+            const head = `
+              <button class="sidebar-tab ${active && single ? "active" : ""} ${isOpen && !single ? "open" : ""}"
+                      data-group="${group.id}" data-tab="${single ? tabs[0] : ""}"
+                      role="tab" aria-selected="${active}" title="${escapeHtml(group.label())}">
+                <span class="nav-icon">${icon(group.icon, 16)}</span>
+                <span class="nav-text">${escapeHtml(group.label())}</span>
+                ${single ? "" : `<span class="sidebar-caret">${icon("chevronDown", 13)}</span>`}
+              </button>`;
+            const children =
+              single || !isOpen
+                ? ""
+                : `<div class="sidebar-subtabs">
+                     ${tabs
+                       .map(
+                         (tab) =>
+                           `<button class="sidebar-subtab ${tab === serverTabState.activeTab ? "active" : ""}"
+                                    data-tab="${tab}" role="tab"
+                                    aria-selected="${tab === serverTabState.activeTab}">${escapeHtml(
+                             tabLabel(tab)
+                           )}</button>`
+                       )
+                       .join("")}
+                   </div>`;
+            return head + children;
+          })
+          .join("")}
+      </div>
+      <button class="sidebar-mode ${getSimpleMode() ? "simple" : ""}" id="sidebar-mode"
+              title="${escapeHtml(getSimpleMode() ? t("egyszeru_mod_ki_hint") : t("egyszeru_mod_be_hint"))}">
+        ${escapeHtml(getSimpleMode() ? t("egyszeru_mod") : t("teljes_mod"))}
+      </button>
+    `;
+    panel.hidden = false;
+    home.hidden = true;
+
+    const go = (tab: string) => {
+      jumpTo({ serverId, tab });
+      // On a phone the sidebar is a drawer over the content; leaving it open
+      // after a choice hides the thing that was just chosen.
+      if (window.matchMedia("(max-width: 620px)").matches) setDrawer(false);
+    };
+
+    panel.querySelectorAll<HTMLButtonElement>(".sidebar-tab").forEach((el) => {
+      el.onclick = () => {
+        const single = el.dataset.tab;
+        if (single) {
+          go(single);
+          return;
+        }
+        // A group with children opens onto its first tab, which is also what
+        // makes it the open group - one click, not two.
+        const group = groups.find(({ group: g }) => g.id === el.dataset.group);
+        if (group) go(group.tabs[0]);
+      };
+    });
+    panel.querySelectorAll<HTMLButtonElement>(".sidebar-subtab").forEach((el) => {
+      el.onclick = () => go(el.dataset.tab!);
+    });
+
+    // Up and Down, because the menu is a column now. The old strip used Left
+    // and Right, which on a vertical list is a keyboard trap of its own.
+    const rows = [...panel.querySelectorAll<HTMLButtonElement>(".sidebar-tab, .sidebar-subtab")];
+    rows.forEach((el, index) => {
+      el.tabIndex = el.classList.contains("active") ? 0 : -1;
+      el.onkeydown = (e) => {
+        if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+        e.preventDefault();
+        rows[(index + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length]?.focus();
+      };
+    });
+    if (rows.length > 0 && !rows.some((el) => el.tabIndex === 0)) rows[0].tabIndex = 0;
+
+    panel.querySelector<HTMLButtonElement>("#sidebar-mode")!.onclick = () => {
+      setSimpleMode(!getSimpleMode());
+      renderServerMenu();
+      showToast(getSimpleMode() ? t("egyszeru_mod_bekapcsolva") : t("teljes_mod_bekapcsolva"));
+    };
+  }
+
   function renderNav() {
     const hash = location.hash || "#";
     root.querySelectorAll<HTMLAnchorElement>(".nav-item").forEach((item) => {
@@ -348,6 +490,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         adoptSimpleForNewcomers(servers.length);
       }
       renderList();
+      renderServerMenu();
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : t("szerverlista_betoltese_sikertelen"), "error");
     }
@@ -487,14 +630,20 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       return;
     }
 
+    serverTabState = { luckPermsInstalled: false, activeTab: null };
     disposeServerView = renderServerView(mainContent, serverId, {
       onDeleted: () => {
         location.hash = "";
         void refreshList();
       },
       onChanged: () => void refreshList(),
+      onTabsChanged: (state) => {
+        serverTabState = state;
+        renderServerMenu();
+      },
     });
     renderList();
+    renderServerMenu();
   }
 
   // The chrome is updated here rather than inside renderMainContent, which
@@ -504,6 +653,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     renderMainContent();
     renderNav();
     renderCrumbs();
+    renderServerMenu();
   };
   window.addEventListener("hashchange", hashHandler);
 

@@ -720,4 +720,5 @@ export const zhCN: Partial<Locale> = {
   eula_elfogadas: "我接受 Minecraft 最终用户许可协议。",
   eula_link: "阅读",
   eula_kotelezo: "不接受 EULA 就无法创建 Minecraft 服务器。",
+  vissza_a_szerverekhez: "所有服务器",
 };

@@ -721,4 +721,5 @@ export const hu: typeof en = {
   eula_elfogadas: "Elfogadom a Minecraft végfelhasználói licencszerződését.",
   eula_link: "Elolvasom",
   eula_kotelezo: "A Minecraft EULA elfogadása nélkül nem hozható létre szerver.",
+  vissza_a_szerverekhez: "Vissza a szerverekhez",
 };

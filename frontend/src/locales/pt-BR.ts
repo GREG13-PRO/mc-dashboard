@@ -720,4 +720,5 @@ export const ptBR: Partial<Locale> = {
   eula_elfogadas: "Aceito o Contrato de Licença de Usuário Final do Minecraft.",
   eula_link: "Ler",
   eula_kotelezo: "Não dá para criar um servidor de Minecraft sem aceitar a EULA.",
+  vissza_a_szerverekhez: "Todos os servidores",
 };

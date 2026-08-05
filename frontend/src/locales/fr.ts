@@ -720,4 +720,5 @@ export const fr: Partial<Locale> = {
   eula_elfogadas: "J’accepte le contrat de licence utilisateur final de Minecraft.",
   eula_link: "Le lire",
   eula_kotelezo: "Impossible de créer un serveur Minecraft sans accepter le CLUF.",
+  vissza_a_szerverekhez: "Tous les serveurs",
 };

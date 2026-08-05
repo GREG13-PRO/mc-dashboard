@@ -1198,45 +1198,6 @@ a.crumb:hover {
   font-weight: 400;
 }
 
-/* ------------------------------------------------------------------- tabs */
-
-.tabs {
-  display: flex;
-  gap: 2px;
-  padding: var(--gap-sm) var(--gap-xl) 0;
-  border-bottom: 0.5px solid var(--border);
-  /* There are now enough tabs to run past the window edge on a laptop; without
-     this the last ones are simply unreachable. */
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.tab {
-  flex: none;
-  white-space: nowrap;
-}
-
-.tab {
-  padding: 5px 12px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  color: var(--text-dim);
-  font-size: 13px;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
-}
-
-.tab:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.tab.active {
-  background: var(--bg-card);
-  color: var(--text);
-  font-weight: 500;
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-
 .tab-content {
   display: flex;
   flex-direction: column;
@@ -1939,11 +1900,6 @@ table.file-table tr.file-row:hover {
   border-width: 1.5px;
 }
 
-:root[data-contrast="high"] .tab.active {
-  box-shadow: inset 0 -3px 0 var(--accent);
-  text-decoration: underline;
-}
-
 /* The selected row is signalled by more than colour, so it survives being
  * looked at by someone who cannot separate the two. */
 :root[data-contrast="high"] .server-card.active {
@@ -1973,12 +1929,6 @@ table.file-table tr.file-row:hover {
 .skip-link:focus {
   left: 8px;
   top: 8px;
-}
-
-/* Tabs are reachable and operable from the keyboard. */
-.tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
 }
 
 /* At larger text sizes the name no longer fits beside the mark and the toggle,
@@ -2400,16 +2350,6 @@ table.file-table tr.file-row:hover {
     padding: var(--gap-md);
   }
 
-  .tabs {
-    padding-left: var(--gap-md);
-    padding-right: var(--gap-md);
-  }
-
-  /* Comfortable thumb targets - 5px of vertical padding is a desktop number. */
-  .tab {
-    padding: 9px 12px;
-  }
-
   .section,
   .tab-content > .section {
     padding-left: var(--gap-md);
@@ -2506,46 +2446,6 @@ table.file-table tr.file-row:hover {
   color: var(--red);
 }
 
-/* ------------------------------------------------- grouped tabs & admin hub */
-
-/* The second row of a grouped tab strip: quieter than the group row above it,
-   so the eye reads the group first and the destination second. */
-.subtabs {
-  display: flex;
-  gap: 2px;
-  padding: 6px var(--gap-xl);
-  border-bottom: 0.5px solid var(--border);
-  background: var(--bg-inset);
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
-.subtab {
-  flex: none;
-  padding: 3px 10px;
-  border-radius: 999px;
-  color: var(--text-dim);
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
-}
-
-.subtab:hover {
-  color: var(--text);
-}
-
-.subtab.active {
-  background: var(--bg-card);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
-}
-
-.subtab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
 .hub-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -2595,71 +2495,6 @@ table.file-table tr.file-row:hover {
 }
 
 @media (max-width: 760px) {
-  .subtabs {
-    padding-left: var(--gap-md);
-    padding-right: var(--gap-md);
-  }
-}
-
-/* ------------------------------------------------------- sliding indicators */
-
-.tabs,
-.subtabs {
-  position: relative;
-}
-
-/* Travels to whichever item is active rather than being redrawn under it.
-   Hidden until it has been placed, so it never flashes at the left edge on
-   first paint. */
-.tab-indicator {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--accent);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    transform 260ms var(--ease),
-    width 260ms var(--ease),
-    opacity 160ms var(--ease);
-}
-
-.subtab-indicator {
-  position: absolute;
-  top: 6px;
-  left: 0;
-  height: 22px;
-  border-radius: 999px;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-sm);
-  opacity: 0;
-  pointer-events: none;
-  /* Behind the labels: this is the pill they sit on, not a marker beside them. */
-  z-index: 0;
-  transition:
-    transform 260ms var(--ease),
-    width 260ms var(--ease),
-    opacity 160ms var(--ease);
-}
-
-.subtab {
-  position: relative;
-  z-index: 1;
-}
-
-/* The pill is the indicator now, so the active item only changes its text. */
-.subtab.active {
-  background: none;
-  box-shadow: none;
-}
-
-/* The underline is the sliding indicator now. The active tab keeps its card
-   background and weight, but drops the inset shadow that used to draw the
-   line - otherwise there are two of them, one of which cannot move. */
-.tab.active {
-  box-shadow: none;
 }
 
 /* Direction matters: content arriving from the side you came from says which
@@ -3987,25 +3822,6 @@ table.file-table tr.file-row:hover {
   .topbar-search kbd { display: none; }
 }
 
-/* ---- Simple/full mode toggle ---------------------------------------------- */
-.mode-toggle {
-  margin-left: auto;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.mode-toggle.simple {
-  border-color: color-mix(in srgb, var(--accent) 88%, black);
-  background: color-mix(in srgb, var(--accent) 88%, black);
-  color: var(--on-accent);
-}
-
 /* ---- Landing on a control ------------------------------------------------- */
 /* Two beats rather than one: a single flash reads as a rendering glitch, two
  * reads as something pointing. */
@@ -4045,4 +3861,134 @@ table.file-table tr.file-row:hover {
 .eula-row a {
   color: var(--accent);
   margin-left: 4px;
+}
+
+/* ---- The server menu, in the sidebar (3.0) --------------------------------
+ * Replaces the two horizontal strips that used to sit above the content. The
+ * left column was already there and mostly empty below the server list; the
+ * ~74px those strips cost is now the content's.
+ */
+.sidebar-back {
+  margin-bottom: 2px;
+}
+
+.sidebar-server-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 10px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.sidebar-server-name strong {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-tab,
+.sidebar-subtab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-tab:hover,
+.sidebar-subtab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.sidebar-tab.open {
+  color: var(--text);
+}
+
+.sidebar-tab.active,
+.sidebar-subtab.active {
+  background: var(--accent-dim);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+/* Indented under their group, with a rule tying them to it - without the line
+   a sub-item reads as another top-level row that happens to sit further in. */
+.sidebar-subtabs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 1px 0 3px 19px;
+  padding-left: 9px;
+  border-left: 1px solid var(--border);
+}
+
+.sidebar-subtab {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.sidebar-caret {
+  margin-left: auto;
+  display: flex;
+  color: var(--text-dim);
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+}
+
+.sidebar-tab.open .sidebar-caret {
+  transform: rotate(0deg);
+}
+
+.sidebar-mode {
+  width: 100%;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.sidebar-mode.simple {
+  border-color: color-mix(in srgb, var(--accent) 88%, black);
+  background: color-mix(in srgb, var(--accent) 88%, black);
+  color: var(--on-accent);
+}
+
+/* Collapsed to the 60px rail: icons only, and the sub-items would have no icon
+   to show, so the group carries the whole thing and its title says the rest. */
+.sidebar.collapsed .sidebar-server-name,
+.sidebar.collapsed .sidebar-subtabs,
+.sidebar.collapsed .sidebar-caret,
+.sidebar.collapsed .sidebar-mode {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-tab {
+  justify-content: center;
+  padding: 8px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-caret {
+    transition: none;
+  }
 }

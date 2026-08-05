@@ -720,4 +720,5 @@ export const ru: Partial<Locale> = {
   eula_elfogadas: "Я принимаю лицензионное соглашение Minecraft.",
   eula_link: "Прочитать",
   eula_kotelezo: "Без принятия EULA сервер Minecraft создать нельзя.",
+  vissza_a_szerverekhez: "Все серверы",
 };
