@@ -28,6 +28,7 @@ export type FixId =
   | "rcon-password"
   | "command-blocks"
   | "properties-perms"
+  | "bind-loopback"
   | "backup";
 
 export interface FixChange {
@@ -112,6 +113,24 @@ export function previewFix(entry: ServerEntry, id: FixId): FixPreview {
         needsRestart: true,
       };
 
+    case "bind-loopback":
+      return {
+        id,
+        changes: [
+          {
+            label: "server-ip",
+            from: props["server-ip"] || "(üres — minden interfész)",
+            to: "127.0.0.1",
+          },
+        ],
+        needsRestart: true,
+        // Said out loud because it is the one way this fix can hurt: a proxy on
+        // another machine reaches the backend over the network, and binding to
+        // the loopback shuts it out along with everyone else.
+        danger:
+          "Csak akkor helyes, ha a proxy ugyanezen a gépen fut. Ha máshol, akkor tűzfalszabály kell helyette.",
+      };
+
     case "properties-perms": {
       const mode = fs.existsSync(propsPath(entry))
         ? (fs.statSync(propsPath(entry)).mode & 0o777).toString(8)
@@ -159,6 +178,10 @@ export async function applyFix(entry: ServerEntry, id: FixId): Promise<string> {
     case "command-blocks":
       writeProperties(propsPath(entry), { "enable-command-block": "false" });
       return "enable-command-block=false";
+
+    case "bind-loopback":
+      writeProperties(propsPath(entry), { "server-ip": "127.0.0.1" });
+      return "server-ip=127.0.0.1";
 
     case "properties-perms": {
       const file = propsPath(entry);

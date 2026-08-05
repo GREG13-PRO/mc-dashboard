@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
@@ -81,6 +82,37 @@ function behindProxy(entry: ServerEntry): boolean {
  * running AuthMe is that offline mode is a decision, not an oversight. It is
  * still weaker than online mode, so it becomes a warning rather than silence.
  */
+/**
+ * Whether a firewall is plausibly keeping a port to itself.
+ *
+ * Deliberately shallow, and it errs towards saying "no". Reading iptables
+ * properly means understanding chains, policies and whatever nftables or
+ * Docker has done underneath, and a check that half-understands a firewall
+ * and then declares a port safe is worse than one that declines to guess.
+ * A default-deny INPUT policy or a ufw that is switched on is enough to stay
+ * quiet; anything else and the operator gets asked.
+ */
+function firewallLikelyBlocks(port: number): boolean {
+  try {
+    const ufw = execFileSync("ufw", ["status"], { encoding: "utf-8", timeout: 3000 });
+    if (/Status:\s*active/i.test(ufw)) {
+      // Active and not explicitly allowing this port through.
+      return !new RegExp(`^${port}(/tcp)?\\s+ALLOW`, "m").test(ufw);
+    }
+  } catch {
+    // No ufw, or not permitted to ask it. Fall through to iptables.
+  }
+  try {
+    const rules = execFileSync("iptables", ["-S", "INPUT"], { encoding: "utf-8", timeout: 3000 });
+    if (/^-P INPUT DROP|^-P INPUT REJECT/m.test(rules)) {
+      return !new RegExp(`--dport ${port}\\b[^\\n]*-j ACCEPT`, "m").test(rules);
+    }
+  } catch {
+    // Not readable without privileges; treat as no firewall rather than assume.
+  }
+  return false;
+}
+
 function loginPluginName(entry: ServerEntry): string | null {
   const dir = path.join(entry.folder, "plugins");
   if (!fs.existsSync(dir)) return null;
@@ -164,6 +196,41 @@ function checkConfig(entry: ServerEntry, findings: Finding[]): void {
           "A server-ip üres, így az RCON-port nem csak a localhoston érhető el. A dashboardnak ehhez elég a localhost.",
         advice: "Zárd le az RCON-portot tűzfallal, vagy kösd a szervert 127.0.0.1-re, ha nem kell kívülről.",
         goTo: "properties",
+      });
+    }
+  }
+
+  /**
+   * A backend server that trusts its proxy, reachable without going through it.
+   *
+   * `online-mode=false` behind a proxy is correct - the proxy authenticates and
+   * the server behind it must not. That is why the finding above stays quiet
+   * once a proxy is detected. But "behind a proxy" only protects anything if
+   * the backend port cannot be reached directly, and nothing checked that.
+   *
+   * Reached directly, such a server accepts whatever username the connecting
+   * client claims. Not a weak password - no password. Anyone who can open a
+   * socket to this port can log in as the owner.
+   *
+   * The proxy reaches it over the loopback, so binding there costs nothing and
+   * closes it. Kept separate from the RCON check above: the same mistake on the
+   * game port has a much larger consequence, and they are fixed independently.
+   */
+  if (proxied && props["online-mode"] === "false") {
+    const port = Number.parseInt(props["server-port"] ?? "25565", 10);
+    const bindsEverywhere = !props["server-ip"] || props["server-ip"] === "0.0.0.0";
+    if (bindsEverywhere && !firewallLikelyBlocks(port)) {
+      findings.push({
+        id: "proxy-backend-exposed",
+        severity: "critical",
+        title: "A proxy mögötti szerver kívülről is elérhető",
+        detail:
+          `Az online-mode ki van kapcsolva - proxy mögött ez helyes -, de a ${port}-es port minden ` +
+          "hálózati interfészen figyel, és nem látszik tűzfal előtte. Aki közvetlenül ide csatlakozik, " +
+          "kihagyja a proxyt és az általa végzett azonosítást, tehát tetszőleges néven léphet be, a tiéden is.",
+        advice:
+          "Kösd a szervert a 127.0.0.1-re (server-ip), hogy csak a proxy érje el, vagy zárd le a portot tűzfallal.",
+        fix: "bind-loopback",
       });
     }
   }
