@@ -119,6 +119,7 @@ import {
   hasWorldEdit,
   SchematicError,
 } from "./schematics";
+import { readSchematicSurface, SchematicReadError } from "./schematic-surface";
 import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
@@ -1347,6 +1348,28 @@ serversRouter.delete("/:id/schematics/:filename", requirePermission("files"), as
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * The schematic seen from above, for the map preview.
+ *
+ * Read on demand rather than cached: a schematic is small next to a region, and
+ * the file changes whenever somebody re-saves it in game, where a stale preview
+ * would be a preview of the wrong build.
+ */
+serversRouter.get("/:id/schematics/:filename/surface", requirePermission("files"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json(await readSchematicSurface(resolveSchematicPath(entry, req.params.filename)));
+  } catch (err) {
+    res
+      .status(err instanceof SchematicReadError || err instanceof SchematicError ? 400 : 500)
+      .json({ error: (err as Error).message });
   }
 });
 

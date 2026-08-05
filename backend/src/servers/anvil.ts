@@ -11,7 +11,7 @@ import zlib from "node:zlib";
  * is a map, not round-tripping world data.
  */
 
-type NbtValue =
+export type NbtValue =
   | number
   | bigint
   | string
@@ -35,7 +35,12 @@ const TAG_COMPOUND = 10;
 const TAG_INT_ARRAY = 11;
 const TAG_LONG_ARRAY = 12;
 
-class NbtReader {
+/**
+ * Exported for the schematic reader, which is the same NBT with a different
+ * root: a sponge `.schem` is one gzipped compound holding a block palette and a
+ * varint array, so it needs a tag parser and nothing else from Anvil.
+ */
+export class NbtReader {
   private offset = 0;
   /** Name of a compound whose children's tag ids should be recorded, if any. */
   private capture: string | null = null;

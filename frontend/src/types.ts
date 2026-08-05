@@ -383,6 +383,22 @@ export interface SurfaceView {
   heights: string;
 }
 
+/** A schematic seen from above, for the placement preview on the map. */
+export interface SchematicSurface {
+  width: number;
+  length: number;
+  height: number;
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
+  palette: string[];
+  /** width*length palette indices, one byte each, base64. */
+  colours: string;
+  /** width*length heights as signed 16-bit little-endian, base64. */
+  heights: string;
+  blockCounts: { name: string; count: number }[];
+}
+
 export interface PlayerPosition {
   name: string;
   x: number;

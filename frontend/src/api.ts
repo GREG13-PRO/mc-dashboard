@@ -21,6 +21,7 @@ import type {
   Macro,
   MapInfo,
   PlayerPosition,
+  SchematicSurface,
   SurfaceView,
   SecurityReport,
   PublishedBuild,
@@ -565,6 +566,9 @@ export const api = {
   },
   async deleteSchematic(serverId: string, filename: string): Promise<void> {
     await request(`/servers/${serverId}/schematics/${encodeURIComponent(filename)}`, { method: "DELETE" });
+  },
+  async getSchematicSurface(serverId: string, filename: string): Promise<SchematicSurface> {
+    return request(`/servers/${serverId}/schematics/${encodeURIComponent(filename)}/surface`);
   },
   schematicDownloadUrl(serverId: string, filename: string): string {
     return `/api/servers/${serverId}/schematics/${encodeURIComponent(filename)}/download`;

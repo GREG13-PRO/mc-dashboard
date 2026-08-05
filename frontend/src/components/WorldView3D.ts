@@ -1,7 +1,7 @@
 import { api } from "../api";
 import { t } from "../lib/i18n";
 import { perspective, lookAt, multiply } from "../lib/mat4";
-import type { Dimension, SurfaceView } from "../types";
+import type { Dimension, SchematicSurface, SurfaceView } from "../types";
 
 /**
  * Blocky 3D view of a square of world, built from the same surface data the 2D
@@ -47,9 +47,33 @@ void main() {
   gl_FragColor = vec4(vColour, 1.0);
 }`;
 
+/**
+ * A schematic standing on the terrain, before anything is written to the world.
+ *
+ * Pasting used to be a leap of faith: pick a file by name, type three numbers,
+ * and find out what you had done by walking there in game. The ghost is the
+ * same blocks the paste will place, drawn where the paste will place them.
+ */
+export interface GhostPlacement {
+  surface: SchematicSurface;
+  /** North-west corner of the build, in world blocks. */
+  x: number;
+  z: number;
+  /** World Y the bottom layer sits on. */
+  y: number;
+}
+
 export interface WorldView3DHandle {
   element: HTMLElement;
   destroy(): void;
+  /** Draws a schematic at a spot, or clears it when given null. */
+  setGhost(placement: GhostPlacement | null): void;
+  /** Terrain height at a world column, or null outside the loaded square. */
+  heightAt(x: number, z: number): number | null;
+  /** Called with world coordinates when the terrain is clicked. */
+  onPick: ((x: number, z: number) => void) | null;
+  /** Resolves once the terrain is loaded, so a caller can place onto it. */
+  ready: Promise<void>;
 }
 
 function decodeBase64(data: string): Uint8Array {
@@ -206,6 +230,130 @@ function buildMesh(view: SurfaceView, palette: [number, number, number][]): Mesh
   return { data, vertices: parts.length / 6, centreY: (minY + maxY) / 2 };
 }
 
+/**
+ * How much the ghost is lightened against the terrain.
+ *
+ * A schematic drawn in its true colours next to the world it will be pasted
+ * into is indistinguishable from a build that is already there, which defeats
+ * the point of a preview. Lightening rather than making it translucent keeps
+ * the shape readable - a see-through building against a busy hillside is a
+ * mess, and the depth buffer would need sorting to draw it correctly anyway.
+ */
+const GHOST_LIFT = 0.32;
+/** Deepest the ghost's sides are drawn, so a build on a cliff edge stays cheap. */
+const GHOST_SKIRT = 40;
+
+/**
+ * The schematic's surface as quads, positioned in the terrain's coordinates.
+ *
+ * Separate from `buildMesh` rather than generalised into it: the ghost skirts
+ * down to the terrain underneath so the building looks like it is standing on
+ * the ground, where the terrain skirts down to its own lowest column. One
+ * function doing both would be an argument list describing two different jobs.
+ */
+function buildGhostMesh(
+  placement: GhostPlacement,
+  view: SurfaceView,
+  terrainHeights: Int16Array,
+  terrainColours: Uint8Array
+): { data: Float32Array; vertices: number } {
+  const { surface } = placement;
+  const colours = decodeBase64(surface.colours);
+  const raw = decodeBase64(surface.heights);
+  const heights = new Int16Array(raw.buffer, raw.byteOffset, surface.width * surface.length);
+  const palette = surface.palette.map((hex) => {
+    const n = Number.parseInt(hex.slice(1), 16);
+    // Lifted towards white here rather than in the shader: the colours are
+    // baked into the vertex buffer, and the shader is shared with the terrain.
+    const lift = (channel: number) => (channel / 255) * (1 - GHOST_LIFT) + GHOST_LIFT;
+    return [lift((n >> 16) & 255), lift((n >> 8) & 255), lift(n & 255)] as [number, number, number];
+  });
+
+  const size = view.size;
+  const parts: number[] = [];
+  const push = (x: number, y: number, z: number, [r, g, b]: [number, number, number], shade: number) => {
+    parts.push(x - size / 2, y, z - size / 2, r * shade, g * shade, b * shade);
+  };
+  const quad = (corners: [number, number, number][], colour: [number, number, number], shade: number) => {
+    const [a, b, c, d] = corners;
+    for (const p of [a, b, c, a, c, d]) push(p[0], p[1], p[2], colour, shade);
+  };
+
+  /** Terrain height at a grid column, or the ghost's own base outside the view. */
+  const groundAt = (gx: number, gz: number): number => {
+    if (gx < 0 || gz < 0 || gx >= size || gz >= size) return placement.y;
+    const at = gz * size + gx;
+    return terrainColours[at] === 0 ? placement.y : terrainHeights[at] + 1;
+  };
+
+  const top = (sx: number, sz: number): number | null => {
+    if (sx < 0 || sz < 0 || sx >= surface.width || sz >= surface.length) return null;
+    const at = sz * surface.width + sx;
+    return colours[at] === 0 ? null : placement.y + heights[at] + 1;
+  };
+
+  for (let sz = 0; sz < surface.length; sz++) {
+    for (let sx = 0; sx < surface.width; sx++) {
+      const at = sz * surface.width + sx;
+      const id = colours[at];
+      if (id === 0) continue;
+      const colour = palette[id] ?? [0.8, 0.8, 0.8];
+      // Grid coordinates within the loaded square, which is what the mesh is
+      // laid out in; the ghost may hang off the edge and that is fine.
+      const gx = placement.x + sx - view.x;
+      const gz = placement.z + sz - view.z;
+      const y = placement.y + heights[at] + 1;
+
+      quad(
+        [
+          [gx, y, gz],
+          [gx, y, gz + 1],
+          [gx + 1, y, gz + 1],
+          [gx + 1, y, gz],
+        ],
+        colour,
+        FACE_SHADE.top
+      );
+
+      const skirt = (nx: number, nz: number) => {
+        const neighbour = top(nx, nz);
+        const ground = groundAt(placement.x + nx - view.x, placement.z + nz - view.z);
+        // Down to whichever is higher - the neighbouring part of the build, or
+        // the ground it stands on - and never more than GHOST_SKIRT deep.
+        return Math.max(neighbour ?? ground, ground, y - GHOST_SKIRT);
+      };
+
+      const north = skirt(sx, sz - 1);
+      if (north < y) {
+        quad([[gx, y, gz], [gx + 1, y, gz], [gx + 1, north, gz], [gx, north, gz]], colour, FACE_SHADE.north);
+      }
+      const south = skirt(sx, sz + 1);
+      if (south < y) {
+        quad(
+          [[gx, y, gz + 1], [gx, south, gz + 1], [gx + 1, south, gz + 1], [gx + 1, y, gz + 1]],
+          colour,
+          FACE_SHADE.south
+        );
+      }
+      const west = skirt(sx - 1, sz);
+      if (west < y) {
+        quad([[gx, y, gz], [gx, west, gz], [gx, west, gz + 1], [gx, y, gz + 1]], colour, FACE_SHADE.west);
+      }
+      const east = skirt(sx + 1, sz);
+      if (east < y) {
+        quad(
+          [[gx + 1, y, gz], [gx + 1, y, gz + 1], [gx + 1, east, gz + 1], [gx + 1, east, gz]],
+          colour,
+          FACE_SHADE.east
+        );
+      }
+    }
+  }
+
+  const data = new Float32Array(parts);
+  return { data, vertices: parts.length / 6 };
+}
+
 export function createWorldView3D(
   serverId: string,
   dimension: Dimension,
@@ -228,11 +376,28 @@ export function createWorldView3D(
   let centreY = 64;
   let vertices = 0;
   let frame = 0;
+  let ghostVertices = 0;
+  /** Kept so the ghost can be rebuilt at a new spot without refetching. */
+  let loaded: SurfaceView | null = null;
+  let terrainHeights: Int16Array | null = null;
+  let terrainColours: Uint8Array | null = null;
+  let ghost: GhostPlacement | null = null;
+  let resolveReady: () => void = () => {};
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve;
+  });
 
   const gl = canvas.getContext("webgl", { antialias: true, alpha: false });
   if (!gl) {
     status.textContent = t("nincs_webgl");
-    return { element: root, destroy() {} };
+    return {
+      element: root,
+      destroy() {},
+      setGhost() {},
+      heightAt: () => null,
+      onPick: null,
+      ready: Promise.resolve(),
+    };
   }
 
   const program = gl.createProgram()!;
@@ -242,11 +407,23 @@ export function createWorldView3D(
   gl.useProgram(program);
 
   const buffer = gl.createBuffer();
+  const ghostBuffer = gl.createBuffer();
   const aPos = gl.getAttribLocation(program, "aPos");
   const aColour = gl.getAttribLocation(program, "aColour");
   const uMvp = gl.getUniformLocation(program, "uMvp");
   gl.enable(gl.DEPTH_TEST);
   gl.clearColor(0.07, 0.08, 0.1, 1);
+
+  /** Points the attributes at one buffer; both have the same interleaved layout. */
+  function bind(which: WebGLBuffer | null) {
+    if (!gl) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, which);
+    const stride = 6 * 4;
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
+    gl.enableVertexAttribArray(aColour);
+    gl.vertexAttribPointer(aColour, 3, gl.FLOAT, false, stride, 3 * 4);
+  }
 
   function draw() {
     if (disposed || !gl) return;
@@ -261,17 +438,112 @@ export function createWorldView3D(
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     if (vertices === 0) return;
 
-    const eye: [number, number, number] = [
+    const mvp = multiply(
+      perspective(Math.PI / 4, width / height, 1, distance * 4 + 1000),
+      lookAt(cameraEye(), [0, centreY, 0], [0, 1, 0])
+    );
+    gl.uniformMatrix4fv(uMvp, false, mvp);
+    bind(buffer);
+    gl.drawArrays(gl.TRIANGLES, 0, vertices);
+    if (ghostVertices > 0) {
+      bind(ghostBuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, ghostVertices);
+    }
+  }
+
+  function cameraEye(): [number, number, number] {
+    return [
       Math.cos(pitch) * Math.sin(yaw) * distance,
       centreY + Math.sin(pitch) * distance,
       Math.cos(pitch) * Math.cos(yaw) * distance,
     ];
-    const mvp = multiply(
-      perspective(Math.PI / 4, width / height, 1, distance * 4 + 1000),
-      lookAt(eye, [0, centreY, 0], [0, 1, 0])
-    );
-    gl.uniformMatrix4fv(uMvp, false, mvp);
-    gl.drawArrays(gl.TRIANGLES, 0, vertices);
+  }
+
+  /**
+   * World column under a point on the canvas.
+   *
+   * Marched rather than solved: the terrain is a heightfield, not a plane, so
+   * there is no closed form - the ray is stepped forward until it drops below
+   * the surface, then bisected once to land on the right block rather than the
+   * one half a step past it. Half-block steps because a step longer than a
+   * block can jump clean over a wall and pick the ground behind it.
+   */
+  function pick(clientX: number, clientY: number): { x: number; z: number } | null {
+    if (!loaded || !terrainHeights || !terrainColours) return null;
+    const box = canvas.getBoundingClientRect();
+    const aspect = (canvas.clientWidth || 1) / (canvas.clientHeight || 1);
+    const tanHalf = Math.tan(Math.PI / 8);
+    const ndcX = ((clientX - box.left) / box.width) * 2 - 1;
+    const ndcY = 1 - ((clientY - box.top) / box.height) * 2;
+
+    const eye = cameraEye();
+    const target: [number, number, number] = [0, centreY, 0];
+    const norm = (v: number[]): [number, number, number] => {
+      const len = Math.hypot(v[0], v[1], v[2]) || 1;
+      return [v[0] / len, v[1] / len, v[2] / len];
+    };
+    const cross = (a: number[], b: number[]) => [
+      a[1] * b[2] - a[2] * b[1],
+      a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0],
+    ];
+    const forward = norm([target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]]);
+    const right = norm(cross(forward, [0, 1, 0]));
+    const up = cross(right, forward);
+    const dir = norm([
+      forward[0] + right[0] * ndcX * tanHalf * aspect + up[0] * ndcY * tanHalf,
+      forward[1] + right[1] * ndcX * tanHalf * aspect + up[1] * ndcY * tanHalf,
+      forward[2] + right[2] * ndcX * tanHalf * aspect + up[2] * ndcY * tanHalf,
+    ]);
+
+    const size = loaded.size;
+    /** Mesh-local coordinates are grid coordinates shifted by half the square. */
+    const heightAtLocal = (lx: number, lz: number): number | null => {
+      const gx = Math.floor(lx + size / 2);
+      const gz = Math.floor(lz + size / 2);
+      if (gx < 0 || gz < 0 || gx >= size || gz >= size) return null;
+      const at = gz * size + gx;
+      return terrainColours![at] === 0 ? null : terrainHeights![at] + 1;
+    };
+
+    const step = 0.5;
+    const far = distance * 4;
+    let previous = 0;
+    for (let travelled = 1; travelled < far; travelled += step) {
+      const px = eye[0] + dir[0] * travelled;
+      const py = eye[1] + dir[1] * travelled;
+      const pz = eye[2] + dir[2] * travelled;
+      const ground = heightAtLocal(px, pz);
+      if (ground !== null && py <= ground) {
+        // One bisection back towards the last point that was still in the air,
+        // which is enough to land on the block that was clicked rather than its
+        // neighbour.
+        const middle = (previous + travelled) / 2;
+        const mx = eye[0] + dir[0] * middle;
+        const mz = eye[2] + dir[2] * middle;
+        const hit = heightAtLocal(mx, mz) !== null ? middle : travelled;
+        return {
+          x: Math.floor(eye[0] + dir[0] * hit + size / 2) + loaded.x,
+          z: Math.floor(eye[2] + dir[2] * hit + size / 2) + loaded.z,
+        };
+      }
+      previous = travelled;
+    }
+    return null;
+  }
+
+  function rebuildGhost() {
+    if (!gl) return;
+    if (!ghost || !loaded || !terrainHeights || !terrainColours) {
+      ghostVertices = 0;
+      requestDraw();
+      return;
+    }
+    const mesh = buildGhostMesh(ghost, loaded, terrainHeights, terrainColours);
+    ghostVertices = mesh.vertices;
+    gl.bindBuffer(gl.ARRAY_BUFFER, ghostBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, mesh.data, gl.STATIC_DRAW);
+    requestDraw();
   }
 
   function requestDraw() {
@@ -291,7 +563,14 @@ export function createWorldView3D(
     canvas.setPointerCapture(e.pointerId);
     let lastX = e.clientX;
     let lastY = e.clientY;
+    // A click places the ghost, a drag orbits. Told apart by distance rather
+    // than by time: orbiting starts with a slow careful movement as often as a
+    // fast one, and a placement is never dragged.
+    const downX = e.clientX;
+    const downY = e.clientY;
+    let moved = 0;
     const move = (m: PointerEvent) => {
+      moved = Math.max(moved, Math.hypot(m.clientX - downX, m.clientY - downY));
       yaw -= (m.clientX - lastX) * 0.008;
       // Stop just short of straight down and of the horizon, where the camera
       // would either gimbal-flip or slide under the terrain.
@@ -305,6 +584,10 @@ export function createWorldView3D(
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerup", up);
       canvas.removeEventListener("pointercancel", up);
+      if (moved <= 4 && handle.onPick) {
+        const spot = pick(u.clientX, u.clientY);
+        if (spot) handle.onPick(spot.x, spot.z);
+      }
     };
     canvas.addEventListener("pointermove", move);
     canvas.addEventListener("pointerup", up);
@@ -334,6 +617,7 @@ export function createWorldView3D(
       );
     } catch {
       status.textContent = t("nem_sikerult_betolteni");
+      resolveReady();
       return;
     }
     if (disposed) return;
@@ -349,34 +633,58 @@ export function createWorldView3D(
     const mesh = buildMesh(view, palette);
     if (mesh.vertices === 0) {
       status.textContent = t("nincs_vilagadat");
+      resolveReady();
       return;
     }
     centreY = mesh.centreY;
     vertices = mesh.vertices;
     status.remove();
 
+    // Kept unpacked so placement can read heights without decoding again on
+    // every pointer move.
+    loaded = view;
+    terrainColours = decodeBase64(view.colours);
+    const rawHeights = decodeBase64(view.heights);
+    terrainHeights = new Int16Array(rawHeights.buffer, rawHeights.byteOffset, view.size * view.size);
+
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(gl.ARRAY_BUFFER, mesh.data, gl.STATIC_DRAW);
-    const stride = 6 * 4;
-    gl.enableVertexAttribArray(aPos);
-    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
-    gl.enableVertexAttribArray(aColour);
-    gl.vertexAttribPointer(aColour, 3, gl.FLOAT, false, stride, 3 * 4);
+    bind(buffer);
     requestDraw();
+    resolveReady();
+    // A ghost set while the terrain was still loading has been remembered but
+    // not drawn; now there is something to stand it on.
+    if (ghost) rebuildGhost();
   })();
 
-  return {
+  const handle: WorldView3DHandle = {
     element: root,
+    onPick: null,
+    ready,
+    setGhost(placement) {
+      ghost = placement;
+      rebuildGhost();
+    },
+    heightAt(x, z) {
+      if (!loaded || !terrainHeights || !terrainColours) return null;
+      const gx = x - loaded.x;
+      const gz = z - loaded.z;
+      if (gx < 0 || gz < 0 || gx >= loaded.size || gz >= loaded.size) return null;
+      const at = gz * loaded.size + gx;
+      return terrainColours[at] === 0 ? null : terrainHeights[at] + 1;
+    },
     destroy() {
       disposed = true;
       if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("resize", onResize);
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("wheel", onWheel);
-      // Frees the buffer immediately instead of waiting for the context to be
+      // Frees the buffers immediately instead of waiting for the context to be
       // garbage collected; browsers allow only a handful of live contexts.
       gl.deleteBuffer(buffer);
+      gl.deleteBuffer(ghostBuffer);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     },
   };
+  return handle;
 }

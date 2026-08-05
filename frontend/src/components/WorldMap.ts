@@ -1,8 +1,14 @@
-import { api } from "../api";
+import { api, ApiError } from "../api";
 import { escapeHtml } from "../lib/escape";
 import { t } from "../lib/i18n";
 import { createWorldView3D, type WorldView3DHandle } from "./WorldView3D";
-import type { Dimension, MapInfo, PlayerPosition } from "../types";
+import type {
+  Dimension,
+  MapInfo,
+  PlayerPosition,
+  Schematic,
+  SchematicSurface,
+} from "../types";
 
 /**
  * Pannable, zoomable world map built from one image per region.
@@ -60,8 +66,10 @@ export function createWorldMap(
       <button class="btn" id="map-spawn">${t("map_spawn")}</button>
       <button class="btn" id="map-fit">${t("map_fit")}</button>
       <button class="btn" id="map-3d">${t("map_3d")}</button>
+      <button class="btn" id="map-place">${t("schem_elhelyezes")}</button>
       <span class="map-coords" id="map-coords"></span>
     </div>
+    <div class="map-place-bar" id="map-place-bar" hidden></div>
     <div class="map-viewport" id="map-viewport">
       <div class="map-canvas" id="map-canvas"></div>
       <div class="map-players" id="map-players"></div>
@@ -162,6 +170,9 @@ export function createWorldMap(
 
   root.querySelector<HTMLSelectElement>("#map-dim")!.onchange = (e) => {
     dimension = (e.target as HTMLSelectElement).value as Dimension;
+    // A placement belongs to the dimension it was aimed at; carrying it over
+    // would leave the bar offering to paste into terrain nobody is looking at.
+    closePlacement();
     close3d();
     buildTiles();
     goToSpawn();
@@ -179,20 +190,34 @@ export function createWorldMap(
 
   const host3d = root.querySelector<HTMLDivElement>("#map-3d-host")!;
   const button3d = root.querySelector<HTMLButtonElement>("#map-3d")!;
-  button3d.onclick = () => {
-    if (view3d) {
-      close3d();
-      return;
-    }
+
+  /** Where the 2D map is looking, in block coordinates. */
+  function centreOfView(): { x: number; z: number } {
+    const box = viewport.getBoundingClientRect();
+    return { x: (box.width / 2 - offsetX) / scale, z: (box.height / 2 - offsetY) / scale };
+  }
+
+  function open3d() {
+    if (view3d) return view3d;
     // Opens on whatever the 2D map is currently centred on, so switching views
     // does not lose your place.
-    const box = viewport.getBoundingClientRect();
-    const centreX = (box.width / 2 - offsetX) / scale;
-    const centreZ = (box.height / 2 - offsetY) / scale;
-    view3d = createWorldView3D(serverId, dimension, centreX, centreZ);
+    const centre = centreOfView();
+    view3d = createWorldView3D(serverId, dimension, centre.x, centre.z);
     host3d.appendChild(view3d.element);
     host3d.hidden = false;
     button3d.classList.add("active");
+    return view3d;
+  }
+
+  button3d.onclick = () => {
+    if (view3d) {
+      // Leaving the 3D view with a placement half-made would strand the bar
+      // pointing at something no longer on screen.
+      closePlacement();
+      close3d();
+      return;
+    }
+    open3d();
   };
 
   function close3d() {
@@ -202,6 +227,204 @@ export function createWorldMap(
     host3d.hidden = true;
     button3d.classList.remove("active");
   }
+
+  /**
+   * Standing a schematic on the terrain before it is pasted.
+   *
+   * The library could already paste, but only by typing three coordinates and
+   * hoping: you found out what you had done by walking there in game, and
+   * WorldEdit has no preview of its own. Here the same blocks the paste will
+   * write are drawn where it will write them, and the position is chosen by
+   * clicking the ground rather than by arithmetic.
+   *
+   * Deliberately tied to the 3D view. On a flat map a building is a coloured
+   * rectangle and you cannot see whether it is standing in a hillside; the
+   * whole value of the preview is the elevation.
+   */
+  const placeBar = root.querySelector<HTMLDivElement>("#map-place-bar")!;
+  const placeButton = root.querySelector<HTMLButtonElement>("#map-place")!;
+  let placement: {
+    filename: string;
+    surface: SchematicSurface;
+    x: number;
+    z: number;
+    /** Blocks up or down from the ground under the north-west corner. */
+    lift: number;
+  } | null = null;
+  let schematics: Schematic[] = [];
+  let placementBusy = false;
+
+  /** The in-game world name for a dimension, which is what WorldEdit wants. */
+  function worldNameFor(dim: Dimension): string {
+    return dim === "nether" ? "world_nether" : dim === "end" ? "world_the_end" : "world";
+  }
+
+  /** Ground under the build's north-west corner, which the lift is relative to. */
+  function baseY(): number {
+    if (!placement || !view3d) return 64;
+    return (view3d.heightAt(placement.x, placement.z) ?? 64) + placement.lift;
+  }
+
+  function drawGhost() {
+    if (!view3d) return;
+    if (!placement) {
+      view3d.setGhost(null);
+      return;
+    }
+    view3d.setGhost({ surface: placement.surface, x: placement.x, z: placement.z, y: baseY() });
+  }
+
+  function closePlacement() {
+    placement = null;
+    placementBusy = false;
+    placeBar.hidden = true;
+    placeBar.innerHTML = "";
+    placeButton.classList.remove("active");
+    if (view3d) {
+      view3d.setGhost(null);
+      view3d.onPick = null;
+    }
+  }
+
+  function paintPlaceBar(message = "", isError = false) {
+    if (!placement) {
+      placeBar.innerHTML = `
+        <select id="place-file">
+          <option value="">${escapeHtml(t("schem_valassz"))}</option>
+          ${schematics
+            .map(
+              (s) =>
+                `<option value="${escapeHtml(s.filename)}">${escapeHtml(s.filename)}${
+                  s.size ? ` — ${s.size.x}×${s.size.y}×${s.size.z}` : ""
+                }</option>`
+            )
+            .join("")}
+        </select>
+        <span class="map-place-hint">${escapeHtml(
+          schematics.length === 0 ? t("schem_nincs_feltoltve") : t("schem_valassz_hint")
+        )}</span>
+        <button class="btn" id="place-cancel">${escapeHtml(t("megse"))}</button>
+        ${message ? `<span class="map-place-msg ${isError ? "error" : ""}">${escapeHtml(message)}</span>` : ""}
+      `;
+      placeBar.querySelector<HTMLSelectElement>("#place-file")!.onchange = (e) => {
+        const filename = (e.target as HTMLSelectElement).value;
+        if (filename) void choose(filename);
+      };
+      placeBar.querySelector<HTMLButtonElement>("#place-cancel")!.onclick = closePlacement;
+      return;
+    }
+
+    const s = placement.surface;
+    const y = baseY();
+    placeBar.innerHTML = `
+      <strong class="map-place-name">${escapeHtml(placement.filename)}</strong>
+      <span class="map-place-size">${s.width}×${s.height}×${s.length}</span>
+      <span class="map-place-pos">X ${placement.x}  Y ${y}  Z ${placement.z}</span>
+      <button class="btn btn-icon" id="place-down" title="${escapeHtml(t("schem_lejjebb"))}">−</button>
+      <button class="btn btn-icon" id="place-up" title="${escapeHtml(t("schem_feljebb"))}">+</button>
+      <label class="checkbox-row map-place-air"><input type="checkbox" id="place-air" />${escapeHtml(
+        t("schem_levego_kihagyas")
+      )}</label>
+      <button class="btn btn-primary" id="place-go" ${placementBusy ? "disabled" : ""}>${escapeHtml(
+        t("schem_ide_berakas")
+      )}</button>
+      <button class="btn" id="place-cancel">${escapeHtml(t("megse"))}</button>
+      <span class="map-place-msg ${isError ? "error" : ""}">${escapeHtml(
+        message || t("schem_kattints_hint")
+      )}</span>
+    `;
+    const step = (by: number) => () => {
+      placement!.lift += by;
+      drawGhost();
+      paintPlaceBar();
+    };
+    placeBar.querySelector<HTMLButtonElement>("#place-down")!.onclick = step(-1);
+    placeBar.querySelector<HTMLButtonElement>("#place-up")!.onclick = step(1);
+    placeBar.querySelector<HTMLButtonElement>("#place-cancel")!.onclick = closePlacement;
+    placeBar.querySelector<HTMLButtonElement>("#place-go")!.onclick = () => void paste();
+  }
+
+  async function choose(filename: string) {
+    const view = open3d();
+    paintPlaceBar(t("betoltes"));
+    let surface: SchematicSurface;
+    try {
+      surface = await api.getSchematicSurface(serverId, filename);
+    } catch (err) {
+      paintPlaceBar(err instanceof ApiError ? err.message : t("nem_sikerult_betolteni"), true);
+      return;
+    }
+    if (stopped) return;
+    // Waits for the terrain, because the build has to be stood on something and
+    // the height is not known until the surface has arrived.
+    await view.ready;
+    if (stopped || placeBar.hidden) return;
+    const centre = centreOfView();
+    placement = {
+      filename,
+      surface,
+      // Centred on the view rather than dropped at its corner: the middle of
+      // the screen is where you were already looking.
+      x: Math.round(centre.x - surface.width / 2),
+      z: Math.round(centre.z - surface.length / 2),
+      lift: 0,
+    };
+    view.onPick = (x, z) => {
+      if (!placement) return;
+      // The click marks where the middle of the build goes, which is how people
+      // point at a spot; the corner is arithmetic nobody wants to do.
+      placement.x = x - Math.floor(placement.surface.width / 2);
+      placement.z = z - Math.floor(placement.surface.length / 2);
+      drawGhost();
+      paintPlaceBar();
+    };
+    drawGhost();
+    paintPlaceBar();
+  }
+
+  async function paste() {
+    if (!placement || placementBusy) return;
+    // Read before the bar is repainted, which discards the checkbox.
+    const ignoreAir = placeBar.querySelector<HTMLInputElement>("#place-air")?.checked ?? false;
+    placementBusy = true;
+    paintPlaceBar(t("schem_berakas_folyamatban"));
+    try {
+      await api.pasteSchematic(serverId, placement.filename, {
+        x: String(placement.x),
+        y: String(baseY()),
+        z: String(placement.z),
+        world: worldNameFor(dimension),
+        ignoreAir,
+      });
+    } catch (err) {
+      placementBusy = false;
+      paintPlaceBar(err instanceof ApiError ? err.message : t("nem_sikerult"), true);
+      return;
+    }
+    placementBusy = false;
+    // The map is served from a cache keyed by region, so the tiles would keep
+    // showing the world as it was before the paste until something evicted it.
+    await api.clearMapCache(serverId).catch(() => undefined);
+    paintPlaceBar(t("schem_berakva"));
+  }
+
+  placeButton.onclick = () => {
+    if (!placeBar.hidden) {
+      closePlacement();
+      return;
+    }
+    placeBar.hidden = false;
+    placeButton.classList.add("active");
+    paintPlaceBar(t("betoltes"));
+    void api
+      .listSchematics(serverId)
+      .then(({ schematics: list, worldEdit }) => {
+        if (stopped) return;
+        schematics = list;
+        paintPlaceBar(worldEdit ? "" : t("schem_nincs_worldedit"), !worldEdit);
+      })
+      .catch(() => paintPlaceBar(t("nem_sikerult_betolteni"), true));
+  };
 
   const onPointerDown = (e: PointerEvent) => {
     dragging = true;
@@ -258,6 +481,7 @@ export function createWorldMap(
     element: root,
     destroy() {
       stopped = true;
+      closePlacement();
       close3d();
       clearInterval(playerTimer);
       viewport.removeEventListener("pointerdown", onPointerDown);

@@ -2025,6 +2025,64 @@ table.file-table tr.file-row:hover {
   font-family: "SF Mono", ui-monospace, monospace;
 }
 
+/*
+ * The schematic placement bar.
+ *
+ * A row under the toolbar rather than a panel over the map: the whole point of
+ * the preview is seeing the build on the terrain, and a floating panel would
+ * cover the thing being previewed.
+ */
+.map-place-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+  margin-top: var(--gap-sm);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.map-place-bar select {
+  max-width: 260px;
+}
+
+.map-place-name {
+  font-size: 13px;
+}
+
+.map-place-size,
+.map-place-hint {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* Tabular figures, so the numbers stop jittering as the ghost is moved. */
+.map-place-pos {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+/* Kept on one line: wrapped over three it read as a paragraph, not a control. */
+.map-place-air {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.map-place-msg {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.map-place-msg.error {
+  color: var(--red);
+}
+
 .map-viewport {
   position: relative;
   flex: 1;
