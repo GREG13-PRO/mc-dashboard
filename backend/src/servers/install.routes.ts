@@ -39,13 +39,23 @@ installRouter.get("/defaults", requireAdmin, async (req, res) => {
 });
 
 installRouter.post("/", requireAdmin, async (req, res) => {
-  const { name, folder, type, version, settings, rcon } = req.body ?? {};
+  const { name, folder, type, version, settings, rcon, acceptEula } = req.body ?? {};
   if (!name || !folder || !type) {
     res.status(400).json({ error: "name, folder and type are required" });
     return;
   }
   if (!VALID_TYPES.has(type)) {
     res.status(400).json({ error: `Unknown server type: ${type}` });
+    return;
+  }
+  // A refusal to agree is a bad request, not a server fault. The installer
+  // checks this too and that check stays: it is the one that guards the file
+  // write, and a second caller could arrive without coming through here.
+  if (kindOf(type) !== "proxy" && acceptEula !== true) {
+    res.status(400).json({
+      error:
+        "A Minecraft EULA elfogadása nélkül nem hozható létre szerver. https://aka.ms/MinecraftEULA",
+    });
     return;
   }
   try {
@@ -55,6 +65,7 @@ installRouter.post("/", requireAdmin, async (req, res) => {
       type,
       version: version ?? "latest",
       settings,
+      acceptEula: acceptEula === true,
     });
     // syncRconToServerProperties, which registry.create calls, deliberately
     // no-ops when there is no server.properties - a proxy has none and never

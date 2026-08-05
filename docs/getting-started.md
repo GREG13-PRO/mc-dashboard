@@ -108,14 +108,16 @@ filled in for you and can be changed later.
 - **BungeeCord / Velocity** — these join several servers into one network. They
   are not a server you can play on. Not for a first server.
 
+**Before Create there is one tick box: the EULA.** A Minecraft server refuses
+to run until you have accepted
+[Mojang's End User Licence Agreement](https://aka.ms/MinecraftEULA) — that is
+their rule, not this dashboard's. Ticking it is what writes `eula=true` into
+the server folder. Nothing is created until you do, and it is worth reading
+once. (Servers that only route players between other servers — BungeeCord and
+Velocity — are not Minecraft servers and are not asked.)
+
 Press **Create**. The dashboard downloads the server and sets up the folder.
 This takes a minute or two on a normal connection.
-
-> **About the EULA.** A Minecraft server refuses to start until `eula.txt` says
-> `eula=true`, which is you agreeing to
-> [Mojang's End User Licence Agreement](https://aka.ms/MinecraftEULA). The
-> dashboard writes that line for you as part of creating the server. Worth
-> knowing that you have agreed to something, and worth reading once.
 
 ---
 

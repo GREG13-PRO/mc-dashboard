@@ -718,4 +718,7 @@ export const hu: typeof en = {
   psearch_resource_pack: "resource pack textúra csomag",
   psearch_server_ip: "szerver ip cím kötés",
   psearch_player_idle_timeout: "tétlenség afk kirúgás időtúllépés",
+  eula_elfogadas: "Elfogadom a Minecraft végfelhasználói licencszerződését.",
+  eula_link: "Elolvasom",
+  eula_kotelezo: "A Minecraft EULA elfogadása nélkül nem hozható létre szerver.",
 };

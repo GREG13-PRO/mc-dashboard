@@ -717,4 +717,7 @@ export const ptBR: Partial<Locale> = {
   psearch_resource_pack: "pacote de recursos texturas",
   psearch_server_ip: "ip do servidor endereço",
   psearch_player_idle_timeout: "inatividade afk expulsão",
+  eula_elfogadas: "Aceito o Contrato de Licença de Usuário Final do Minecraft.",
+  eula_link: "Ler",
+  eula_kotelezo: "Não dá para criar um servidor de Minecraft sem aceitar a EULA.",
 };

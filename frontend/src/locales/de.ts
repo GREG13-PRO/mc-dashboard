@@ -717,4 +717,7 @@ export const de: Partial<Locale> = {
   psearch_resource_pack: "ressourcenpaket texturenpaket",
   psearch_server_ip: "server-ip adresse binden",
   psearch_player_idle_timeout: "leerlauf afk kick zeitlimit",
+  eula_elfogadas: "Ich akzeptiere die Minecraft-Endbenutzer-Lizenzvereinbarung.",
+  eula_link: "Nachlesen",
+  eula_kotelezo: "Ohne Zustimmung zur EULA lässt sich kein Minecraft-Server anlegen.",
 };

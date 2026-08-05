@@ -717,4 +717,7 @@ export const ru: Partial<Locale> = {
   psearch_resource_pack: "ресурспак текстуры",
   psearch_server_ip: "ip сервера адрес",
   psearch_player_idle_timeout: "бездействие афк кик",
+  eula_elfogadas: "Я принимаю лицензионное соглашение Minecraft.",
+  eula_link: "Прочитать",
+  eula_kotelezo: "Без принятия EULA сервер Minecraft создать нельзя.",
 };

@@ -716,4 +716,7 @@ export const en = {
   psearch_resource_pack: "resource pack texture pack",
   psearch_server_ip: "server ip bind address",
   psearch_player_idle_timeout: "idle timeout afk kick",
+  eula_elfogadas: "I accept the Minecraft End User Licence Agreement.",
+  eula_link: "Read it",
+  eula_kotelezo: "A Minecraft server cannot be created without accepting the EULA.",
 };

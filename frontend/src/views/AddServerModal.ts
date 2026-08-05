@@ -147,6 +147,18 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
         existing?.crashRestart?.maxAttempts ?? 3
       }" />
     </div>
+    ${
+      existing
+        ? ""
+        : `
+    <div class="field checkbox-row eula-row" id="eula-row" style="display:none">
+      <input type="checkbox" id="f-eula" />
+      <label for="f-eula">${t("eula_elfogadas")}
+        <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noopener noreferrer">${t(
+          "eula_link"
+        )}</a></label>
+    </div>`
+    }
     <div id="form-error" class="error-text"></div>
     <div class="modal-actions">
       <button id="cancel-btn" class="btn">${t("megse")}</button>
@@ -164,6 +176,23 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
   const stopCommandField = form.querySelector<HTMLDivElement>("#stop-command-field")!;
 
   const installSettings = form.querySelector<HTMLDivElement>("#install-settings");
+  const eulaRow = form.querySelector<HTMLDivElement>("#eula-row");
+  const eulaBox = form.querySelector<HTMLInputElement>("#f-eula");
+
+  /**
+   * The EULA question, shown only when the answer matters.
+   *
+   * A proxy has no eula.txt and an existing folder already has whatever answer
+   * its owner gave, so asking there would be a checkbox that does nothing -
+   * which teaches people to tick without reading, and this is the one box in
+   * the application where that matters.
+   */
+  function updateEulaRow() {
+    if (!eulaRow) return;
+    const type = installTypeSelect?.value ?? "manual";
+    const needed = type !== "manual" && typeKinds.get(type) !== "proxy";
+    eulaRow.style.display = needed ? "" : "none";
+  }
   const mcSettings = form.querySelector<HTMLDivElement>("#install-mc-settings");
   const typeKinds = new Map<string, "server" | "proxy">();
 
@@ -180,6 +209,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       // loading, so simple mode had nothing to switch to and sat on "manual" -
       // which is exactly the mode that shows a start script and a stop command.
       applyMode();
+      updateEulaRow();
     });
 
     installTypeSelect.onchange = () => {
@@ -189,6 +219,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
         installSettings!.style.display = "none";
         startScriptField.style.display = "";
         stopCommandField.style.display = "";
+        updateEulaRow();
         return;
       }
       startScriptField.style.display = "none";
@@ -196,6 +227,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
       installVersionField!.style.display = "";
       installSettings!.style.display = "";
       mcSettings!.style.display = typeKinds.get(type) === "proxy" ? "none" : "";
+      updateEulaRow();
       installVersionSelect!.innerHTML = `<option value="">${t("verziok_betoltese")}</option>`;
       api
         .listServerVersions(type as ServerInstallType)
@@ -387,6 +419,14 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
           ? { enabled: true, port: defaults.rconPort, password: defaults.rconPassword }
           : undefined;
 
+      // Checked here rather than by disabling the button: a button that is dead
+      // for a reason you cannot see is worse than one that tells you why.
+      if (!isProxy && !eulaBox?.checked) {
+        errorEl.textContent = t("eula_kotelezo");
+        eulaBox?.focus();
+        return;
+      }
+
       const saveBtn = form.querySelector<HTMLButtonElement>("#save-btn")!;
       const originalLabel = saveBtn.textContent;
       saveBtn.disabled = true;
@@ -401,6 +441,7 @@ export function openAddServerModal(onCreated: () => void, existing?: ServerEntry
           version,
           settings,
           rcon,
+          acceptEula: eulaBox?.checked === true,
         });
         showToast(t("szerver_telepitve"));
         close();

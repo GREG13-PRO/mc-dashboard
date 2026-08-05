@@ -717,4 +717,7 @@ export const fr: Partial<Locale> = {
   psearch_resource_pack: "pack de ressources textures",
   psearch_server_ip: "ip du serveur adresse",
   psearch_player_idle_timeout: "inactivité afk expulsion",
+  eula_elfogadas: "J’accepte le contrat de licence utilisateur final de Minecraft.",
+  eula_link: "Le lire",
+  eula_kotelezo: "Impossible de créer un serveur Minecraft sans accepter le CLUF.",
 };

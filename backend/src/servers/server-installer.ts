@@ -222,6 +222,7 @@ export async function installServer(input: {
   type: ServerInstallType;
   version: string;
   settings?: ServerInstallSettings;
+  acceptEula?: boolean;
 }): Promise<InstallResult> {
   const { folder, type, version } = input;
   const settings = normalizeSettings(input.settings);
@@ -229,6 +230,16 @@ export async function installServer(input: {
 
   const isProxy = kindOf(type) === "proxy";
   if (!isProxy) {
+    // `eula=true` is a person agreeing to Mojang's licence. It used to be
+    // written here unconditionally, which meant the dashboard entered into an
+    // agreement on behalf of someone who was never shown it - convenient, and
+    // not ours to do. The caller has to have asked.
+    if (!input.acceptEula) {
+      throw new Error(
+        "A Minecraft EULA elfogadása nélkül nem hozható létre szerver. " +
+          "https://aka.ms/MinecraftEULA"
+      );
+    }
     await fsp.writeFile(path.join(folder, "eula.txt"), "eula=true\n");
   }
 

@@ -4026,3 +4026,23 @@ table.file-table tr.file-row:hover {
     animation: none;
   }
 }
+
+/* The EULA row. Sits apart from the fields above it because it is a decision,
+ * not a setting - and the link has to be reachable without ticking first. */
+.eula-row {
+  align-items: flex-start;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.eula-row label {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.eula-row a {
+  color: var(--accent);
+  margin-left: 4px;
+}

@@ -134,4 +134,12 @@ export interface ServerInstallInput {
   type: ServerInstallType;
   version: string;
   settings?: ServerInstallSettings;
+  /**
+   * The caller says the person in front of them accepted Mojang's EULA.
+   *
+   * Required for anything that runs a Minecraft server, because writing
+   * `eula=true` is that acceptance and it is not the dashboard's to give. A
+   * proxy is not a Minecraft server and has no eula.txt, so it does not ask.
+   */
+  acceptEula?: boolean;
 }
