@@ -107,14 +107,13 @@ appDistAdminRouter.post("/", upload.single("file"), async (req, res) => {
  * not a way to walk off with someone's repository token.
  */
 appDistAdminRouter.get("/github/status", async (_req, res) => {
-  if (!hasToken()) {
-    res.json({ configured: false, watcher: watcherState() });
-    return;
-  }
+  // Asked for either way. The repository is public, so a release can be read
+  // without a token; `configured` now says whether one is stored, not whether
+  // the feature works.
   try {
-    res.json({ configured: true, latest: await latestRelease(), watcher: watcherState() });
+    res.json({ configured: hasToken(), latest: await latestRelease(), watcher: watcherState() });
   } catch (err) {
-    res.json({ configured: true, error: (err as Error).message, watcher: watcherState() });
+    res.json({ configured: hasToken(), error: (err as Error).message, watcher: watcherState() });
   }
 });
 

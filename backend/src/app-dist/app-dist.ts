@@ -7,11 +7,13 @@ import { env } from "../config/env";
 /**
  * Hosts the installable apps so they can update themselves from the dashboard.
  *
- * Not from GitHub: this project's repository is private, so an unauthenticated
- * request for its latest release gets a 404 - which is why the desktop app's
- * update check had never found anything in its life, and why a phone could not
- * have checked at all. Embedding a token in a shipped app is not an option
- * either, since anyone holding the app holds the token.
+ * Not from GitHub. The repository was private when this was written, so an
+ * unauthenticated request for its latest release got a 404 - which is why the
+ * desktop app's update check had never found anything in its life. It is public
+ * now and that particular obstacle is gone, but the arrangement is still the
+ * right one: the apps sit on a network where the dashboard is always reachable
+ * and GitHub may not be, and one server asking GitHub once beats every device
+ * asking for itself.
  *
  * The dashboard is the one server every copy of these apps is already pointed
  * at, so it is the natural place to serve an update from.

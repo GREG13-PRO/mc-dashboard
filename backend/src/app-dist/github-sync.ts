@@ -10,11 +10,20 @@ import { identify, saveBuild, publishedFor, compareVersions, type PublishedBuild
  * and re-uploaded by hand after every release.
  *
  * CI cannot push them here instead: the dashboard sits on a home network that
- * GitHub has no route to. So the direction has to be the other way round, and
- * that needs a token, because the repository is private.
+ * GitHub has no route to, so the direction has to be the other way round.
  *
- * The token is the admin's own, stored on this machine only, never sent back to
- * a browser, and only ever used against this one repository.
+ * A token used to be required, from when the repository was private. It is
+ * public now, and asking for a personal access token before the feature will do
+ * anything is a real cost - it is the step people stop at, and it puts a
+ * credential on a machine that no longer needs one to do this job.
+ *
+ * So the token is optional. Without one the requests go out unauthenticated,
+ * which GitHub allows for a public repository at sixty requests an hour per
+ * address - the watcher makes two every six hours. With one, the limit is five
+ * thousand, which is the only reason to still offer it.
+ *
+ * When there is a token it is the admin's own, stored on this machine only,
+ * never sent back to a browser, and only ever used against this one repository.
  */
 
 const REPO = "GREG13-PRO/mc-dashboard";
@@ -47,11 +56,13 @@ export async function clearToken(): Promise<void> {
   await fsp.rm(tokenPath(), { force: true });
 }
 
-async function readToken(): Promise<string> {
+/** The stored token, or null to go out unauthenticated. */
+async function readToken(): Promise<string | null> {
   try {
-    return (await fsp.readFile(tokenPath(), "utf-8")).trim();
+    const token = (await fsp.readFile(tokenPath(), "utf-8")).trim();
+    return token || null;
   } catch {
-    throw new GithubSyncError("Nincs beállítva GitHub token.");
+    return null;
   }
 }
 
@@ -68,7 +79,7 @@ interface Release {
 
 function request(
   url: string,
-  token: string,
+  token: string | null,
   accept: string,
   redirectsLeft = MAX_REDIRECTS
 ): Promise<Buffer> {
@@ -81,7 +92,7 @@ function request(
     // to its object storage, which rejects a request carrying both its own
     // signed URL and an Authorization header ("only one auth mechanism
     // allowed") - so the header is dropped the moment the host changes.
-    if (new URL(url).hostname === "api.github.com") {
+    if (token && new URL(url).hostname === "api.github.com") {
       headers.Authorization = `Bearer ${token}`;
     }
 
@@ -98,13 +109,7 @@ function request(
       }
       if (res.statusCode !== 200) {
         res.resume();
-        reject(
-          new GithubSyncError(
-            res.statusCode === 401 || res.statusCode === 404
-              ? "A GitHub elutasította a kérést. Ellenőrizd, hogy a token érvényes-e és látja-e ezt a repót."
-              : `HTTP ${res.statusCode} a GitHubtól.`
-          )
-        );
+        reject(new GithubSyncError(describeFailure(res.statusCode, res.headers, token)));
         return;
       }
       const chunks: Buffer[] = [];
@@ -117,6 +122,40 @@ function request(
     );
     req.on("error", reject);
   });
+}
+
+/**
+ * Says what went wrong in terms of what the reader can do about it.
+ *
+ * The three failures worth telling apart are a rate limit, a bad token and a
+ * missing release - and the advice for each is different, so a single "GitHub
+ * refused the request. Check your token" sent people looking for a problem with
+ * a token they may not even have set.
+ */
+function describeFailure(
+  status: number | undefined,
+  headers: Record<string, string | string[] | undefined>,
+  token: string | null
+): string {
+  const remaining = headers["x-ratelimit-remaining"];
+  if (status === 403 && remaining === "0") {
+    const resets = Number(headers["x-ratelimit-reset"]);
+    const when = Number.isFinite(resets) ? new Date(resets * 1000).toLocaleTimeString("hu-HU") : null;
+    return token
+      ? `A GitHub óradíj-korlátja elfogyott.${when ? ` Újraindul: ${when}.` : ""}`
+      : `A GitHub óradíj-korlátja elfogyott (token nélkül óránként 60 kérés).${
+          when ? ` Újraindul: ${when}.` : ""
+        } Egy token 5000-re emeli.`;
+  }
+  if (status === 401) {
+    return "A GitHub elutasította a tokent. Lehet, hogy lejárt - töröld, vagy adj meg egy újat.";
+  }
+  if (status === 404) {
+    return token
+      ? "A GitHub nem találja ezt a repót. Ellenőrizd, hogy a token látja-e."
+      : "A GitHub nem találja ezt a repót, vagy még nincs benne kiadás.";
+  }
+  return `HTTP ${status} a GitHubtól.`;
 }
 
 export interface RemoteRelease {
@@ -166,11 +205,10 @@ export async function syncLatestRelease(): Promise<PublishedBuild[]> {
  * Checks GitHub on a timer and publishes anything newer.
  *
  * This is the piece that makes every app find updates on its own. The apps
- * cannot check GitHub themselves: the repository is private, so an
- * unauthenticated request for its latest release gets a 404, and a token
- * shipped inside an app is a token everyone holding that app has. So the
- * dashboard - which can hold a token safely, on one machine the admin
- * controls - does the looking, and the apps ask the dashboard.
+ * do not check GitHub themselves: one dashboard asking is one request per
+ * six hours, where every app asking is one per device - and the phones are on
+ * a network where the dashboard is always reachable and GitHub may not be. So
+ * the dashboard does the looking, and the apps ask the dashboard.
  *
  * Nothing is installed by this. It only makes the newer build available; every
  * app still shows its own "there is an update" prompt and waits to be told.
@@ -219,10 +257,8 @@ export function watcherState(): WatcherState {
 
 export async function checkOnce(): Promise<WatcherState> {
   state.lastCheckedAt = new Date().toISOString();
-  if (!hasToken()) {
-    state.lastResult = "Nincs beállítva GitHub token.";
-    return watcherState();
-  }
+  // No token check any more: the repository is public, so a check without one
+  // is a check that works.
   try {
     const remote = await latestRelease();
     const current = await publishedFor("android");

@@ -105,32 +105,28 @@ export function renderAppDistView(root: HTMLElement): () => void {
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
           <label class="btn btn-primary" for="build-file">${t("build_feltoltese")}</label>
           <input type="file" id="build-file" accept=".apk,.dmg,.exe" hidden />
+          <button class="btn" id="gh-sync">${t("behuzas_githubrol")}</button>
+          <button class="btn" id="gh-check">${t("ellenorzes_most")}</button>
           ${
             github.configured
-              ? `<button class="btn" id="gh-sync">${t("behuzas_githubrol")}</button>
-                 <button class="btn" id="gh-check">${t("ellenorzes_most")}</button>
-                 <button class="btn" id="gh-clear">${t("token_torlese")}</button>`
+              ? `<button class="btn" id="gh-clear">${t("token_torlese")}</button>`
               : `<button class="btn" id="gh-token">${t("github_token_beallitasa")}</button>`
           }
         </div>
-        ${
-          github.configured
-            ? `<div class="field checkbox-row" style="margin-top:10px;">
-                 <input type="checkbox" id="gh-watch" ${github.watcher.enabled ? "checked" : ""} />
-                 <label for="gh-watch" style="margin:0">${t("automatikus_ellenorzes")}</label>
-               </div>
-               <p class="finding-advice" style="margin:0;">
-                 ${t("automatikus_ellenorzes_leiras")}
-                 ${
-                   github.watcher.lastCheckedAt
-                     ? `<br>${t("utolso_ellenorzes")}: ${new Date(
-                         github.watcher.lastCheckedAt
-                       ).toLocaleString()} — ${escapeHtml(github.watcher.lastResult ?? "")}`
-                     : ""
-                 }
-               </p>`
-            : ""
-        }
+        <div class="field checkbox-row" style="margin-top:10px;">
+          <input type="checkbox" id="gh-watch" ${github.watcher.enabled ? "checked" : ""} />
+          <label for="gh-watch" style="margin:0">${t("automatikus_ellenorzes")}</label>
+        </div>
+        <p class="finding-advice" style="margin:0;">
+          ${t("automatikus_ellenorzes_leiras")}
+          ${
+            github.watcher.lastCheckedAt
+              ? `<br>${t("utolso_ellenorzes")}: ${new Date(
+                  github.watcher.lastCheckedAt
+                ).toLocaleString()} — ${escapeHtml(github.watcher.lastResult ?? "")}`
+              : ""
+          }
+        </p>
         <p class="finding-advice" style="margin-top:8px;">
           ${
             github.error
@@ -139,7 +135,7 @@ export function renderAppDistView(root: HTMLElement): () => void {
                 ? `${t("githubon_legfrissebb")}: ${escapeHtml(github.latest.tag)} (${
                     github.latest.assets.length
                   } ${t("build_db")})`
-                : t("github_token_magyarazat")
+                : t("github_nincs_kiadas")
           }
         </p>
       </div>
