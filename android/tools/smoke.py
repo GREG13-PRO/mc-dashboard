@@ -101,11 +101,34 @@ def screenshot(name):
     print(f"captured {name} ({len(png)} bytes)")
 
 
-def hierarchy(name):
+PERMISSION_PACKAGE = "com.android.permissioncontroller"
+
+
+def dump(name):
     adb("shell", "uiautomator", "dump", "/sdcard/ui.xml")
     adb("pull", "/sdcard/ui.xml", name)
     with open(name, encoding="utf-8", errors="replace") as handle:
         return handle.read()
+
+
+def hierarchy(name, clear_dialogs=True):
+    """The view hierarchy, with any system permission dialog cleared first.
+
+    uiautomator only ever dumps the topmost window, so a dialog in front of the
+    app is not something a caller can see past - it reads as the app having no
+    views at all. Every check in this file then fails at once, which is how a
+    working app reported its WebView, its localStorage and its update check all
+    broken in the same run.
+
+    Clearing happens here rather than at the call sites because the dialog can
+    arrive at any moment, and a check that has to remember to look for it is a
+    check that will forget.
+    """
+    xml = dump(name)
+    if clear_dialogs and PERMISSION_PACKAGE in xml and clear_permission_dialog(xml):
+        time.sleep(1.5)
+        xml = dump(name)
+    return xml
 
 
 BOUNDS = r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"'
@@ -127,21 +150,39 @@ def tap_bounds(bounds, label):
     print(f"tapped {label} at {(x1 + x2) // 2},{(y1 + y2) // 2}")
 
 
-def dismiss_system_dialog(dump_name):
-    """Clears the keyboard's runtime permission prompt.
+def clear_permission_dialog(xml):
+    """Presses whatever this Android version calls the refuse button.
 
-    Focusing a text field raises the AOSP keyboard, which on a fresh emulator
-    immediately asks for contacts access - and that dialog swallows the next
-    tap, which is how this test first "failed" with the app working fine.
+    By resource id first, because that is the same on every version; by label
+    only as a fallback, since the theme upper-cases dialog buttons on some
+    releases and leaves them alone on others.
     """
-    xml = hierarchy(dump_name)
-    for label in ("DENY", "Deny", "DENY ANYWAY"):
-        bounds = find(xml, "text", label)
+    candidates = [("resource-id", f"{PERMISSION_PACKAGE}:id/permission_deny_button")]
+    candidates += [("text", label) for label in ("DENY", "Deny", "DENY ANYWAY", "Don't allow")]
+    for attribute, value in candidates:
+        bounds = find(xml, attribute, value)
         if bounds:
-            tap_bounds(bounds, f"permission dialog {label}")
-            time.sleep(1.5)
+            tap_bounds(bounds, f"permission dialog {value}")
             return True
     return False
+
+
+def silence_keyboard_permission():
+    """Grants the keyboard its contacts permission before it can ask for it.
+
+    Disabling every input method was the previous attempt at this and was not
+    enough: the keyboard is still started when a field takes focus, and it still
+    asks. Granting up front leaves nothing to ask about.
+
+    Granting rather than revoking on purpose - a revoked permission is asked for
+    again, a granted one is not.
+    """
+    listing = adb("shell", "ime", "list", "-s", "-a", capture=True).decode("utf-8", "replace")
+    packages = {ime.split("/")[0] for ime in listing.split() if "/" in ime}
+    packages.add("com.android.inputmethod.latin")
+    for package in sorted(packages):
+        adb("shell", "pm", "grant", package, "android.permission.READ_CONTACTS", check=False)
+        print(f"pre-granted contacts to {package}")
 
 
 def tap_text(label, dump_name):
@@ -163,15 +204,14 @@ def tap_text(label, dump_name):
 
 
 def tap(description, dump_name):
-    for attempt in range(3):
-        xml = hierarchy(dump_name)
-        bounds = find(xml, "content-desc", description)
-        if bounds:
-            tap_bounds(bounds, description)
-            return
-        if not dismiss_system_dialog(f"{dump_name}.dialog{attempt}.xml"):
-            break
-    print(hierarchy(dump_name)[:4000])
+    # hierarchy() has already cleared anything sitting in front of the app, so a
+    # view that is still missing is genuinely missing.
+    xml = hierarchy(dump_name)
+    bounds = find(xml, "content-desc", description)
+    if bounds:
+        tap_bounds(bounds, description)
+        return
+    print(xml[:4000])
     raise SystemExit(f"no view with content-desc={description}")
 
 
@@ -207,6 +247,7 @@ def main():
     server = serve()
     adb("install", "-r", "android/app/build/outputs/apk/debug/app-debug.apk")
     disable_keyboards()
+    silence_keyboard_permission()
     adb("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
     time.sleep(6)
     screenshot("1-setup.png")
@@ -221,7 +262,19 @@ def main():
     tap("host", "ui-setup.xml")
     adb("shell", "input", "text", HOST)
     screenshot("2-filled.png")
-    tap("connect", "ui-filled.xml")
+
+    # Pressed until the setup screen is gone rather than once. A dialog arriving
+    # between the dump and the tap swallows the press, and the tap itself cannot
+    # tell - it reports success either way, which is what made the earlier
+    # failure look like a broken WebView rather than a missed button.
+    for attempt in range(3):
+        tap("connect", f"ui-filled{attempt}.xml")
+        time.sleep(3)
+        if 'content-desc="connect"' not in hierarchy(f"ui-after-connect{attempt}.xml"):
+            break
+        print("still on the setup screen; pressing connect again")
+    else:
+        raise SystemExit("connect never took")
 
     # The update check runs as the app starts and its dialog sits over the
     # page, so it has to be dealt with before the WebView can be inspected at
