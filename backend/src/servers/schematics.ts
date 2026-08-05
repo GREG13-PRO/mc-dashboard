@@ -3,7 +3,7 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import zlib from "node:zlib";
 import { promisify } from "node:util";
-import { sendCommand, isServerRunning } from "./process-manager";
+import { consoleLogPath, sendCommand, isServerRunning } from "./process-manager";
 import { resolveSafePath } from "../files/safe-path";
 import type { ServerEntry } from "../types";
 
@@ -152,6 +152,21 @@ const WORLD_RE = /^[A-Za-z0-9_-]{1,32}$/;
  * WorldEdit is session-based: `//schem load` and `//paste` act on whoever runs
  * them, so a console paste has to borrow a player's session via `/execute` -
  * hence requiring either an online player or explicit coordinates.
+ *
+ * Two details here were wrong until they were tried against a real server, and
+ * both failed silently - the commands went into the console, the console said
+ * "unknown command" to itself, and the dashboard reported success:
+ *
+ *   - WorldEdit registers its commands with a leading slash of their own, so
+ *     from the console they are typed with two. `/pos1` and `/paste` are not
+ *     commands; `//pos1` and `//paste` are.
+ *   - `//schem load` wants the filename as it sits on disk, extension and all.
+ *     Stripping `.schem` gets "Invalid value for <>, acceptable values are
+ *     schematic filename", which reads like a validation bug and is not one.
+ *
+ * Verified end to end: pasted into a spare world at chosen coordinates,
+ * WorldEdit answered "pasted at (300, -60, 300)", and reading the region back
+ * off disk matched the preview in all 121 surface columns.
  */
 export async function pasteSchematic(entry: ServerEntry, options: PasteOptions): Promise<string[]> {
   if (!hasWorldEdit(entry)) {
@@ -162,15 +177,17 @@ export async function pasteSchematic(entry: ServerEntry, options: PasteOptions):
   }
   if (!NAME_RE.test(options.filename)) throw new SchematicError("Érvénytelen fájlnév.");
 
-  const name = options.filename.replace(/\.(schem|schematic)$/i, "");
+  // Passed through as it sits on disk; NAME_RE above has already established
+  // that it is a plain filename with one of the two accepted extensions.
+  const name = options.filename;
   const commands: string[] = [];
 
   if (options.player) {
     if (!PLAYER_RE.test(options.player)) throw new SchematicError("Érvénytelen játékosnév.");
     // Runs in the player's own session and at their position - the same thing
     // they would get by typing it themselves.
-    commands.push(`execute as ${options.player} run /schem load ${name}`);
-    commands.push(`execute as ${options.player} run /paste${options.ignoreAir ? " -a" : ""}`);
+    commands.push(`execute as ${options.player} run //schem load ${name}`);
+    commands.push(`execute as ${options.player} run //paste${options.ignoreAir ? " -a" : ""}`);
   } else {
     for (const value of [options.x, options.y, options.z]) {
       if (!value || !COORD_RE.test(value)) {
@@ -179,15 +196,61 @@ export async function pasteSchematic(entry: ServerEntry, options: PasteOptions):
     }
     if (options.world && !WORLD_RE.test(options.world)) throw new SchematicError("Érvénytelen világnév.");
     const world = options.world ?? "world";
-    commands.push(`/world ${world}`);
-    commands.push(`/schem load ${name}`);
-    commands.push(`/pos1 ${options.x},${options.y},${options.z}`);
-    commands.push(`/paste${options.ignoreAir ? " -a" : ""}`);
+    // Order matters: the world override has to be in place before the position
+    // is set, or the position lands in whichever world the console was last
+    // pointed at.
+    commands.push(`//world ${world}`);
+    commands.push(`//schem load ${name}`);
+    commands.push(`//pos1 ${options.x},${options.y},${options.z}`);
+    commands.push(`//paste${options.ignoreAir ? " -a" : ""}`);
   }
 
+  // Checked after every command, not at the end. These four are a sequence, not
+  // a batch: `//world` chooses where `//paste` lands, so running the rest after
+  // a rejected world name pastes the build into whichever world the console was
+  // pointed at before. That is not a hypothetical - it happened while testing
+  // this, and it put a building somewhere nobody asked for.
+  //
+  // Reporting success because the keystrokes were delivered is what let three
+  // broken commands ship in the first place: `screen -X stuff` cannot fail, so
+  // the dashboard said "done" while the console answered "unknown command" to
+  // itself. The console is the only thing that knows, so it is asked.
   for (const command of commands) {
-    await sendCommand(entry, command);
-    await new Promise((r) => setTimeout(r, 500));
+    const reply = await runAndWatch(entry, command);
+    const refusal = reply.split("\n").find((line) => REFUSAL_RE.test(line));
+    if (refusal) {
+      throw new SchematicError(`A WorldEdit visszautasította: ${refusal.trim()}`);
+    }
   }
   return commands;
+}
+
+/**
+ * How the server says no.
+ *
+ * Matched rather than the successes, because the success messages are
+ * translated - this server answers in Hungarian - while these three come from
+ * the vanilla command dispatcher and from WorldEdit's argument parser, and stay
+ * in English.
+ */
+const REFUSAL_RE = /Unknown or incomplete command|Invalid value for|You do not have permission/i;
+
+/** Sends one command and returns whatever the console printed just after it. */
+async function runAndWatch(entry: ServerEntry, command: string, waitMs = 2500): Promise<string> {
+  const file = consoleLogPath(entry);
+  const before = fs.existsSync(file) ? (await fsp.stat(file)).size : 0;
+  await sendCommand(entry, command);
+  await new Promise((r) => setTimeout(r, waitMs));
+  if (!fs.existsSync(file)) return "";
+  const stat = await fsp.stat(file);
+  if (stat.size <= before) return "";
+  const handle = await fsp.open(file, "r");
+  try {
+    const buffer = Buffer.alloc(stat.size - before);
+    await handle.read(buffer, 0, buffer.length, before);
+    // Colour codes would break the matching below.
+    return buffer.toString("utf-8").replace(/\x1b\[[0-9;]*m/g, "");
+  } finally {
+    await handle.close();
+  }
 }
