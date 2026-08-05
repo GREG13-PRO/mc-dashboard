@@ -44,9 +44,9 @@ function humanise(name: string): string {
   return name.replace(/_/g, " ").replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
 }
 
-export function renderGameRules(root: HTMLElement, serverId: string): void {
+export function renderGameRules(root: HTMLElement, serverId: string, focusRule?: string): void {
   let state: GameRuleState | null = null;
-  let filter = "";
+  let filter = focusRule ?? "";
 
   function matches(def: GameRuleDef): boolean {
     if (!filter) return true;

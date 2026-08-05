@@ -77,6 +77,45 @@ export function applyGlass(on: boolean): void {
   else root.setAttribute("data-glass", "off");
 }
 
+const SIMPLE_KEY = "mc-dashboard-simple";
+
+/**
+ * Beginner mode: six tabs instead of twenty-one.
+ *
+ * Not a separate application and not a reduced one - every tab it shows is the
+ * same tab, with the same controls. It stops offering the fifteen that only
+ * become interesting once something has gone wrong, which is the difference
+ * between a first server taking five minutes and taking an afternoon of
+ * reading tab names.
+ *
+ * Off by default rather than on. Someone already running servers here should
+ * not lose half their interface to an update, and the first-run path turns it
+ * on for a new installation where there is nobody to surprise - see
+ * `adoptSimpleForNewcomers`.
+ */
+export function getSimpleMode(): boolean {
+  return localStorage.getItem(SIMPLE_KEY) === "1";
+}
+
+export function setSimpleMode(on: boolean): void {
+  localStorage.setItem(SIMPLE_KEY, on ? "1" : "0");
+}
+
+/**
+ * Turns beginner mode on for a browser that has never expressed a preference
+ * and is looking at an installation with no servers in it.
+ *
+ * The two conditions together are what make this safe: no stored answer means
+ * nobody has chosen, and no servers means nobody has done anything yet either.
+ * Called once, on the first server list that arrives.
+ */
+export function adoptSimpleForNewcomers(serverCount: number): boolean {
+  if (localStorage.getItem(SIMPLE_KEY) !== null) return getSimpleMode();
+  const simple = serverCount === 0;
+  localStorage.setItem(SIMPLE_KEY, simple ? "1" : "0");
+  return simple;
+}
+
 export function applyDisplayPreferences(): void {
   applyTextSize(getTextSize());
   applyHighContrast(getHighContrast());

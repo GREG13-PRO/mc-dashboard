@@ -115,3 +115,16 @@ export function applyLanguage(): void {
 export function t(key: LocaleKey): string {
   return DICTIONARIES[current][key] ?? en[key] ?? String(key);
 }
+
+/**
+ * The whole dictionary, for the one caller that needs to read the keys rather
+ * than look one up: the search index is built from every `prop_*` description,
+ * so it cannot fall out of step with the properties screen the way a
+ * hand-written second list would.
+ *
+ * Merged over English so a language with gaps still indexes everything - a
+ * missing translation should cost you the wording, not the ability to find it.
+ */
+export function currentLocale(): Record<string, string> {
+  return { ...(en as Record<string, string>), ...(DICTIONARIES[current] as Record<string, string>) };
+}

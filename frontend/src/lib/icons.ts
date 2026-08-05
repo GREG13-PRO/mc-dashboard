@@ -12,6 +12,10 @@
  */
 
 const PATHS: Record<string, string> = {
+  search: '<circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />',
+  package: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M4 7.5l8 4.5 8-4.5" /><path d="M12 12v9" />',
+  clock: '<circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" />',
   // Navigation.
   grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
   server:

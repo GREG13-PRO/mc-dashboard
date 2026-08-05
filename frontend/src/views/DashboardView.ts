@@ -25,6 +25,8 @@ import { icon } from "../lib/icons";
 import { logoMark } from "../lib/logo";
 import { escapeHtml } from "../lib/escape";
 import { staggerIn } from "../lib/motion";
+import { openCommandPalette } from "../components/CommandPalette";
+import { adoptSimpleForNewcomers } from "../lib/display";
 import type { LocaleKey } from "../lib/i18n";
 import type { ServerWithStatus } from "../types";
 
@@ -132,7 +134,14 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
         </div>
       </nav>
       <main class="main-content" id="main-content" tabindex="-1">
-        <header class="topbar"><nav class="crumbs" id="crumbs" aria-label="${t("hol_vagyok")}"></nav></header>
+        <header class="topbar">
+          <nav class="crumbs" id="crumbs" aria-label="${t("hol_vagyok")}"></nav>
+          <button class="topbar-search" id="open-palette" aria-label="${t("kereses")}">
+            ${icon("search", 15)}
+            <span>${t("kereses_hely")}</span>
+            <kbd>${navigator.platform.toLowerCase().includes("mac") ? "\u2318" : "Ctrl"} K</kbd>
+          </button>
+        </header>
         <div class="view-root" id="view-root">
           <div class="empty-state">${t("valassz_egy_szervert_a_bal_oldalon")}</div>
         </div>
@@ -326,9 +335,18 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       .join("");
   }
 
+  /** Only the first list decides; after that the switch is the user's. */
+  let modeDecided = false;
+
   async function refreshList() {
     try {
       servers = await api.listServers();
+      if (!modeDecided) {
+        modeDecided = true;
+        // An installation with no servers has nobody to surprise, so it starts
+        // in simple mode. One that already has servers keeps every tab it had.
+        adoptSimpleForNewcomers(servers.length);
+      }
       renderList();
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : t("szerverlista_betoltese_sikertelen"), "error");
@@ -489,6 +507,33 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   };
   window.addEventListener("hashchange", hashHandler);
 
+  const openPalette = () => openCommandPalette(servers, parseServerIdFromHash());
+  root.querySelector<HTMLButtonElement>("#open-palette")?.addEventListener("click", openPalette);
+
+  /**
+   * Ctrl+K, and plain "/" when nothing is being typed into.
+   *
+   * The slash is what people press in a list without thinking about it, and it
+   * costs nothing here because the guard already excludes every field it could
+   * have been meant for.
+   */
+  const paletteKey = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    const typing =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target?.isContentEditable === true;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      openPalette();
+    } else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      openPalette();
+    }
+  };
+  document.addEventListener("keydown", paletteKey);
+
   renderNav();
   renderCrumbs();
   void refreshList().then(renderMainContent);
@@ -497,6 +542,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
   return () => {
     if (pollTimer) clearInterval(pollTimer);
     window.removeEventListener("hashchange", hashHandler);
+    document.removeEventListener("keydown", paletteKey);
     disposeServerView?.();
   };
 }

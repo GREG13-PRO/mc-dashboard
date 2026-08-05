@@ -3,6 +3,11 @@
 Webes felügyeleti panel BungeeCord + alszerverekhez: indítás/leállítás, élő konzol,
 fájlkezelő és RCON játékoslista, `screen` session-ökön keresztül.
 
+> **New to running a Minecraft server?** Read
+> [**Your first Minecraft server, start to finish**](docs/getting-started.md) —
+> an English guide that assumes no prior knowledge and gets you from nothing to
+> a world your friends can join, by clicking.
+
 Ez a projekt **csak Linuxon futtatható és tesztelhető** — a dashboard a `screen`
 parancson keresztül indítja/kezeli a szervereket, ami Windows alatt nincs meg. A
 kódot írni bárhol lehet, de telepíteni/futtatni a Linux szerveren kell.

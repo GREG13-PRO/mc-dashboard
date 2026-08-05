@@ -20,6 +20,8 @@ import { renderGameRules } from "../components/GameRules";
 import { renderSchedules } from "../components/Schedules";
 import { renderOverview } from "../components/Overview";
 import { openLuckPermsEditor } from "../components/LuckPermsEditor";
+import { getSimpleMode, setSimpleMode } from "../lib/display";
+import { onJump, takeJump } from "../lib/navigate";
 
 type Tab =
   | "console"
@@ -44,31 +46,44 @@ type Tab =
   | "schedules"
   | "overview";
 /**
- * The tabs, grouped.
+ * The tabs, grouped by what you are trying to do.
  *
  * Sixteen of them in one scrolling strip meant the last few were only
- * reachable by dragging, and even the visible ones were a wall of unrelated
- * words. Grouping costs one extra row and makes the row you are not using
- * disappear. Groups of one show no second row at all, so Console and Security
- * stay a single click.
+ * reachable by dragging, so they were grouped - but grouped by where the data
+ * happened to live rather than by what anyone came to do. "Content" ended up
+ * holding files, plugins, schematics, packs, worlds and the map: six things
+ * with nothing in common except that none of them fitted anywhere else. The
+ * three world tabs were the worst of it, filed next to the file browser while
+ * a person looking for their map had no reason to look under "Content" at all.
+ *
+ * So: the world and everything you do to it in one place, and the things you
+ * install in another. Groups of one show no second row, so Console and
+ * Security stay a single click.
  */
 const TAB_GROUPS: { id: string; label: () => string; tabs: Tab[] }[] = [
   { id: "overview", label: () => t("attekintes"), tabs: ["overview"] },
   { id: "console", label: () => t("konzol"), tabs: ["console"] },
   { id: "players", label: () => t("jatekosok"), tabs: ["players", "access", "luckperms"] },
-  {
-    id: "content",
-    label: () => t("tartalom"),
-    tabs: ["files", "plugins", "schematics", "content", "worlds", "map"],
-  },
+  { id: "world", label: () => t("vilag"), tabs: ["map", "worlds", "schematics"] },
+  { id: "content", label: () => t("tartalom"), tabs: ["plugins", "content", "files"] },
   {
     id: "maintenance",
     label: () => t("karbantartas"),
-    tabs: ["timeline", "performance", "macros", "schedules", "stats"],
+    tabs: ["schedules", "macros", "timeline", "performance", "stats"],
   },
   { id: "security", label: () => t("biztonsag"), tabs: ["security"] },
   { id: "settings", label: () => t("beallitasok"), tabs: ["settings", "properties", "motd", "gamerules"] },
 ];
+
+/**
+ * What a first server actually needs.
+ *
+ * Twenty-one tabs is the right answer for someone running four servers and the
+ * wrong one for someone who has just made their first. Beginner mode is not a
+ * different application - every tab here is the same tab - it just stops
+ * showing the nineteen things that only matter once something has gone wrong.
+ */
+const BEGINNER_TABS: Tab[] = ["overview", "console", "players", "map", "settings", "properties"];
 
 const ALL_TABS: Tab[] = [
   "overview",
@@ -125,7 +140,15 @@ export function renderServerView(
           ? "settings"
           : tab;
   const permittedTabs = ALL_TABS.filter((tab) => perms[capabilityFor(tab) as keyof typeof perms]);
-  const visibleTabs = () => permittedTabs.filter((tab) => tab !== "luckperms" || luckPermsInstalled);
+  const visibleTabs = () =>
+    permittedTabs.filter(
+      (tab) =>
+        (tab !== "luckperms" || luckPermsInstalled) &&
+        // A tab you are already looking at is never hidden underneath you: the
+        // switch can be thrown while an advanced tab is open, and dropping the
+        // content out from under the cursor is worse than one extra tab.
+        (!getSimpleMode() || BEGINNER_TABS.includes(tab) || tab === activeTab)
+    );
 
   /** Groups that still have something in them after permissions are applied. */
   const groupsWithTabs = (): [(typeof TAB_GROUPS)[number], Tab[]][] => {
@@ -141,6 +164,20 @@ export function renderServerView(
   let activeTab: Tab = availableTabs[0] ?? "console";
   let server: ServerWithStatus | null = null;
   let disposed = false;
+
+  /**
+   * A control the search box asked to land on, waiting for its tab to draw.
+   *
+   * Read once and cleared: the tab that consumes it is redrawn on every refresh
+   * of the server list, and a focus that stuck would re-filter the properties
+   * screen every five seconds under the reader's hands.
+   */
+  let pendingFocus: string | null = null;
+  const takeFocus = (): string | undefined => {
+    const focus = pendingFocus ?? undefined;
+    pendingFocus = null;
+    return focus;
+  };
 
   let terminal: ConsoleLogView | null = null;
   let socket: ConsoleSocket | null = null;
@@ -270,6 +307,10 @@ export function renderServerView(
           })
           .join("")}
         <span class="tab-indicator" aria-hidden="true"></span>
+        <button class="mode-toggle ${getSimpleMode() ? "simple" : ""}" id="mode-toggle"
+                title="${escapeHtml(getSimpleMode() ? t("egyszeru_mod_ki_hint") : t("egyszeru_mod_be_hint"))}">
+          ${escapeHtml(getSimpleMode() ? t("egyszeru_mod") : t("teljes_mod"))}
+        </button>
       </div>
       ${
         currentGroupTabs().length > 1
@@ -355,6 +396,16 @@ export function renderServerView(
           groupEls[(index + step + groupEls.length) % groupEls.length]?.focus();
         }
       };
+    });
+
+    root.querySelector<HTMLButtonElement>("#mode-toggle")?.addEventListener("click", () => {
+      setSimpleMode(!getSimpleMode());
+      // Redrawn whole rather than just re-labelled: the tab strip, the sub-row
+      // and the properties list all read the mode, and re-deriving them by hand
+      // is three chances to leave one behind.
+      renderShell();
+      renderTabContent();
+      showToast(getSimpleMode() ? t("egyszeru_mod_bekapcsolva") : t("teljes_mod_bekapcsolva"));
     });
 
     bindSubtabs();
@@ -536,13 +587,13 @@ export function renderServerView(
     } else if (activeTab === "settings") {
       renderSettings(content);
     } else if (activeTab === "properties") {
-      renderPropertiesEditor(content, serverId);
+      renderPropertiesEditor(content, serverId, takeFocus());
     } else if (activeTab === "overview") {
       disposeTab = renderOverview(content, serverId);
     } else if (activeTab === "schedules") {
       renderSchedules(content, serverId);
     } else if (activeTab === "gamerules") {
-      renderGameRules(content, serverId);
+      renderGameRules(content, serverId, takeFocus());
     } else if (activeTab === "motd") {
       // The preview draws the server list row, and the row's first line is the
       // server's name - so the editor needs it, not just the id.
@@ -2983,8 +3034,40 @@ export function renderServerView(
 
   void load().then(startStatsLoop);
 
+  /**
+   * Takes a jump from the search box when it names this server.
+   *
+   * Handled here rather than through the hash so a jump within the server you
+   * are already looking at swaps the tab instead of tearing the whole view down
+   * and building it again.
+   */
+  const stopListening = onJump((jump) => {
+    if (disposed || jump.serverId !== serverId) return false;
+    pendingFocus = jump.focus ?? null;
+    // Beginner mode hides most tabs, and a search result that silently did
+    // nothing would be worse than one that shows the tab it promised.
+    if (getSimpleMode() && !BEGINNER_TABS.includes(jump.tab as Tab)) {
+      setSimpleMode(false);
+      renderShell();
+    }
+    if (jump.tab === activeTab) renderTabContent();
+    else goToTab(jump.tab as Tab);
+    return true;
+  });
+
+  // A jump parked while another server was on screen; this view is the one it
+  // was waiting for.
+  const parked = takeJump(serverId);
+  if (parked) {
+    pendingFocus = parked.focus ?? null;
+    queueMicrotask(() => {
+      if (!disposed) goToTab(parked.tab as Tab);
+    });
+  }
+
   return () => {
     disposed = true;
+    stopListening();
     mapHandle?.destroy();
     mapHandle = null;
     if (statsTimer) clearInterval(statsTimer);

@@ -4,6 +4,7 @@ import { t } from "../lib/i18n";
 import { icon } from "../lib/icons";
 import { showToast } from "../components/Toast";
 import type { PropertyCategory, PropertyDef, ServerProperties } from "../types";
+import { getSimpleMode } from "../lib/display";
 
 /**
  * server.properties as a form rather than a text file.
@@ -109,9 +110,37 @@ function control(def: PropertyDef, value: string): string {
     value="${escapeHtml(value)}" ${def.secret ? `placeholder="${t("valtozatlan")}"` : ""} />`;
 }
 
-export function renderPropertiesEditor(root: HTMLElement, serverId: string): void {
+/**
+ * The keys a first server is actually set up with.
+ *
+ * Chosen by what a beginner has a reason to change on day one, not by which
+ * are most interesting: difficulty and gamemode because that is what the
+ * server feels like, the player limit and whitelist because that is who gets
+ * in, PvP and the MOTD because people ask for them by name, view distance
+ * because it is the one performance dial worth touching. The other fifty-odd
+ * are one switch away and searchable from anywhere.
+ */
+const BEGINNER_KEYS = new Set([
+  "motd",
+  "difficulty",
+  "gamemode",
+  "pvp",
+  "max-players",
+  "white-list",
+  "online-mode",
+  "spawn-protection",
+  "view-distance",
+  "server-port",
+  "hardcore",
+  "allow-nether",
+]);
+
+export function renderPropertiesEditor(root: HTMLElement, serverId: string, focusKey?: string): void {
   let data: ServerProperties | null = null;
-  let filter = "";
+  // A jump from the search box arrives as a filter, which is the honest way to
+  // show one property: the box says what is being shown, and clearing it puts
+  // the rest of the file back.
+  let filter = focusKey ?? "";
   let open: PropertyCategory | null = null;
   /**
    * Keys the user has actually changed, and the value they changed them to.
@@ -137,6 +166,11 @@ export function renderPropertiesEditor(root: HTMLElement, serverId: string): voi
   }
 
   function matches(def: PropertyDef): boolean {
+    // Beginner mode narrows the file to the dozen keys a first server is
+    // actually configured with. Searching escapes it on purpose: someone who
+    // types a key name has already told you they know it exists, and hiding it
+    // from them would be the search lying about the file.
+    if (!filter && getSimpleMode() && !BEGINNER_KEYS.has(def.key)) return false;
     if (!filter) return true;
     const needle = filter.toLowerCase();
     return def.key.toLowerCase().includes(needle) || describe(def.key).toLowerCase().includes(needle);
