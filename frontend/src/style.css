@@ -3992,3 +3992,32 @@ table.file-table tr.file-row:hover {
     transition: none;
   }
 }
+
+/* ---- Player names over the 3D map ----------------------------------------
+ * A layer of absolutely-placed spans rather than text drawn into the canvas.
+ * Positions are recomputed every frame from the same matrix the geometry uses,
+ * so a label stays on its marker while the camera orbits.
+ */
+.map-3d-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.map-3d-label {
+  position: absolute;
+  /* The projected point is the top of the marker; the label sits centred above
+     it, which is why it is pulled back by half its own width. */
+  transform: translate(-50%, -100%);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  /* Its own backing rather than the theme's, because it sits over terrain that
+     can be any colour - a themed chip would be unreadable over half the map. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}

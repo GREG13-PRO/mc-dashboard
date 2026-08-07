@@ -1,7 +1,8 @@
 import { api } from "../api";
 import { t } from "../lib/i18n";
+import { escapeHtml } from "../lib/escape";
 import { perspective, lookAt, multiply } from "../lib/mat4";
-import type { Dimension, SchematicSurface, SurfaceView } from "../types";
+import type { Dimension, PlayerPosition, SchematicSurface, SurfaceView } from "../types";
 
 /**
  * Blocky 3D view of a square of world, built from the same surface data the 2D
@@ -66,6 +67,8 @@ export interface GhostPlacement {
 export interface WorldView3DHandle {
   element: HTMLElement;
   destroy(): void;
+  /** Draws the people who are online, where they are standing. */
+  setPlayers(players: PlayerPosition[]): void;
   /** Draws a schematic at a spot, or clears it when given null. */
   setGhost(placement: GhostPlacement | null): void;
   /** Terrain height at a world column, or null outside the loaded square. */
@@ -354,6 +357,111 @@ function buildGhostMesh(
   return { data, vertices: parts.length / 6 };
 }
 
+/**
+ * A player, as a shape you can find on a hillside.
+ *
+ * A dot would vanish the moment the camera tilted, so a marker is a slim
+ * column standing on the ground with a wedge on top pointing the way the
+ * player is facing. The column is what makes them findable from across the
+ * map; the wedge is what makes a crowd readable once you are close.
+ *
+ * Colour comes from the name, so the same person is the same colour every
+ * time - the alternative is a palette that reshuffles whenever somebody logs
+ * out.
+ */
+function playerColour(name: string): [number, number, number] {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  // Fixed saturation and lightness, hue from the name: every colour reads as a
+  // marker, and none of them lands on the terrain's greens and browns.
+  const hue = (h >>> 0) % 360;
+  const [r, g, b] = hslToRgb(hue / 360, 0.75, 0.62);
+  return [r, g, b];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const f = (n: number) => {
+    const k = (n + h * 12) % 12;
+    return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return [f(0), f(8), f(4)];
+}
+
+const MARKER_HEIGHT = 3.2;
+const MARKER_WIDTH = 0.55;
+
+function buildPlayerMesh(
+  players: PlayerPosition[],
+  view: SurfaceView,
+  groundAt: (x: number, z: number) => number | null
+): { data: Float32Array; vertices: number } {
+  const size = view.size;
+  const parts: number[] = [];
+  const push = (x: number, y: number, z: number, c: [number, number, number], shade: number) => {
+    parts.push(x - size / 2, y, z - size / 2, c[0] * shade, c[1] * shade, c[2] * shade);
+  };
+  const tri = (
+    a: [number, number, number],
+    b: [number, number, number],
+    c: [number, number, number],
+    colour: [number, number, number],
+    shade: number
+  ) => {
+    for (const p of [a, b, c]) push(p[0], p[1], p[2], colour, shade);
+  };
+
+  for (const player of players) {
+    const gx = player.x - view.x;
+    const gz = player.z - view.z;
+    // Somebody outside the loaded square has no ground to stand on and would be
+    // drawn hanging in the air at the edge.
+    if (gx < -1 || gz < -1 || gx > size + 1 || gz > size + 1) continue;
+    // Their own Y, floored to the terrain when the two disagree - a player in a
+    // cave is below the surface and a marker down there is invisible.
+    const ground = groundAt(gx, gz);
+    const base = ground === null ? player.y : Math.max(player.y, ground);
+    const colour = playerColour(player.name);
+    const w = MARKER_WIDTH / 2;
+    const top = base + MARKER_HEIGHT;
+
+    // Four sides of a square column, each a pair of triangles.
+    const corners: [number, number][] = [
+      [gx - w, gz - w],
+      [gx + w, gz - w],
+      [gx + w, gz + w],
+      [gx - w, gz + w],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const [x1, z1] = corners[i];
+      const [x2, z2] = corners[(i + 1) % 4];
+      const shade = i % 2 === 0 ? 0.82 : 0.66;
+      tri([x1, base, z1], [x2, base, z2], [x2, top, z2], colour, shade);
+      tri([x1, base, z1], [x2, top, z2], [x1, top, z1], colour, shade);
+    }
+
+    // The wedge on top, pointing where they are looking. Minecraft's yaw is 0
+    // at south and grows clockwise, which is why the sine and cosine are the
+    // way round they are.
+    const yaw = ((player.yaw ?? 0) * Math.PI) / 180;
+    const dx = -Math.sin(yaw);
+    const dz = Math.cos(yaw);
+    const nose = 1.5;
+    const tail = 0.6;
+    tri(
+      [gx + dx * nose, top, gz + dz * nose],
+      [gx - dz * tail - dx * tail, top, gz + dx * tail - dz * tail],
+      [gx + dz * tail - dx * tail, top, gz - dx * tail - dz * tail],
+      colour,
+      1
+    );
+  }
+
+  return { data: new Float32Array(parts), vertices: parts.length / 6 };
+}
+
 export function createWorldView3D(
   serverId: string,
   dimension: Dimension,
@@ -364,9 +472,11 @@ export function createWorldView3D(
   root.className = "map-3d";
   root.innerHTML = `
     <canvas class="map-3d-canvas"></canvas>
+    <div class="map-3d-labels" id="map-3d-labels" aria-hidden="true"></div>
     <div class="map-3d-status">${t("betoltes")}</div>
   `;
   const canvas = root.querySelector<HTMLCanvasElement>("canvas")!;
+  const labels = root.querySelector<HTMLDivElement>("#map-3d-labels")!;
   const status = root.querySelector<HTMLDivElement>(".map-3d-status")!;
 
   let disposed = false;
@@ -377,6 +487,8 @@ export function createWorldView3D(
   let vertices = 0;
   let frame = 0;
   let ghostVertices = 0;
+  let playerVertices = 0;
+  let players: PlayerPosition[] = [];
   /** Kept so the ghost can be rebuilt at a new spot without refetching. */
   let loaded: SurfaceView | null = null;
   let terrainHeights: Int16Array | null = null;
@@ -393,6 +505,7 @@ export function createWorldView3D(
     return {
       element: root,
       destroy() {},
+      setPlayers() {},
       setGhost() {},
       heightAt: () => null,
       onPick: null,
@@ -408,6 +521,7 @@ export function createWorldView3D(
 
   const buffer = gl.createBuffer();
   const ghostBuffer = gl.createBuffer();
+  const playerBuffer = gl.createBuffer();
   const aPos = gl.getAttribLocation(program, "aPos");
   const aColour = gl.getAttribLocation(program, "aColour");
   const uMvp = gl.getUniformLocation(program, "uMvp");
@@ -449,6 +563,77 @@ export function createWorldView3D(
       bind(ghostBuffer);
       gl.drawArrays(gl.TRIANGLES, 0, ghostVertices);
     }
+    if (playerVertices > 0) {
+      bind(playerBuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, playerVertices);
+    }
+    paintLabels(mvp, width, height);
+  }
+
+  /**
+   * Names, as HTML over the canvas.
+   *
+   * Not in the shader: text in WebGL means a glyph atlas and a second draw
+   * path, for a handful of short strings the browser already renders better.
+   * Projecting the marker's top through the same matrix the geometry used is
+   * what keeps the label attached to it while the camera moves.
+   */
+  function paintLabels(mvp: Float32Array, width: number, height: number) {
+    if (players.length === 0 || !loaded) {
+      if (labels.childElementCount > 0) labels.innerHTML = "";
+      return;
+    }
+    const size = loaded.size;
+    const html: string[] = [];
+    for (const player of players) {
+      const gx = player.x - loaded.x;
+      const gz = player.z - loaded.z;
+      if (gx < -1 || gz < -1 || gx > size + 1 || gz > size + 1) continue;
+      const ground = handle.heightAt(player.x, player.z);
+      const y = (ground === null ? player.y : Math.max(player.y, ground)) + MARKER_HEIGHT + 1.2;
+      const [px, py, pw] = project(mvp, gx - size / 2, y, gz - size / 2);
+      // Behind the camera w goes negative, and dividing by it folds the point
+      // back onto the screen upside down.
+      if (pw <= 0) continue;
+      const sx = ((px / pw) * 0.5 + 0.5) * width;
+      const sy = (0.5 - (py / pw) * 0.5) * height;
+      html.push(
+        `<span class="map-3d-label" style="left:${sx.toFixed(1)}px;top:${sy.toFixed(
+          1
+        )}px;">${escapeHtml(player.name)}</span>`
+      );
+    }
+    labels.innerHTML = html.join("");
+  }
+
+  /** Column-major, the layout mat4.ts builds and WebGL expects. */
+  function project(m: Float32Array, x: number, y: number, z: number): [number, number, number] {
+    return [
+      m[0] * x + m[4] * y + m[8] * z + m[12],
+      m[1] * x + m[5] * y + m[9] * z + m[13],
+      m[3] * x + m[7] * y + m[11] * z + m[15],
+    ];
+  }
+
+  function rebuildPlayers() {
+    if (!gl) return;
+    if (!loaded || players.length === 0) {
+      playerVertices = 0;
+      requestDraw();
+      return;
+    }
+    const mesh = buildPlayerMesh(players, loaded, (gx, gz) => {
+      if (!terrainHeights || !terrainColours || !loaded) return null;
+      const x = Math.floor(gx);
+      const z = Math.floor(gz);
+      if (x < 0 || z < 0 || x >= loaded.size || z >= loaded.size) return null;
+      const at = z * loaded.size + x;
+      return terrainColours[at] === 0 ? null : terrainHeights[at] + 1;
+    });
+    playerVertices = mesh.vertices;
+    gl.bindBuffer(gl.ARRAY_BUFFER, playerBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, mesh.data, gl.STATIC_DRAW);
+    requestDraw();
   }
 
   function cameraEye(): [number, number, number] {
@@ -652,15 +837,21 @@ export function createWorldView3D(
     bind(buffer);
     requestDraw();
     resolveReady();
-    // A ghost set while the terrain was still loading has been remembered but
-    // not drawn; now there is something to stand it on.
+    // A ghost or a set of players handed over while the terrain was still
+    // loading has been remembered but not drawn; now there is ground to stand
+    // them on.
     if (ghost) rebuildGhost();
+    if (players.length > 0) rebuildPlayers();
   })();
 
   const handle: WorldView3DHandle = {
     element: root,
     onPick: null,
     ready,
+    setPlayers(next) {
+      players = next;
+      rebuildPlayers();
+    },
     setGhost(placement) {
       ghost = placement;
       rebuildGhost();
@@ -683,6 +874,7 @@ export function createWorldView3D(
       // garbage collected; browsers allow only a handful of live contexts.
       gl.deleteBuffer(buffer);
       gl.deleteBuffer(ghostBuffer);
+      gl.deleteBuffer(playerBuffer);
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     },
   };

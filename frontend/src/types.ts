@@ -404,7 +404,11 @@ export interface SchematicSurface {
 export interface PlayerPosition {
   name: string;
   x: number;
+  /** Height, so a 3D marker stands on the ground rather than in it. */
+  y: number;
   z: number;
+  /** Where they are looking, in degrees; null when it could not be read. */
+  yaw: number | null;
   dimension: Dimension;
 }
 

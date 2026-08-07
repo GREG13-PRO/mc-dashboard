@@ -15,7 +15,16 @@ import type { ServerEntry } from "../types";
 export interface PlayerPosition {
   name: string;
   x: number;
+  /**
+   * Height. Parsed all along - `Pos` is three numbers and the regex has always
+   * captured all three - and thrown away, because a flat map has no use for it.
+   * The 3D view does: a marker at the wrong height either sinks into the hill
+   * or floats over it.
+   */
+  y: number;
   z: number;
+  /** Where the player is looking, in degrees. Null when it could not be read. */
+  yaw: number | null;
   dimension: Dimension;
 }
 
@@ -25,6 +34,8 @@ const PLAYER_NAME_RE = /^[A-Za-z0-9_]{1,16}$/;
 
 // "Steve has the following entity data: [1.5d, 64.0d, -3.25d]"
 const POS_RE = /\[\s*(-?[\d.]+)d?,\s*(-?[\d.]+)d?,\s*(-?[\d.]+)d?\s*]/;
+// "Steve has the following entity data: [0.0f, -12.5f]" - yaw then pitch.
+const ROT_RE = /\[\s*(-?[\d.]+)f?,\s*(-?[\d.]+)f?\s*]/;
 // "Steve has the following entity data: "minecraft:the_nether""
 const DIM_RE = /"?minecraft:(\w+)"?\s*$/;
 
@@ -48,22 +59,47 @@ export async function playerPositions(entry: ServerEntry): Promise<PlayerPositio
   try {
     replies = await rconCommands(
       entry,
-      names.flatMap((name) => [`data get entity ${name} Pos`, `data get entity ${name} Dimension`])
+      names.flatMap((name) => [
+        `data get entity ${name} Pos`,
+        `data get entity ${name} Dimension`,
+        `data get entity ${name} Rotation`,
+      ])
     );
   } catch {
     // A map that briefly cannot reach RCON should still show the terrain.
     return [];
   }
 
+  return parsePositions(names, replies);
+}
+
+/**
+ * Turns RCON's replies into positions.
+ *
+ * Separate from the call that fetched them so it can be checked against known
+ * `data get` output rather than against a server with somebody standing on it -
+ * which needs a running server, a client, and on this one an AuthMe account.
+ * Three commands go out per player and they come back in order, so the parsing
+ * is entirely a question of indexing, and indexing is exactly the thing worth
+ * testing.
+ */
+export function parsePositions(names: string[], replies: string[]): PlayerPosition[] {
   const out: PlayerPosition[] = [];
+  const PER_PLAYER = 3;
   names.forEach((name, i) => {
-    const pos = POS_RE.exec(replies[i * 2] ?? "");
+    const pos = POS_RE.exec(replies[i * PER_PLAYER] ?? "");
     if (!pos) return;
-    const dim = DIM_RE.exec((replies[i * 2 + 1] ?? "").trim());
+    const dim = DIM_RE.exec((replies[i * PER_PLAYER + 1] ?? "").trim());
+    // Rotation is [yaw, pitch]; only the yaw matters for an arrow seen from
+    // above. A player whose rotation could not be read yields null rather than
+    // 0, which would be a confident claim that they are facing south.
+    const rot = ROT_RE.exec(replies[i * PER_PLAYER + 2] ?? "");
     out.push({
       name,
       x: Math.round(Number(pos[1])),
+      y: Math.round(Number(pos[2])),
       z: Math.round(Number(pos[3])),
+      yaw: rot ? Number(rot[1]) : null,
       dimension: DIMENSION_BY_ID[dim?.[1] ?? ""] ?? "overworld",
     });
   });

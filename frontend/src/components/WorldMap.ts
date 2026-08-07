@@ -126,12 +126,22 @@ export function createWorldMap(
 
   async function pollPlayers() {
     try {
-      players = await api.getMapPlayers(serverId);
+      // Guarded rather than trusted: a response without a `players` array
+      // destructures to undefined without throwing, and the first thing done
+      // with it is a filter - so a malformed reply takes the whole map down
+      // rather than showing no markers.
+      const next = await api.getMapPlayers(serverId);
+      players = Array.isArray(next) ? next : [];
     } catch {
       // A stopped server or an RCON hiccup just means no markers.
       players = [];
     }
-    if (!stopped) paintPlayers();
+    if (stopped) return;
+    paintPlayers();
+    // The 3D view draws the same people as markers standing on the terrain, so
+    // it is fed from the same poll rather than asking again on its own clock -
+    // two pollers would put the flat map and the 3D one a few seconds apart.
+    view3d?.setPlayers(players.filter((p) => p.dimension === dimension));
   }
 
   function buildTiles() {
@@ -203,6 +213,9 @@ export function createWorldMap(
     // does not lose your place.
     const centre = centreOfView();
     view3d = createWorldView3D(serverId, dimension, centre.x, centre.z);
+    // Whatever the last poll saw, so the markers are there on the first frame
+    // rather than up to three seconds later.
+    view3d.setPlayers(players.filter((p) => p.dimension === dimension));
     host3d.appendChild(view3d.element);
     host3d.hidden = false;
     button3d.classList.add("active");
