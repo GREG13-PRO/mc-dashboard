@@ -23,6 +23,7 @@ import type {
   PlayerPosition,
   ChatMessage,
   PlayerProfile,
+  TimelineChange,
   PlayerProfileSummary,
   SchematicSurface,
   SurfaceView,
@@ -565,6 +566,35 @@ export const api = {
     size: number
   ): Promise<SurfaceView> {
     return request(`/servers/${serverId}/map/${dimension}/view?x=${x}&z=${z}&size=${size}`);
+  },
+  /** The same surface payload as the live map, but as a snapshot has it. */
+  async getSnapshotView(
+    serverId: string,
+    snapshot: string,
+    dimension: string,
+    x: number,
+    z: number,
+    size: number
+  ): Promise<SurfaceView> {
+    return request(
+      `/servers/${serverId}/timeline/${encodeURIComponent(snapshot)}/view?dim=${dimension}&x=${x}&z=${z}&size=${size}`
+    );
+  },
+  async getTimelineChanges(serverId: string, snapshot: string): Promise<TimelineChange[]> {
+    const { changes } = await request<{ changes: TimelineChange[] }>(
+      `/servers/${serverId}/timeline/${encodeURIComponent(snapshot)}/changes`
+    );
+    return changes;
+  },
+  async restoreTimelineFiles(
+    serverId: string,
+    snapshot: string,
+    paths: string[]
+  ): Promise<{ restored: number; backup: string }> {
+    return request(`/servers/${serverId}/timeline/${encodeURIComponent(snapshot)}/restore-files`, {
+      method: "POST",
+      body: JSON.stringify({ paths }),
+    });
   },
   async clearMapCache(serverId: string): Promise<void> {
     await request(`/servers/${serverId}/map/cache`, { method: "DELETE" });

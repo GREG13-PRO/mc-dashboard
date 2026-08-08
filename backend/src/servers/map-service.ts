@@ -135,9 +135,18 @@ export async function surfaceView(
   dim: Dimension,
   originX: number,
   originZ: number,
-  size: number
+  size: number,
+  /**
+   * Where to read the regions from, and under what cache scope.
+   *
+   * Given for a rewind: the time machine materialises a snapshot's regions
+   * into their own folder, and the surfaces read from them must not be filed
+   * under the live world's cache - see regionSurface's `scope`.
+   */
+  from?: { regionDir: string; scope: string }
 ): Promise<SurfaceView> {
-  const dir = regionDirFor(entry, dim);
+  const dir = from?.regionDir ?? regionDirFor(entry, dim);
+  const scope = from?.scope ?? "live";
   if (!dir) throw new MapError("Ehhez a dimenzióhoz nincs világadat.");
   if (!Number.isInteger(size) || size < 16 || size > MAX_VIEW_SIZE) {
     throw new MapError("Érvénytelen nézetméret.");
@@ -157,7 +166,7 @@ export async function surfaceView(
 
   for (let rz = firstRegionZ; rz <= lastRegionZ; rz++) {
     for (let rx = firstRegionX; rx <= lastRegionX; rx++) {
-      const surface = await regionSurface(entry, dim, dir, rx, rz);
+      const surface = await regionSurface(entry, dim, dir, rx, rz, scope);
       if (!surface) continue;
       const regionOriginX = rx * REGION_BLOCKS;
       const regionOriginZ = rz * REGION_BLOCKS;

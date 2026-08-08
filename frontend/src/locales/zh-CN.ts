@@ -750,4 +750,10 @@ export const zhCN: Partial<Locale> = {
   nincs_uzenete: "在面板还能读到的那段控制台里没有说过话。",
   kitiltva: "已封禁",
   online: "在线",
+  most: "现在",
+  a_multat_latod: "你正在查看过去",
+  mi_valtozna: "会改变什么？",
+  vissza_a_jelenbe: "回到现在",
+  semmi_nem_valtozna: "什么都不会变——世界已经和这个快照一致。",
+  valtozo_fajlok: "将会写回 {n} 个世界文件。",
 };

@@ -466,7 +466,16 @@ export function createWorldView3D(
   serverId: string,
   dimension: Dimension,
   centreX: number,
-  centreZ: number
+  centreZ: number,
+  /**
+   * A snapshot id to draw instead of the world as it is.
+   *
+   * Given at construction rather than switchable afterwards: the view's whole
+   * loaded state - the mesh, the heights, the colours the picking reads - comes
+   * from one fetch, and swapping the source underneath all of that is a lot of
+   * state to get right for something the caller can do by making a new view.
+   */
+  snapshotId?: string
 ): WorldView3DHandle {
   const root = document.createElement("div");
   root.className = "map-3d";
@@ -793,13 +802,11 @@ export function createWorldView3D(
   void (async () => {
     let view: SurfaceView;
     try {
-      view = await api.getSurfaceView(
-        serverId,
-        dimension,
-        Math.round(centreX - VIEW_BLOCKS / 2),
-        Math.round(centreZ - VIEW_BLOCKS / 2),
-        VIEW_BLOCKS
-      );
+      const originX = Math.round(centreX - VIEW_BLOCKS / 2);
+      const originZ = Math.round(centreZ - VIEW_BLOCKS / 2);
+      view = snapshotId
+        ? await api.getSnapshotView(serverId, snapshotId, dimension, originX, originZ, VIEW_BLOCKS)
+        : await api.getSurfaceView(serverId, dimension, originX, originZ, VIEW_BLOCKS);
     } catch {
       status.textContent = t("nem_sikerult_betolteni");
       resolveReady();

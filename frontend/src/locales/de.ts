@@ -750,4 +750,10 @@ export const de: Partial<Locale> = {
   nincs_uzenete: "Hat in dem Teil der Konsole, den das Dashboard noch sieht, nichts gesagt.",
   kitiltva: "Gebannt",
   online: "Online",
+  most: "Jetzt",
+  a_multat_latod: "Du siehst die Vergangenheit",
+  mi_valtozna: "Was würde sich ändern?",
+  vissza_a_jelenbe: "Zurück zum Jetzt",
+  semmi_nem_valtozna: "Nichts würde sich ändern — die Welt entspricht diesem Snapshot bereits.",
+  valtozo_fajlok: "{n} Weltdateien würden zurückgeschrieben.",
 };

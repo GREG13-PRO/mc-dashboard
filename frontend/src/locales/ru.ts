@@ -750,4 +750,10 @@ export const ru: Partial<Locale> = {
   nincs_uzenete: "Ничего не говорил в той части консоли, которую панель ещё видит.",
   kitiltva: "Забанен",
   online: "В сети",
+  most: "Сейчас",
+  a_multat_latod: "Ты смотришь в прошлое",
+  mi_valtozna: "Что изменится?",
+  vissza_a_jelenbe: "Вернуться в настоящее",
+  semmi_nem_valtozna: "Ничего не изменится — мир уже совпадает с этим снимком.",
+  valtozo_fajlok: "Будет перезаписано файлов мира: {n}.",
 };

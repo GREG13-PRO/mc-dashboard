@@ -141,6 +141,9 @@ import {
   listSnapshots,
   restoreSnapshot,
   timelineSize,
+  materialiseRegions,
+  changedFiles,
+  restoreFiles,
   deleteTimeline,
   TimelineError,
 } from "./world-timeline";
@@ -1669,6 +1672,82 @@ serversRouter.post("/:id/timeline/restore", requirePermission("settings"), async
   try {
     const restored = await restoreSnapshot(entry, String(req.body?.id ?? ""));
     res.json({ ok: true, restored });
+  } catch (err) {
+    res.status(err instanceof TimelineError ? 409 : 500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * The world as a snapshot has it, in the same shape the live map sends.
+ *
+ * Same payload as the live surface view, so the 3D map draws the past with the
+ * renderer it already has - a rewind is a different set of regions, not a
+ * different kind of picture.
+ */
+serversRouter.get("/:id/timeline/:snapshot/view", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const dim = String(req.query.dim ?? "overworld") as Dimension;
+    const regionDir = await materialiseRegions(entry, req.params.snapshot, dim);
+    if (!regionDir) {
+      res.status(404).json({ error: "Ebben a pillanatképben nincs ilyen dimenzió." });
+      return;
+    }
+    const x = Number(req.query.x ?? 0);
+    const z = Number(req.query.z ?? 0);
+    const size = Number(req.query.size ?? 192);
+    res.json(
+      await surfaceView(entry, dim, x, z, size, {
+        regionDir,
+        // Scoped so a look at the past is never answered from the live cache,
+        // and never overwrites it.
+        scope: `snap-${req.params.snapshot}`,
+      })
+    );
+  } catch (err) {
+    res.status(err instanceof TimelineError || err instanceof MapError ? 400 : 500).json({
+      error: (err as Error).message,
+    });
+  }
+});
+
+/** What a rewind would actually change, compared by hash rather than by date. */
+serversRouter.get("/:id/timeline/:snapshot/changes", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ changes: await changedFiles(entry, req.params.snapshot) });
+  } catch (err) {
+    res.status(err instanceof TimelineError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+/** Restores only the named files - one griefed region, not the whole day. */
+serversRouter.post("/:id/timeline/:snapshot/restore-files", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  const paths = (req.body ?? {}).paths;
+  if (!Array.isArray(paths) || paths.length === 0) {
+    res.status(400).json({ error: "Nincs kiválasztva fájl." });
+    return;
+  }
+  try {
+    // A rewind overwrites world data, so there is a way back from it even when
+    // the rewind itself was the mistake.
+    const backup = await createBackup(entry);
+    const restored = await restoreFiles(entry, req.params.snapshot, paths.map(String));
+    await clearMapCache(entry);
+    res.json({ ok: true, restored, backup: backup.filename });
   } catch (err) {
     res.status(err instanceof TimelineError ? 409 : 500).json({ error: (err as Error).message });
   }

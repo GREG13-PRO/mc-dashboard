@@ -749,4 +749,10 @@ export const en = {
   nincs_uzenete: "Has not said anything in the console this dashboard can still read.",
   kitiltva: "Banned",
   online: "Online",
+  most: "Now",
+  a_multat_latod: "You are looking at the past",
+  mi_valtozna: "What would change?",
+  vissza_a_jelenbe: "Back to now",
+  semmi_nem_valtozna: "Nothing would change — the world already matches this snapshot.",
+  valtozo_fajlok: "{n} world files would be written back.",
 };

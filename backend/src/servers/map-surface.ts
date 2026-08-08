@@ -107,8 +107,25 @@ function build(chunks: Awaited<ReturnType<typeof readRegionSurface>>): RegionSur
   return { palette, blocks, heights };
 }
 
-function cacheFile(entry: ServerEntry, dim: Dimension, x: number, z: number): string {
-  return path.join(env.dataDir, "map-cache", entry.id, `${dim}.${x}.${z}.surface`);
+/**
+ * Where a region's decoded surface is kept.
+ *
+ * `scope` exists because the same server, dimension and coordinates can now
+ * mean two different sets of blocks: the world as it is, and the world as some
+ * snapshot has it. Without it a rewind would either be answered from the live
+ * cache - showing the present and calling it the past - or would overwrite the
+ * live cache with the past, which is worse. The mtime check below would hide
+ * both most of the time, which is the kind of bug that surfaces once and is
+ * never reproducible.
+ */
+function cacheFile(
+  entry: ServerEntry,
+  dim: Dimension,
+  x: number,
+  z: number,
+  scope: string
+): string {
+  return path.join(env.dataDir, "map-cache", entry.id, scope, `${dim}.${x}.${z}.surface`);
 }
 
 export async function regionSurface(
@@ -116,12 +133,14 @@ export async function regionSurface(
   dim: Dimension,
   regionDir: string,
   x: number,
-  z: number
+  z: number,
+  /** Which reading of this world - "live", or a snapshot id. */
+  scope = "live"
 ): Promise<RegionSurface | null> {
   const source = path.join(regionDir, `r.${x}.${z}.mca`);
   if (!fs.existsSync(source)) return null;
 
-  const cache = cacheFile(entry, dim, x, z);
+  const cache = cacheFile(entry, dim, x, z, scope);
   const sourceStat = await fsp.stat(source);
   if (fs.existsSync(cache)) {
     const cacheStat = await fsp.stat(cache);

@@ -751,4 +751,10 @@ export const hu: typeof en = {
   nincs_uzenete: "Nem szólalt meg a konzolnak abban a részében, amit a dashboard még lát.",
   kitiltva: "Kitiltva",
   online: "Online",
+  most: "Most",
+  a_multat_latod: "A múltat látod",
+  mi_valtozna: "Mi változna?",
+  vissza_a_jelenbe: "Vissza a jelenbe",
+  semmi_nem_valtozna: "Semmi nem változna — a világ már megegyezik ezzel a pillanatképpel.",
+  valtozo_fajlok: "{n} világfájl íródna vissza.",
 };

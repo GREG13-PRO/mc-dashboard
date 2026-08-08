@@ -4247,3 +4247,26 @@ table.file-table tr.file-row:hover {
     max-height: 220px;
   }
 }
+
+/* ---- Rewind banner ---------------------------------------------------------
+ * Above the map, in the warning colour, because everything below it is a
+ * picture of a world that no longer exists and nothing says so otherwise.
+ */
+.map-rewind-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+  margin-top: var(--gap-sm);
+  padding: 8px 12px;
+  border: 1px solid var(--yellow);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
+.map-rewind-msg {
+  margin-left: auto;
+  color: var(--text-dim);
+}

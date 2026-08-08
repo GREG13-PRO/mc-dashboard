@@ -445,6 +445,13 @@ export interface PlayerProfileSummary {
   banned: boolean;
 }
 
+export interface TimelineChange {
+  path: string;
+  /** Absent from the world now, present in the snapshot. */
+  missingNow: boolean;
+  bytes: number;
+}
+
 export type ChatKind = "chat" | "me" | "join" | "leave" | "death";
 
 export interface ChatMessage {

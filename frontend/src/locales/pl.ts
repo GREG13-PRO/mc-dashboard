@@ -750,4 +750,10 @@ export const pl: Partial<Locale> = {
   nincs_uzenete: "Nic nie powiedział w tej części konsoli, którą panel jeszcze widzi.",
   kitiltva: "Zbanowany",
   online: "Online",
+  most: "Teraz",
+  a_multat_latod: "Patrzysz w przeszłość",
+  mi_valtozna: "Co by się zmieniło?",
+  vissza_a_jelenbe: "Wróć do teraz",
+  semmi_nem_valtozna: "Nic by się nie zmieniło — świat już odpowiada tej migawce.",
+  valtozo_fajlok: "Zapisano by z powrotem {n} plików świata.",
 };

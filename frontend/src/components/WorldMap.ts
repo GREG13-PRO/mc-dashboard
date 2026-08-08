@@ -46,6 +46,16 @@ export function createWorldMap(
   let players: PlayerPosition[] = [];
   let stopped = false;
   let view3d: WorldView3DHandle | null = null;
+  /**
+   * Which snapshot the 3D view is showing, or null for the world as it is.
+   *
+   * Switching rebuilds the view rather than swapping its source: everything
+   * loaded - the mesh, the heights, the colours the picking reads - comes from
+   * one fetch, and there is no reason to make that swappable when destroying
+   * and recreating is what changing dimension already does.
+   */
+  let snapshot: string | null = null;
+  let snapshots: { id: string; at: string }[] = [];
   let lastX = 0;
   let lastY = 0;
 
@@ -67,6 +77,7 @@ export function createWorldMap(
       <button class="btn" id="map-fit">${t("map_fit")}</button>
       <button class="btn" id="map-3d">${t("map_3d")}</button>
       <button class="btn" id="map-place">${t("schem_elhelyezes")}</button>
+      <select id="map-snapshot" hidden></select>
       <span class="map-coords" id="map-coords"></span>
     </div>
     <div class="map-place-bar" id="map-place-bar" hidden></div>
@@ -184,6 +195,12 @@ export function createWorldMap(
     // would leave the bar offering to paste into terrain nobody is looking at.
     closePlacement();
     close3d();
+    // The snapshot list belongs to the server, not the dimension, so it is not
+    // refetched here - only the picture is.
+    snapshot = null;
+    const picker = root.querySelector<HTMLSelectElement>("#map-snapshot");
+    if (picker) picker.value = "";
+    paintRewindBar();
     buildTiles();
     goToSpawn();
   };
@@ -212,7 +229,7 @@ export function createWorldMap(
     // Opens on whatever the 2D map is currently centred on, so switching views
     // does not lose your place.
     const centre = centreOfView();
-    view3d = createWorldView3D(serverId, dimension, centre.x, centre.z);
+    view3d = createWorldView3D(serverId, dimension, centre.x, centre.z, snapshot ?? undefined);
     // Whatever the last poll saw, so the markers are there on the first frame
     // rather than up to three seconds later.
     view3d.setPlayers(players.filter((p) => p.dimension === dimension));
@@ -239,6 +256,82 @@ export function createWorldMap(
     host3d.innerHTML = "";
     host3d.hidden = true;
     button3d.classList.remove("active");
+    root.querySelector<HTMLElement>("#map-rewind-bar")?.remove();
+  }
+
+  /**
+   * The list of snapshots, offered only when there are any.
+   *
+   * The time machine is off by default because an active world churns tens of
+   * megabytes a minute even diffed, so on most servers this control would be an
+   * empty dropdown asking a question with no answers.
+   */
+  async function loadSnapshots() {
+    try {
+      snapshots = (await api.getTimeline(serverId)).snapshots.map((s) => ({ id: s.id, at: s.at }));
+    } catch {
+      snapshots = [];
+    }
+    const select = root.querySelector<HTMLSelectElement>("#map-snapshot");
+    if (!select) return;
+    select.hidden = snapshots.length === 0;
+    if (snapshots.length === 0) return;
+    select.innerHTML =
+      `<option value="">${escapeHtml(t("most"))}</option>` +
+      snapshots
+        .map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(new Date(s.at).toLocaleString())}</option>`)
+        .join("");
+    select.value = snapshot ?? "";
+    select.onchange = () => {
+      snapshot = select.value || null;
+      if (view3d) {
+        close3d();
+        open3d();
+      } else if (snapshot) {
+        open3d();
+      }
+      paintRewindBar();
+    };
+  }
+
+  /** Says out loud that what is on screen is not the world as it is. */
+  function paintRewindBar() {
+    root.querySelector<HTMLElement>("#map-rewind-bar")?.remove();
+    if (!snapshot) return;
+    const at = snapshots.find((s) => s.id === snapshot)?.at;
+    const bar = document.createElement("div");
+    bar.className = "map-rewind-bar";
+    bar.id = "map-rewind-bar";
+    bar.innerHTML = `
+      <span>${escapeHtml(t("a_multat_latod"))} — ${escapeHtml(at ? new Date(at).toLocaleString() : "")}</span>
+      <button class="btn" id="rewind-changes">${escapeHtml(t("mi_valtozna"))}</button>
+      <button class="btn" id="rewind-now">${escapeHtml(t("vissza_a_jelenbe"))}</button>
+      <span class="map-rewind-msg" id="rewind-msg"></span>
+    `;
+    viewport.before(bar);
+    bar.querySelector<HTMLButtonElement>("#rewind-now")!.onclick = () => {
+      snapshot = null;
+      const select = root.querySelector<HTMLSelectElement>("#map-snapshot");
+      if (select) select.value = "";
+      close3d();
+      open3d();
+    };
+    bar.querySelector<HTMLButtonElement>("#rewind-changes")!.onclick = () => void showChanges();
+  }
+
+  async function showChanges() {
+    const msg = root.querySelector<HTMLElement>("#rewind-msg");
+    if (!snapshot || !msg) return;
+    msg.textContent = t("betoltes");
+    try {
+      const changes = await api.getTimelineChanges(serverId, snapshot);
+      msg.textContent =
+        changes.length === 0
+          ? t("semmi_nem_valtozna")
+          : t("valtozo_fajlok").replace("{n}", String(changes.length));
+    } catch (err) {
+      msg.textContent = err instanceof ApiError ? err.message : t("nem_sikerult_betolteni");
+    }
   }
 
   /**
@@ -484,6 +577,7 @@ export function createWorldMap(
   viewport.addEventListener("pointerup", onPointerUp);
   viewport.addEventListener("wheel", onWheel, { passive: false });
 
+  void loadSnapshots();
   buildTiles();
   // The viewport has no size until it is in the document.
   requestAnimationFrame(goToSpawn);

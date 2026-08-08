@@ -227,6 +227,135 @@ export async function restoreSnapshot(entry: ServerEntry, id: string): Promise<n
   return restored;
 }
 
+
+// ------------------------------------------------------------------- rewinding
+
+/**
+ * The relative region folders each dimension can live in.
+ *
+ * The same list map-service uses, kept here rather than imported because
+ * importing it the other way round would make the map depend on the time
+ * machine - and the map has to work with the time machine switched off.
+ */
+const DIMENSION_REGION_DIRS: Record<string, string[]> = {
+  overworld: ["world/region"],
+  nether: ["world_nether/DIM-1/region", "world/DIM-1/region"],
+  end: ["world_the_end/DIM1/region", "world/DIM1/region"],
+};
+
+async function readManifest(entry: ServerEntry, id: string): Promise<Manifest> {
+  if (!/^[\d-]+T[\d-]+Z?$/.test(id)) throw new TimelineError("Invalid snapshot id");
+  const file = path.join(snapshotsDir(entry), `${id}.json`);
+  if (!fs.existsSync(file)) throw new TimelineError("Nincs ilyen pillanatkép.");
+  return JSON.parse(await fsp.readFile(file, "utf-8")) as Manifest;
+}
+
+/**
+ * Lays a snapshot's region files out as a folder the map can read.
+ *
+ * The object store holds each file once under its hash, which is the whole
+ * reason a snapshot is cheap - but nothing can read a world out of it, because
+ * the names are gone. Rather than teach the map reader about the store, the
+ * files are linked back into a folder with their real names. Hard links, so a
+ * rewind of a 40 MB world costs directory entries rather than 40 MB, and the
+ * store's copy stays the only one.
+ *
+ * Kept between calls: scrubbing back and forth through snapshots would
+ * otherwise rebuild the same folder every time. Cleared with the timeline.
+ */
+export async function materialiseRegions(
+  entry: ServerEntry,
+  id: string,
+  dim: string
+): Promise<string | null> {
+  const manifest = await readManifest(entry, id);
+  const prefixes = DIMENSION_REGION_DIRS[dim] ?? [];
+  const wanted = Object.entries(manifest.files).filter(([rel]) =>
+    prefixes.some((p) => rel.startsWith(`${p}/`)) && rel.endsWith(".mca")
+  );
+  if (wanted.length === 0) return null;
+
+  const out = path.join(timelineDir(entry), "materialised", id, dim);
+  await fsp.mkdir(out, { recursive: true });
+  for (const [rel, { hash }] of wanted) {
+    const object = path.join(objectsDir(entry), hash);
+    if (!fs.existsSync(object)) continue;
+    const target = path.join(out, path.basename(rel));
+    if (fs.existsSync(target)) continue;
+    try {
+      await fsp.link(object, target);
+    } catch {
+      // Different filesystem, or a hard link limit: a copy still works, it
+      // just costs the bytes.
+      await fsp.copyFile(object, target);
+    }
+  }
+  return out;
+}
+
+export interface ChangedFile {
+  path: string;
+  /** Absent from the world now, present in the snapshot. */
+  missingNow: boolean;
+  bytes: number;
+}
+
+/**
+ * Which world files a rewind would actually change.
+ *
+ * Compared by hash, so a region the server rewrote without changing anything
+ * inside it - which happens on every save - does not appear. Answering "what
+ * would this do" before doing it is the difference between a rewind and a
+ * gamble.
+ */
+export async function changedFiles(entry: ServerEntry, id: string): Promise<ChangedFile[]> {
+  const manifest = await readManifest(entry, id);
+  const out: ChangedFile[] = [];
+  for (const [rel, { hash, size }] of Object.entries(manifest.files)) {
+    const live = path.join(entry.folder, rel);
+    if (!live.startsWith(entry.folder + path.sep)) continue;
+    if (!fs.existsSync(live)) {
+      out.push({ path: rel, missingNow: true, bytes: size });
+      continue;
+    }
+    if ((await hashFile(live)) !== hash) out.push({ path: rel, missingNow: false, bytes: size });
+  }
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/**
+ * Restores only the named files.
+ *
+ * The whole-world restore is still there and is the right answer for "undo the
+ * afternoon". This is for the other case: one region got griefed and the rest
+ * of the world has a day's building in it that nobody wants to lose.
+ */
+export async function restoreFiles(
+  entry: ServerEntry,
+  id: string,
+  paths: string[]
+): Promise<number> {
+  if (await isServerRunning(entry)) {
+    throw new TimelineError("A visszaállításhoz le kell állítani a szervert.");
+  }
+  const manifest = await readManifest(entry, id);
+  const wanted = new Set(paths);
+  let restored = 0;
+  for (const [rel, { hash }] of Object.entries(manifest.files)) {
+    if (!wanted.has(rel)) continue;
+    const object = path.join(objectsDir(entry), hash);
+    if (!fs.existsSync(object)) continue;
+    const target = path.join(entry.folder, rel);
+    // The manifest's paths came from walking this folder, but they are read
+    // back off disk, so containment is re-checked before writing.
+    if (!target.startsWith(entry.folder + path.sep)) continue;
+    await fsp.mkdir(path.dirname(target), { recursive: true });
+    await fsp.copyFile(object, target);
+    restored++;
+  }
+  return restored;
+}
+
 export async function deleteTimeline(entry: ServerEntry): Promise<void> {
   await fsp.rm(timelineDir(entry), { recursive: true, force: true });
 }

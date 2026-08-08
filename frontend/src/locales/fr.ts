@@ -750,4 +750,10 @@ export const fr: Partial<Locale> = {
   nincs_uzenete: "N’a rien dit dans la partie de la console que le tableau de bord voit encore.",
   kitiltva: "Banni",
   online: "En ligne",
+  most: "Maintenant",
+  a_multat_latod: "Tu regardes le passé",
+  mi_valtozna: "Qu’est-ce qui changerait ?",
+  vissza_a_jelenbe: "Retour au présent",
+  semmi_nem_valtozna: "Rien ne changerait : le monde correspond déjà à cet instantané.",
+  valtozo_fajlok: "{n} fichiers du monde seraient réécrits.",
 };

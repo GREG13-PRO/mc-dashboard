@@ -750,4 +750,10 @@ export const ptBR: Partial<Locale> = {
   nincs_uzenete: "Não disse nada na parte do console que o painel ainda enxerga.",
   kitiltva: "Banido",
   online: "Online",
+  most: "Agora",
+  a_multat_latod: "Você está vendo o passado",
+  mi_valtozna: "O que mudaria?",
+  vissza_a_jelenbe: "Voltar ao agora",
+  semmi_nem_valtozna: "Nada mudaria — o mundo já corresponde a este instantâneo.",
+  valtozo_fajlok: "{n} arquivos do mundo seriam reescritos.",
 };
