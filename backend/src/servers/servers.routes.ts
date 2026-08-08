@@ -120,6 +120,7 @@ import {
   SchematicError,
 } from "./schematics";
 import { readSchematicSurface, SchematicReadError } from "./schematic-surface";
+import { recentChat, sendChat, ChatError } from "./chat";
 import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
@@ -1226,6 +1227,41 @@ serversRouter.get("/:id/map", requireAnyPermission, async (req, res) => {
     res.json(await mapInfo(entry));
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+/**
+ * The conversation, without the console around it.
+ *
+ * Readable by anyone who may see the server at all - chat is not a privileged
+ * thing to look at, and hiding it from a moderator who can already ban people
+ * would be an odd line to draw. Sending needs the console capability, because
+ * it is putting words on everyone's screen.
+ */
+serversRouter.get("/:id/chat", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ messages: await recentChat(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/chat", requirePermission("console"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const sent = await sendChat(entry, String((req.body ?? {}).text ?? ""), req.user?.username ?? "dashboard");
+    res.json({ ok: true, text: sent });
+  } catch (err) {
+    res.status(err instanceof ChatError ? 400 : 500).json({ error: (err as Error).message });
   }
 });
 

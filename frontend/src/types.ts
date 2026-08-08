@@ -401,6 +401,16 @@ export interface SchematicSurface {
   blockCounts: { name: string; count: number }[];
 }
 
+export type ChatKind = "chat" | "me" | "join" | "leave" | "death";
+
+export interface ChatMessage {
+  /** The clock time the server printed, as it printed it. */
+  at: string;
+  kind: ChatKind;
+  player: string | null;
+  text: string;
+}
+
 export interface PlayerPosition {
   name: string;
   x: number;

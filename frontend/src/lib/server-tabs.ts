@@ -16,6 +16,7 @@ export type Tab =
   | "files"
   | "plugins"
   | "players"
+  | "chat"
   | "access"
   | "luckperms"
   | "timeline"
@@ -49,7 +50,7 @@ export type Tab =
 export const TAB_GROUPS: { id: string; label: () => string; icon: string; tabs: Tab[] }[] = [
   { id: "overview", label: () => t("attekintes"), icon: "gauge", tabs: ["overview"] },
   { id: "console", label: () => t("konzol"), icon: "terminal", tabs: ["console"] },
-  { id: "players", label: () => t("jatekosok"), icon: "users", tabs: ["players", "access", "luckperms"] },
+  { id: "players", label: () => t("jatekosok"), icon: "users", tabs: ["players", "chat", "access", "luckperms"] },
   { id: "world", label: () => t("vilag"), icon: "globe", tabs: ["map", "worlds", "schematics"] },
   { id: "content", label: () => t("tartalom"), icon: "package", tabs: ["plugins", "content", "files"] },
   {
@@ -75,7 +76,7 @@ export const TAB_GROUPS: { id: string; label: () => string; icon: string; tabs: 
  * different application - every tab here is the same tab - it just stops
  * showing the fifteen that only matter once something has gone wrong.
  */
-export const BEGINNER_TABS: Tab[] = ["overview", "console", "players", "map", "settings", "properties"];
+export const BEGINNER_TABS: Tab[] = ["overview", "console", "players", "chat", "map", "settings", "properties"];
 
 /** The order the tabs are laid out in, which is also the direction the eye moves. */
 export const ALL_TABS: Tab[] = TAB_GROUPS.flatMap((group) => group.tabs);
@@ -99,6 +100,10 @@ export function capabilityFor(tab: Tab): "console" | "files" | "players" | "sett
     case "players":
     case "access":
       return "players";
+    // Reading chat needs no more right than seeing the server; sending is
+    // guarded on the route, which is where the words actually leave.
+    case "chat":
+      return "players";
     default:
       return "settings";
   }
@@ -110,6 +115,7 @@ export function tabLabel(tab: Tab): string {
     overview: () => t("attekintes"),
     console: () => t("konzol"),
     players: () => t("jatekosok"),
+    chat: () => t("cseveges"),
     access: () => t("hozzaferes"),
     luckperms: () => "LuckPerms",
     map: () => t("terkep"),

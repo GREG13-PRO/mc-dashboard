@@ -21,6 +21,7 @@ import type {
   Macro,
   MapInfo,
   PlayerPosition,
+  ChatMessage,
   SchematicSurface,
   SurfaceView,
   SecurityReport,
@@ -530,6 +531,13 @@ export const api = {
 
   async getMapInfo(serverId: string): Promise<MapInfo> {
     return request(`/servers/${serverId}/map`);
+  },
+  async getChat(serverId: string): Promise<ChatMessage[]> {
+    const { messages } = await request<{ messages: ChatMessage[] }>(`/servers/${serverId}/chat`);
+    return messages;
+  },
+  async sendChat(serverId: string, text: string): Promise<void> {
+    await request(`/servers/${serverId}/chat`, { method: "POST", body: JSON.stringify({ text }) });
   },
   async getMapPlayers(serverId: string): Promise<PlayerPosition[]> {
     const { players } = await request<{ players: PlayerPosition[] }>(`/servers/${serverId}/map/players`);

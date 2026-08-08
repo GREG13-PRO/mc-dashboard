@@ -721,4 +721,9 @@ export const ru: Partial<Locale> = {
   eula_link: "Прочитать",
   eula_kotelezo: "Без принятия EULA сервер Minecraft создать нельзя.",
   vissza_a_szerverekhez: "Все серверы",
+  cseveges: "Чат",
+  chat_uzenet_hely: "Скажи что-нибудь всем…",
+  chat_kuldes: "Отправить",
+  chat_forras: "Читается из консоли сервера: чат, /me, входы, выходы и смерти. Плагин чата, меняющий формат сообщений, распознан не будет.",
+  chat_nincs_uzenet: "Пока ничего не сказано.",
 };

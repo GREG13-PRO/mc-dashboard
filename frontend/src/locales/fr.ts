@@ -721,4 +721,9 @@ export const fr: Partial<Locale> = {
   eula_link: "Le lire",
   eula_kotelezo: "Impossible de créer un serveur Minecraft sans accepter le CLUF.",
   vissza_a_szerverekhez: "Tous les serveurs",
+  cseveges: "Discussion",
+  chat_uzenet_hely: "Dis quelque chose à tout le monde…",
+  chat_kuldes: "Envoyer",
+  chat_forras: "Lu dans la console du serveur : discussion, /me, arrivées, départs et morts. Un plugin de chat qui reformate les messages ne sera pas reconnu.",
+  chat_nincs_uzenet: "Rien n’a encore été dit.",
 };

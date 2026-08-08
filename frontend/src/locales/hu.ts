@@ -722,4 +722,9 @@ export const hu: typeof en = {
   eula_link: "Elolvasom",
   eula_kotelezo: "A Minecraft EULA elfogadása nélkül nem hozható létre szerver.",
   vissza_a_szerverekhez: "Vissza a szerverekhez",
+  cseveges: "Csevegés",
+  chat_uzenet_hely: "Mondj valamit mindenkinek…",
+  chat_kuldes: "Küldés",
+  chat_forras: "A szerver konzoljából olvasva: csevegés, /me, be- és kilépés, halálüzenetek. Egy csevegő bővítmény átformázott üzeneteit nem ismeri fel.",
+  chat_nincs_uzenet: "Még nem hangzott el semmi.",
 };

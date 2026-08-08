@@ -721,4 +721,9 @@ export const zhCN: Partial<Locale> = {
   eula_link: "阅读",
   eula_kotelezo: "不接受 EULA 就无法创建 Minecraft 服务器。",
   vissza_a_szerverekhez: "所有服务器",
+  cseveges: "聊天",
+  chat_uzenet_hely: "对所有在线玩家说点什么…",
+  chat_kuldes: "发送",
+  chat_forras: "从服务器控制台读取：聊天、/me、进入、离开和死亡。会重新格式化消息的聊天插件无法识别。",
+  chat_nincs_uzenet: "还没有人说过话。",
 };

@@ -721,4 +721,9 @@ export const de: Partial<Locale> = {
   eula_link: "Nachlesen",
   eula_kotelezo: "Ohne Zustimmung zur EULA lässt sich kein Minecraft-Server anlegen.",
   vissza_a_szerverekhez: "Alle Server",
+  cseveges: "Chat",
+  chat_uzenet_hely: "Sag allen etwas…",
+  chat_kuldes: "Senden",
+  chat_forras: "Aus der Serverkonsole gelesen: Chat, /me, Beitritte, Abgänge und Tode. Ein Chat-Plugin, das Nachrichten umformatiert, wird nicht erkannt.",
+  chat_nincs_uzenet: "Es wurde noch nichts gesagt.",
 };

@@ -4021,3 +4021,96 @@ table.file-table tr.file-row:hover {
      can be any colour - a themed chip would be unreadable over half the map. */
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
+
+/* ---- Chat ------------------------------------------------------------------
+ * A column that fills the tab: the log grows, the send box stays put at the
+ * bottom. Sized off the viewport rather than the content so it does not jump
+ * about as messages arrive.
+ */
+.chat-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  height: calc(100vh - 200px);
+  min-height: 320px;
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+}
+
+.chat-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chat-line:hover {
+  background: var(--surface-2);
+}
+
+.chat-time {
+  flex: none;
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+
+.chat-icon {
+  flex: none;
+  display: flex;
+  align-self: center;
+  color: var(--text-dim);
+}
+
+.chat-body {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.chat-name {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+/* Joins, leaves and deaths are context, not conversation - dimmed so the eye
+   goes to what people actually said. */
+.chat-event {
+  color: var(--text-dim);
+}
+
+.chat-emote {
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.chat-send {
+  display: flex;
+  gap: var(--gap-sm);
+}
+
+.chat-send input {
+  flex: 1;
+}
+
+.chat-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* The name colours are generated from the name and land anywhere on the wheel,
+   so under high contrast they are dropped for the plain text colour. */
+:root[data-contrast="high"] .chat-name {
+  color: var(--text) !important;
+}

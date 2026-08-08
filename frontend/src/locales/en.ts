@@ -720,4 +720,9 @@ export const en = {
   eula_link: "Read it",
   eula_kotelezo: "A Minecraft server cannot be created without accepting the EULA.",
   vissza_a_szerverekhez: "All servers",
+  cseveges: "Chat",
+  chat_uzenet_hely: "Say something to everyone online…",
+  chat_kuldes: "Send",
+  chat_forras: "Read out of the server console: chat, /me, joins, leaves and deaths. A chat plugin that reformats messages will not be recognised.",
+  chat_nincs_uzenet: "Nothing has been said yet.",
 };

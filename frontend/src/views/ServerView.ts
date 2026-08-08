@@ -19,6 +19,7 @@ import { renderMotdEditor } from "../components/MotdEditor";
 import { renderGameRules } from "../components/GameRules";
 import { renderSchedules } from "../components/Schedules";
 import { renderOverview } from "../components/Overview";
+import { renderChat } from "../components/ChatPanel";
 import { openLuckPermsEditor } from "../components/LuckPermsEditor";
 import { getSimpleMode, setSimpleMode } from "../lib/display";
 import { onJump, takeJump } from "../lib/navigate";
@@ -224,32 +225,6 @@ export function renderServerView(
       )} perc</div>`;
   }
 
-  function labelFor(tab: Tab): string {
-    return {
-      console: t("konzol"),
-      files: t("fajlok"),
-      plugins: t("bovitmenyek"),
-      players: t("jatekosok"),
-      access: "Whitelist / Ban",
-      luckperms: "LuckPerms",
-      timeline: "Time Machine",
-      performance: t("teljesitmeny"),
-      content: t("csomagok"),
-      macros: t("makrok"),
-      stats: t("statisztika"),
-      schematics: t("schematicek"),
-      map: t("terkep"),
-      security: t("biztonsag"),
-      worlds: t("vilagok"),
-      settings: t("beallitasok"),
-      properties: "server.properties",
-      motd: "MOTD",
-      gamerules: t("jatekszabalyok"),
-      schedules: t("utemezesek"),
-      overview: t("attekintes"),
-    }[tab];
-  }
-
   async function runAction(fn: () => Promise<void>) {
     try {
       await fn();
@@ -316,6 +291,8 @@ export function renderServerView(
       void renderStats(content);
     } else if (activeTab === "schematics") {
       void renderSchematics(content);
+    } else if (activeTab === "chat") {
+      disposeTab = renderChat(content, serverId, perms.console);
     } else if (activeTab === "map") {
       void renderMap(content);
     } else if (activeTab === "security") {
