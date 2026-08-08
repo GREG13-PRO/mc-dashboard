@@ -121,6 +121,7 @@ import {
 } from "./schematics";
 import { readSchematicSurface, SchematicReadError } from "./schematic-surface";
 import { recentChat, sendChat, ChatError } from "./chat";
+import { listProfiles, playerProfile, ProfileError } from "./player-profile";
 import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
@@ -1238,6 +1239,32 @@ serversRouter.get("/:id/map", requireAnyPermission, async (req, res) => {
  * would be an odd line to draw. Sending needs the console capability, because
  * it is putting words on everyone's screen.
  */
+serversRouter.get("/:id/players/profiles", requirePermission("players"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ profiles: await listProfiles(entry) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.get("/:id/players/profiles/:name", requirePermission("players"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    res.json({ profile: await playerProfile(entry, req.params.name) });
+  } catch (err) {
+    res.status(err instanceof ProfileError ? 404 : 500).json({ error: (err as Error).message });
+  }
+});
+
 serversRouter.get("/:id/chat", requireAnyPermission, async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {

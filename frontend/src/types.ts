@@ -401,6 +401,50 @@ export interface SchematicSurface {
   blockCounts: { name: string; count: number }[];
 }
 
+export interface PlayerStats {
+  playTimeMinutes: number | null;
+  deaths: number | null;
+  mobKills: number | null;
+  playerKills: number | null;
+  /** Metres. */
+  walked: number | null;
+  damageDealt: number | null;
+  damageTaken: number | null;
+  jumps: number | null;
+}
+
+export interface PlayerProfile {
+  uuid: string;
+  name: string;
+  online: boolean;
+  firstPlayed: string | null;
+  lastPlayed: string | null;
+  gamemode: string | null;
+  health: number | null;
+  food: number | null;
+  xpLevel: number | null;
+  position: { x: number; y: number; z: number; dimension: string } | null;
+  stats: PlayerStats;
+  addresses: string[];
+  logins: number;
+  /** How many logs were searched, so an empty list is not read as "never". */
+  addressLogsRead: number;
+  op: boolean;
+  whitelisted: boolean;
+  banned: boolean;
+  messages: ChatMessage[];
+}
+
+export interface PlayerProfileSummary {
+  uuid: string;
+  name: string;
+  online: boolean;
+  lastPlayed: string | null;
+  playTimeMinutes: number | null;
+  op: boolean;
+  banned: boolean;
+}
+
 export type ChatKind = "chat" | "me" | "join" | "leave" | "death";
 
 export interface ChatMessage {

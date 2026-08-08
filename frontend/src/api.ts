@@ -22,6 +22,8 @@ import type {
   MapInfo,
   PlayerPosition,
   ChatMessage,
+  PlayerProfile,
+  PlayerProfileSummary,
   SchematicSurface,
   SurfaceView,
   SecurityReport,
@@ -531,6 +533,18 @@ export const api = {
 
   async getMapInfo(serverId: string): Promise<MapInfo> {
     return request(`/servers/${serverId}/map`);
+  },
+  async getPlayerProfiles(serverId: string): Promise<PlayerProfileSummary[]> {
+    const { profiles } = await request<{ profiles: PlayerProfileSummary[] }>(
+      `/servers/${serverId}/players/profiles`
+    );
+    return profiles;
+  },
+  async getPlayerProfile(serverId: string, name: string): Promise<PlayerProfile> {
+    const { profile } = await request<{ profile: PlayerProfile }>(
+      `/servers/${serverId}/players/profiles/${encodeURIComponent(name)}`
+    );
+    return profile;
   },
   async getChat(serverId: string): Promise<ChatMessage[]> {
     const { messages } = await request<{ messages: ChatMessage[] }>(`/servers/${serverId}/chat`);

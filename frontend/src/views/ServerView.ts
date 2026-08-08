@@ -20,6 +20,7 @@ import { renderGameRules } from "../components/GameRules";
 import { renderSchedules } from "../components/Schedules";
 import { renderOverview } from "../components/Overview";
 import { renderChat } from "../components/ChatPanel";
+import { renderPlayerProfiles } from "../components/PlayerProfiles";
 import { openLuckPermsEditor } from "../components/LuckPermsEditor";
 import { getSimpleMode, setSimpleMode } from "../lib/display";
 import { onJump, takeJump } from "../lib/navigate";
@@ -291,6 +292,8 @@ export function renderServerView(
       void renderStats(content);
     } else if (activeTab === "schematics") {
       void renderSchematics(content);
+    } else if (activeTab === "profiles") {
+      disposeTab = renderPlayerProfiles(content, serverId);
     } else if (activeTab === "chat") {
       disposeTab = renderChat(content, serverId, perms.console);
     } else if (activeTab === "map") {

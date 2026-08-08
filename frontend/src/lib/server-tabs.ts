@@ -17,6 +17,7 @@ export type Tab =
   | "plugins"
   | "players"
   | "chat"
+  | "profiles"
   | "access"
   | "luckperms"
   | "timeline"
@@ -50,7 +51,7 @@ export type Tab =
 export const TAB_GROUPS: { id: string; label: () => string; icon: string; tabs: Tab[] }[] = [
   { id: "overview", label: () => t("attekintes"), icon: "gauge", tabs: ["overview"] },
   { id: "console", label: () => t("konzol"), icon: "terminal", tabs: ["console"] },
-  { id: "players", label: () => t("jatekosok"), icon: "users", tabs: ["players", "chat", "access", "luckperms"] },
+  { id: "players", label: () => t("jatekosok"), icon: "users", tabs: ["players", "profiles", "chat", "access", "luckperms"] },
   { id: "world", label: () => t("vilag"), icon: "globe", tabs: ["map", "worlds", "schematics"] },
   { id: "content", label: () => t("tartalom"), icon: "package", tabs: ["plugins", "content", "files"] },
   {
@@ -103,6 +104,7 @@ export function capabilityFor(tab: Tab): "console" | "files" | "players" | "sett
     // Reading chat needs no more right than seeing the server; sending is
     // guarded on the route, which is where the words actually leave.
     case "chat":
+    case "profiles":
       return "players";
     default:
       return "settings";
@@ -116,6 +118,7 @@ export function tabLabel(tab: Tab): string {
     console: () => t("konzol"),
     players: () => t("jatekosok"),
     chat: () => t("cseveges"),
+    profiles: () => t("profilok"),
     access: () => t("hozzaferes"),
     luckperms: () => "LuckPerms",
     map: () => t("terkep"),
