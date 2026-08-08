@@ -45,6 +45,18 @@ export interface PluginVersionInfo {
   downloadUrl: string | null;
   externalUrl: string | null;
   datePublished: string | null;
+  /**
+   * What the index says the jar should hash to.
+   *
+   * Both sources publish one - Modrinth a sha512, Hangar a sha256 - and until
+   * now neither was used. The jar was downloaded, hashed, and the hash written
+   * into the manifest as a record of what arrived rather than as a check that
+   * the right thing arrived. This project has already been compromised once by
+   * a jar nobody verified.
+   */
+  expectedHash: { algorithm: "sha512" | "sha256"; value: string } | null;
+  /** Bytes the index claims, checked alongside the hash where it is given. */
+  expectedSize: number | null;
 }
 
 export interface InstalledPlugin {
@@ -161,7 +173,13 @@ interface ModrinthVersion {
   game_versions: string[];
   loaders: string[];
   date_published: string;
-  files: { filename: string; url: string; primary: boolean }[];
+  files: {
+    filename: string;
+    url: string;
+    primary: boolean;
+    size?: number;
+    hashes?: { sha1?: string; sha512?: string };
+  }[];
 }
 
 export type PluginPlatform = "bukkit" | "bungeecord" | "velocity";
@@ -202,8 +220,60 @@ export function detectPlatform(entry: ServerEntry): PluginPlatform {
 interface HangarVersion {
   name: string;
   createdAt: string;
-  downloads: Record<string, { fileInfo: { name: string } | null; downloadUrl: string | null; externalUrl: string | null }>;
+  downloads: Record<
+    string,
+    {
+      fileInfo: { name: string; sizeBytes?: number; sha256Hash?: string } | null;
+      downloadUrl: string | null;
+      externalUrl: string | null;
+    }
+  >;
   platformDependencies: Record<string, string[]>;
+}
+
+async function hashOf(file: string, algorithm: "sha256" | "sha512"): Promise<string> {
+  const hash = crypto.createHash(algorithm);
+  const stream = fs.createReadStream(file);
+  for await (const chunk of stream) hash.update(chunk as Buffer);
+  return hash.digest("hex");
+}
+
+/**
+ * Refuses a jar that is not the one the index described.
+ *
+ * The download comes over TLS from an API this dashboard trusts, which stops
+ * somebody on the wire but not a mirror serving something else, an index entry
+ * that has been tampered with, or a truncated transfer that would otherwise be
+ * loaded as a plugin. The file is deleted rather than left on disk: a rejected
+ * jar sitting in the plugins folder is a jar the server will load on its next
+ * start, which is the opposite of refusing it.
+ *
+ * A version with no published hash is still installed. Both sources publish one
+ * today, but a source that stops - or a new one that never did - should not
+ * make the plugin browser stop working; the manifest still records what
+ * arrived, so an unverified install is at least identifiable afterwards.
+ */
+export async function verifyDownload(
+  dest: string,
+  version: Pick<PluginVersionInfo, "expectedHash" | "expectedSize">
+): Promise<void> {
+  if (version.expectedSize !== null) {
+    const { size } = await fsp.stat(dest);
+    if (size !== version.expectedSize) {
+      await fsp.rm(dest, { force: true });
+      throw new Error(
+        `A letöltött fájl mérete nem egyezik (${size} bájt a várt ${version.expectedSize} helyett). A telepítés megszakadt.`
+      );
+    }
+  }
+  if (!version.expectedHash) return;
+  const actual = await hashOf(dest, version.expectedHash.algorithm);
+  if (actual.toLowerCase() !== version.expectedHash.value.toLowerCase()) {
+    await fsp.rm(dest, { force: true });
+    throw new Error(
+      `A letöltött fájl ${version.expectedHash.algorithm} ellenőrzőösszege nem egyezik azzal, amit a forrás megadott. A fájl törölve, a telepítés megszakadt.`
+    );
+  }
 }
 
 export async function listPluginVersions(
@@ -229,6 +299,10 @@ export async function listPluginVersions(
           downloadUrl: file?.url ?? null,
           externalUrl: null,
           datePublished: v.date_published,
+          expectedHash: file?.hashes?.sha512
+            ? { algorithm: "sha512" as const, value: file.hashes.sha512 }
+            : null,
+          expectedSize: file?.size ?? null,
         };
       });
     }
@@ -251,6 +325,10 @@ export async function listPluginVersions(
           downloadUrl: hosted?.downloadUrl ?? null,
           externalUrl: hosted?.externalUrl ?? null,
           datePublished: v.createdAt ?? null,
+          expectedHash: hosted?.fileInfo?.sha256Hash
+            ? { algorithm: "sha256" as const, value: hosted.fileInfo.sha256Hash }
+            : null,
+          expectedSize: hosted?.fileInfo?.sizeBytes ?? null,
         };
       });
   });
@@ -443,6 +521,7 @@ export async function installPlugin(
   // sandbox check as any user-supplied path rather than being trusted.
   const dest = resolveSafePath(dir, version.filename);
   await downloadFile(version.downloadUrl, dest);
+  await verifyDownload(dest, version);
 
   const manifest = await readPluginManifest(entry);
   // Replacing a plugin usually means a differently-named jar (the version is
@@ -460,7 +539,7 @@ export async function installPlugin(
     versionId: version.id,
     versionName: version.name,
     installedAt: new Date().toISOString(),
-    sha256: crypto.createHash("sha256").update(await fsp.readFile(dest)).digest("hex"),
+    sha256: await hashOf(dest, "sha256"),
   };
   await writeManifest(entry, manifest);
 
