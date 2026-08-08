@@ -78,6 +78,10 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
    * a timer, which is unreadable. Only a genuinely new server moves.
    */
   const seenServers = new Set<string>();
+  /** Same idea as `seenServers`, kept separate: the home grid and the sidebar
+   *  list are different elements, so each needs its own memory of who has
+   *  already arrived on screen. */
+  const seenHomeCards = new Set<string>();
   /**
    * What the server view is currently showing.
    *
@@ -491,6 +495,13 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
       }
       renderList();
       renderServerMenu();
+      // The grid only exists while the home route is showing, so its presence
+      // in the DOM is the check - re-deriving the route here would be a second
+      // copy of the routing rules in renderMainContent, free to drift from it.
+      const mainContent = root.querySelector<HTMLElement>("#view-root");
+      if (mainContent?.querySelector("#home-grid, .home-empty")) {
+        renderHomeGrid(mainContent);
+      }
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : t("szerverlista_betoltese_sikertelen"), "error");
     }
@@ -545,6 +556,86 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
           const next = cards[index + (e.key === "ArrowDown" ? 1 : -1)];
           next?.focus();
         }
+      };
+    });
+  }
+
+  /**
+   * The home page's own content: a card per server, and nothing else.
+   *
+   * Before 3.0.8 this was one line of placeholder text pointing at the
+   * sidebar. The sidebar list already answers "which servers exist" - this
+   * answers "what do I do next", the way the servers themselves are the
+   * point of the page rather than a caption under an empty space.
+   */
+  function renderHomeGrid(mainContent: HTMLElement) {
+    if (servers.length === 0) {
+      // Nothing in this branch depends on data that the poll could change, so
+      // a rebuild would only replay the arrival animation for no reason.
+      if (mainContent.querySelector(".home-empty")) return;
+      mainContent.innerHTML = `
+        <div class="home-empty">
+          <span class="home-empty-icon">${icon("server", 28)}</span>
+          <p>${t("meg_nincs_hozzaadott_szerver")}</p>
+          ${
+            isAdmin()
+              ? `<button class="btn btn-primary" id="home-add-server">${t("plus_uj_szerver")}</button>`
+              : ""
+          }
+        </div>`;
+      mainContent.querySelector<HTMLButtonElement>("#home-add-server")?.addEventListener("click", () => {
+        openAddServerModal(() => void refreshList());
+      });
+      return;
+    }
+
+    const cardsHtml = servers
+      .map(
+        (s) => `
+      <button class="home-card" type="button" data-id="${s.id}" role="listitem"
+              title="${escapeHtml(s.name)}">
+        <div class="home-card-top">
+          <span class="home-card-icon">${icon("server", 20)}</span>
+          <span class="status-dot ${s.running ? "running" : "stopped"}"></span>
+        </div>
+        <strong class="home-card-name">${escapeHtml(s.name)}</strong>
+        <span class="home-card-meta">
+          ${
+            s.rcon.enabled && s.players
+              ? `${icon("users", 13)} ${s.players.online}/${s.players.max}`
+              : `<span>${s.running ? t("fut") : t("leallitva")}</span>`
+          }
+          ${
+            s.running && s.resources
+              ? `<span class="home-card-dot">·</span>${icon("gauge", 13)} ${s.resources.cpuPercent.toFixed(0)}%`
+              : ""
+          }
+        </span>
+      </button>`
+      )
+      .join("");
+
+    // Reused across the five-second poll rather than rebuilt: #home-grid is
+    // not a direct child of #view-root, so refreshing what is inside it
+    // cannot retrigger the whole-screen arrival animation - only the wrapper
+    // being freshly inserted does that, and that should happen once, on the
+    // navigation that brought the home page on screen.
+    const existingGrid = mainContent.querySelector<HTMLDivElement>("#home-grid");
+    if (existingGrid) {
+      existingGrid.innerHTML = cardsHtml;
+    } else {
+      mainContent.innerHTML = `
+        <div class="home-grid-wrap">
+          <h2 class="home-grid-title">${t("szerverek")}</h2>
+          <div class="home-grid" id="home-grid" role="list">${cardsHtml}</div>
+        </div>`;
+    }
+
+    const cards = [...mainContent.querySelectorAll<HTMLButtonElement>(".home-card")];
+    staggerIn(cards, seenHomeCards, (el) => el.dataset.id ?? "");
+    cards.forEach((card) => {
+      card.onclick = () => {
+        location.hash = `#/server/${encodeURIComponent(card.dataset.id!)}`;
       };
     });
   }
@@ -626,7 +717,7 @@ export function renderDashboard(root: HTMLElement, onLogout: () => void): () => 
     const serverId = parseServerIdFromHash();
 
     if (!serverId) {
-      mainContent.innerHTML = `<div class="empty-state">${t("valassz_egy_szervert_a_bal_oldalon")}</div>`;
+      renderHomeGrid(mainContent);
       return;
     }
 
