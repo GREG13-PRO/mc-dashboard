@@ -756,4 +756,10 @@ export const pl: Partial<Locale> = {
   vissza_a_jelenbe: "Wróć do teraz",
   semmi_nem_valtozna: "Nic by się nie zmieniło — świat już odpowiada tej migawce.",
   valtozo_fajlok: "Zapisano by z powrotem {n} plików świata.",
+  csatlakozas: "Czy może wejść?",
+  kinek_a_neve: "Jego nick w Minecrafcie (opcjonalnie)",
+  csatlakozas_leiras: "Sprawdza w kolejności, w jakiej połączenie naprawdę zawodzi - pierwszy problem widzisz jako pierwszy. Po podaniu nicku whitelist i ban dotyczą tej osoby.",
+  minden_rendben: "Nic nie blokuje wejścia",
+  ezt_add_meg: "Podaj mu ten adres",
+  odaugras: "Przejdź tam",
 };

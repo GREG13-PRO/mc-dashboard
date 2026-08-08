@@ -122,6 +122,7 @@ import {
 import { readSchematicSurface, SchematicReadError } from "./schematic-surface";
 import { recentChat, sendChat, ChatError } from "./chat";
 import { listProfiles, playerProfile, ProfileError } from "./player-profile";
+import { diagnoseConnection } from "./connection-doctor";
 import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
@@ -1242,6 +1243,26 @@ serversRouter.get("/:id/map", requireAnyPermission, async (req, res) => {
  * would be an odd line to draw. Sending needs the console capability, because
  * it is putting words on everyone's screen.
  */
+/**
+ * Why somebody cannot join.
+ *
+ * Readable by anyone who may see the server: it reports the whitelist, the ban
+ * list and the port, all of which are already visible on their own screens.
+ */
+serversRouter.get("/:id/why", requireAnyPermission, async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  try {
+    const name = req.query.player ? String(req.query.player) : undefined;
+    res.json({ report: await diagnoseConnection(entry, name) });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 serversRouter.get("/:id/players/profiles", requirePermission("players"), async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {

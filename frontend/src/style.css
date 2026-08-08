@@ -4270,3 +4270,125 @@ table.file-table tr.file-row:hover {
   margin-left: auto;
   color: var(--text-dim);
 }
+
+/* ---- Connection doctor -----------------------------------------------------
+ * The verdict first, at a size you cannot miss, then the checks that produced
+ * it. Somebody opening this screen has a friend waiting; the answer goes at the
+ * top, not at the end of a list.
+ */
+.cd-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+}
+
+.cd-ask {
+  display: flex;
+  gap: var(--gap-sm);
+}
+
+.cd-ask input {
+  max-width: 280px;
+}
+
+.cd-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.cd-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.cd-verdict strong {
+  font-size: 15px;
+}
+
+.cd-verdict span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.cd-verdict code {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.cd-verdict.cd-ok {
+  border-left-color: var(--green);
+}
+
+.cd-verdict.cd-problem {
+  border-left-color: var(--red);
+}
+
+.cd-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cd-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+}
+
+.cd-check:hover {
+  background: var(--surface-2);
+}
+
+.cd-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cd-body strong {
+  font-size: 13px;
+}
+
+.cd-body p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.cd-advice {
+  color: var(--accent-text) !important;
+}
+
+.cd-icon {
+  display: flex;
+  margin-top: 1px;
+}
+
+/* Colour carries the status, so it is never the only thing that does: the
+   wording of every check says the same thing on its own. */
+.cd-check.cd-ok .cd-icon { color: var(--green); }
+.cd-check.cd-problem .cd-icon { color: var(--red); }
+.cd-check.cd-warning .cd-icon { color: var(--yellow); }
+.cd-check.cd-unknown .cd-icon { color: var(--text-dim); }
+
+.cd-go {
+  flex: none;
+  align-self: center;
+}
+
+@media (max-width: 620px) {
+  .cd-check {
+    flex-wrap: wrap;
+  }
+  .cd-go {
+    margin-left: 26px;
+  }
+}

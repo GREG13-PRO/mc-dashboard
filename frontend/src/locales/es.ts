@@ -756,4 +756,10 @@ export const es: Partial<Locale> = {
   vissza_a_jelenbe: "Volver al presente",
   semmi_nem_valtozna: "No cambiaría nada: el mundo ya coincide con esta instantánea.",
   valtozo_fajlok: "Se reescribirían {n} archivos del mundo.",
+  csatlakozas: "¿Puede entrar?",
+  kinek_a_neve: "Su nombre de Minecraft (opcional)",
+  csatlakozas_leiras: "Comprueba en el orden en que una conexión falla de verdad, así el primer problema es lo primero que ves. Con un nombre, la whitelist y el baneo se refieren a esa persona.",
+  minden_rendben: "Nada impide entrar",
+  ezt_add_meg: "Dale esta dirección",
+  odaugras: "Llévame allí",
 };

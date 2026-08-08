@@ -755,4 +755,10 @@ export const en = {
   vissza_a_jelenbe: "Back to now",
   semmi_nem_valtozna: "Nothing would change — the world already matches this snapshot.",
   valtozo_fajlok: "{n} world files would be written back.",
+  csatlakozas: "Can they join?",
+  kinek_a_neve: "Their Minecraft name (optional)",
+  csatlakozas_leiras: "Runs the checks in the order a connection actually fails, so the first thing that is wrong is the first thing you see. Give a name and the whitelist and ban answers become about that person.",
+  minden_rendben: "Nothing is stopping anyone joining",
+  ezt_add_meg: "Give them this address",
+  odaugras: "Take me there",
 };

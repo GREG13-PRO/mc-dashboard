@@ -22,6 +22,7 @@ import type {
   MapInfo,
   PlayerPosition,
   ChatMessage,
+  ConnectionReport,
   PlayerProfile,
   TimelineChange,
   PlayerProfileSummary,
@@ -534,6 +535,12 @@ export const api = {
 
   async getMapInfo(serverId: string): Promise<MapInfo> {
     return request(`/servers/${serverId}/map`);
+  },
+  async diagnoseConnection(serverId: string, player?: string): Promise<ConnectionReport> {
+    const { report } = await request<{ report: ConnectionReport }>(
+      `/servers/${serverId}/why${player ? `?player=${encodeURIComponent(player)}` : ""}`
+    );
+    return report;
   },
   async getPlayerProfiles(serverId: string): Promise<PlayerProfileSummary[]> {
     const { profiles } = await request<{ profiles: PlayerProfileSummary[] }>(

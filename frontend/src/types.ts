@@ -445,6 +445,24 @@ export interface PlayerProfileSummary {
   banned: boolean;
 }
 
+export type CheckStatus = "ok" | "problem" | "warning" | "unknown";
+
+export interface ConnectionCheck {
+  id: string;
+  status: CheckStatus;
+  title: string;
+  detail: string;
+  advice?: string;
+  goTo?: string;
+}
+
+export interface ConnectionReport {
+  lanAddress: string | null;
+  port: number;
+  checks: ConnectionCheck[];
+  about: string | null;
+}
+
 export interface TimelineChange {
   path: string;
   /** Absent from the world now, present in the snapshot. */

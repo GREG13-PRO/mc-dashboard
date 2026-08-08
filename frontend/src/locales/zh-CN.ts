@@ -756,4 +756,10 @@ export const zhCN: Partial<Locale> = {
   vissza_a_jelenbe: "回到现在",
   semmi_nem_valtozna: "什么都不会变——世界已经和这个快照一致。",
   valtozo_fajlok: "将会写回 {n} 个世界文件。",
+  csatlakozas: "他能进来吗？",
+  kinek_a_neve: "他的 Minecraft 名字（可选）",
+  csatlakozas_leiras: "按照连接真正失败的顺序检查，所以第一个问题就是你最先看到的。填上名字后，白名单和封禁的判断就针对这个人。",
+  minden_rendben: "没有任何东西阻止加入",
+  ezt_add_meg: "把这个地址给他",
+  odaugras: "带我过去",
 };

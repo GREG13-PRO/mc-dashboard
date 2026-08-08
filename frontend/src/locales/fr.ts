@@ -756,4 +756,10 @@ export const fr: Partial<Locale> = {
   vissza_a_jelenbe: "Retour au présent",
   semmi_nem_valtozna: "Rien ne changerait : le monde correspond déjà à cet instantané.",
   valtozo_fajlok: "{n} fichiers du monde seraient réécrits.",
+  csatlakozas: "Peut-il rejoindre ?",
+  kinek_a_neve: "Son pseudo Minecraft (facultatif)",
+  csatlakozas_leiras: "Vérifie dans l’ordre où une connexion échoue réellement : le premier problème est la première chose que tu vois. Avec un pseudo, la whitelist et le bannissement portent sur cette personne.",
+  minden_rendben: "Rien n’empêche de rejoindre",
+  ezt_add_meg: "Donne-lui cette adresse",
+  odaugras: "M’y emmener",
 };

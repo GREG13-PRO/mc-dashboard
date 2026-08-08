@@ -756,4 +756,10 @@ export const de: Partial<Locale> = {
   vissza_a_jelenbe: "Zurück zum Jetzt",
   semmi_nem_valtozna: "Nichts würde sich ändern — die Welt entspricht diesem Snapshot bereits.",
   valtozo_fajlok: "{n} Weltdateien würden zurückgeschrieben.",
+  csatlakozas: "Kann er beitreten?",
+  kinek_a_neve: "Sein Minecraft-Name (optional)",
+  csatlakozas_leiras: "Prüft in der Reihenfolge, in der eine Verbindung tatsächlich scheitert - der erste Fehler ist das Erste, was du siehst. Mit einem Namen beziehen sich Whitelist und Bann auf diese Person.",
+  minden_rendben: "Dem Beitritt steht nichts im Weg",
+  ezt_add_meg: "Gib ihm diese Adresse",
+  odaugras: "Dorthin springen",
 };

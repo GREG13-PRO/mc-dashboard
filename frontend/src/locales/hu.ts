@@ -757,4 +757,10 @@ export const hu: typeof en = {
   vissza_a_jelenbe: "Vissza a jelenbe",
   semmi_nem_valtozna: "Semmi nem változna — a világ már megegyezik ezzel a pillanatképpel.",
   valtozo_fajlok: "{n} világfájl íródna vissza.",
+  csatlakozas: "Csatlakozás",
+  kinek_a_neve: "A Minecraft-neve (nem kötelező)",
+  csatlakozas_leiras: "Abban a sorrendben ellenőriz, ahogy egy csatlakozás valójában elbukik, tehát az első hiba az első, amit látsz. Ha megadsz egy nevet, a whitelist és a tiltás róla szól majd.",
+  minden_rendben: "Semmi nem akadályozza a belépést",
+  ezt_add_meg: "Ezt a címet add meg neki",
+  odaugras: "Ugorj oda",
 };

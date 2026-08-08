@@ -756,4 +756,10 @@ export const ptBR: Partial<Locale> = {
   vissza_a_jelenbe: "Voltar ao agora",
   semmi_nem_valtozna: "Nada mudaria — o mundo já corresponde a este instantâneo.",
   valtozo_fajlok: "{n} arquivos do mundo seriam reescritos.",
+  csatlakozas: "Ele consegue entrar?",
+  kinek_a_neve: "O nome dele no Minecraft (opcional)",
+  csatlakozas_leiras: "Verifica na ordem em que uma conexão realmente falha, então o primeiro problema é a primeira coisa que você vê. Com um nome, a whitelist e o banimento passam a ser sobre essa pessoa.",
+  minden_rendben: "Nada impede a entrada",
+  ezt_add_meg: "Passe este endereço para ele",
+  odaugras: "Me leve lá",
 };
