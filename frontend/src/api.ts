@@ -23,6 +23,7 @@ import type {
   PlayerPosition,
   ChatMessage,
   ConnectionReport,
+  TunnelState,
   PlayerProfile,
   TimelineChange,
   PlayerProfileSummary,
@@ -535,6 +536,31 @@ export const api = {
 
   async getMapInfo(serverId: string): Promise<MapInfo> {
     return request(`/servers/${serverId}/map`);
+  },
+  async getTunnel(serverId: string): Promise<{ tunnel: TunnelState; supported: boolean }> {
+    return request(`/servers/${serverId}/tunnel`);
+  },
+  async startTunnel(serverId: string): Promise<TunnelState> {
+    const { tunnel } = await request<{ tunnel: TunnelState }>(`/servers/${serverId}/tunnel/start`, {
+      method: "POST",
+      // Sent explicitly rather than implied by pressing a button: the route
+      // refuses without it, so a script cannot publish somebody's server by
+      // calling the endpoint.
+      body: JSON.stringify({ accept: true }),
+    });
+    return tunnel;
+  },
+  async stopTunnel(serverId: string): Promise<TunnelState> {
+    const { tunnel } = await request<{ tunnel: TunnelState }>(`/servers/${serverId}/tunnel/stop`, { method: "POST" });
+    return tunnel;
+  },
+  async claimTunnel(serverId: string): Promise<TunnelState> {
+    const { tunnel } = await request<{ tunnel: TunnelState }>(`/servers/${serverId}/tunnel/claim`, { method: "POST" });
+    return tunnel;
+  },
+  async resetTunnel(serverId: string): Promise<TunnelState> {
+    const { tunnel } = await request<{ tunnel: TunnelState }>(`/servers/${serverId}/tunnel/reset`, { method: "POST" });
+    return tunnel;
   },
   async diagnoseConnection(serverId: string, player?: string): Promise<ConnectionReport> {
     const { report } = await request<{ report: ConnectionReport }>(

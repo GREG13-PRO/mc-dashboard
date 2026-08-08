@@ -21,7 +21,7 @@ import { renderSchedules } from "../components/Schedules";
 import { renderOverview } from "../components/Overview";
 import { renderChat } from "../components/ChatPanel";
 import { renderPlayerProfiles } from "../components/PlayerProfiles";
-import { renderConnectionDoctor } from "../components/ConnectionDoctor";
+import { renderConnectionDoctor, renderTunnelPanel } from "../components/ConnectionDoctor";
 import { openLuckPermsEditor } from "../components/LuckPermsEditor";
 import { getSimpleMode, setSimpleMode } from "../lib/display";
 import { onJump, takeJump } from "../lib/navigate";
@@ -294,7 +294,18 @@ export function renderServerView(
     } else if (activeTab === "schematics") {
       void renderSchematics(content);
     } else if (activeTab === "connection") {
-      disposeTab = renderConnectionDoctor(content, serverId);
+      // Two panels on one tab: the checks, then the way to publish. The
+      // tunnel is the answer to the one question the checks refuse to answer.
+      const checks = document.createElement("div");
+      const tunnel = document.createElement("div");
+      tunnel.style.marginTop = "16px";
+      content.append(checks, tunnel);
+      const stopChecks = renderConnectionDoctor(checks, serverId);
+      const stopTunnelPanel = perms.settings ? renderTunnelPanel(tunnel, serverId) : () => {};
+      disposeTab = () => {
+        stopChecks();
+        stopTunnelPanel();
+      };
     } else if (activeTab === "profiles") {
       disposeTab = renderPlayerProfiles(content, serverId);
     } else if (activeTab === "chat") {

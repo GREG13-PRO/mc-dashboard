@@ -4392,3 +4392,75 @@ table.file-table tr.file-row:hover {
     margin-left: 26px;
   }
 }
+
+/* ---- Public address --------------------------------------------------------
+ * The consequences are the largest text in the card, above the control that
+ * causes them. This is the one button in the application that makes somebody's
+ * machine reachable from the internet.
+ */
+.tn-card {
+  border-left: 3px solid var(--yellow);
+}
+
+.tn-warn {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tn-error {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--red);
+}
+
+.tn-accept {
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.tn-actions {
+  display: flex;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+}
+
+.tn-claim {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+}
+
+.tn-claim p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.tn-claim a {
+  color: var(--accent);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.tn-log {
+  margin: 10px 0;
+  font-size: 11px;
+}
+
+.tn-log pre {
+  max-height: 200px;
+  overflow: auto;
+  margin: 6px 0 0;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+  font-size: 11px;
+  white-space: pre-wrap;
+}

@@ -445,6 +445,15 @@ export interface PlayerProfileSummary {
   banned: boolean;
 }
 
+export interface TunnelState {
+  running: boolean;
+  claimed: boolean;
+  claimUrl: string | null;
+  agentVersion: string;
+  log: string[];
+  serverId: string | null;
+}
+
 export type CheckStatus = "ok" | "problem" | "warning" | "unknown";
 
 export interface ConnectionCheck {

@@ -123,6 +123,15 @@ import { readSchematicSurface, SchematicReadError } from "./schematic-surface";
 import { recentChat, sendChat, ChatError } from "./chat";
 import { listProfiles, playerProfile, ProfileError } from "./player-profile";
 import { diagnoseConnection } from "./connection-doctor";
+import {
+  startTunnel,
+  stopTunnel,
+  completeClaim,
+  resetTunnel,
+  tunnelState,
+  hostArchSupported,
+  TunnelError,
+} from "./tunnel";
 import { detectMinecraftVersion, checkCompatibility } from "./version-check";
 import { announce, release, listFor } from "./presence";
 import {
@@ -1249,6 +1258,83 @@ serversRouter.get("/:id/map", requireAnyPermission, async (req, res) => {
  * Readable by anyone who may see the server: it reports the whitelist, the ban
  * list and the port, all of which are already visible on their own screens.
  */
+/**
+ * The public address.
+ *
+ * Admin-only through requirePermission("settings"): starting it makes the
+ * server reachable from the internet, which is not a thing a moderator should
+ * be able to do on somebody else's behalf.
+ */
+serversRouter.get("/:id/tunnel", requirePermission("settings"), (_req, res) => {
+  res.json({ tunnel: tunnelState(), supported: hostArchSupported() });
+});
+
+serversRouter.post("/:id/tunnel/start", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  // Said yes to in the interface, and required here too: the route is reachable
+  // without the interface, and this is the one button that publishes somebody's
+  // server to the internet.
+  if ((req.body ?? {}).accept !== true) {
+    res.status(400).json({ error: "Az alagút indításához el kell fogadni, hogy mivel jár." });
+    return;
+  }
+  try {
+    const tunnel = await startTunnel(entry);
+    recordAudit({
+      actor: req.user?.username ?? "?",
+      actorId: req.user?.id ?? null,
+      action: "Nyilvános alagút indítva",
+      serverId: entry.id,
+      serverName: entry.name,
+      detail: tunnel.claimed ? "igényelt ügynökkel" : "igénylésre vár",
+      ip: req.ip ?? null,
+      ok: true,
+    });
+    res.json({ tunnel });
+  } catch (err) {
+    res.status(err instanceof TunnelError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/tunnel/stop", requirePermission("settings"), async (req, res) => {
+  const entry = serverRegistry.get(req.params.id);
+  if (!entry) {
+    res.status(404).json({ error: "Server not found" });
+    return;
+  }
+  recordAudit({
+    actor: req.user?.username ?? "?",
+    actorId: req.user?.id ?? null,
+    action: "Nyilvános alagút leállítva",
+    serverId: entry.id,
+    serverName: entry.name,
+    detail: "",
+    ip: req.ip ?? null,
+    ok: true,
+  });
+  res.json({ tunnel: await stopTunnel() });
+});
+
+serversRouter.post("/:id/tunnel/claim", requirePermission("settings"), async (_req, res) => {
+  try {
+    res.json({ tunnel: await completeClaim() });
+  } catch (err) {
+    res.status(err instanceof TunnelError ? 400 : 500).json({ error: (err as Error).message });
+  }
+});
+
+serversRouter.post("/:id/tunnel/reset", requirePermission("settings"), async (_req, res) => {
+  try {
+    res.json({ tunnel: await resetTunnel() });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 serversRouter.get("/:id/why", requireAnyPermission, async (req, res) => {
   const entry = serverRegistry.get(req.params.id);
   if (!entry) {
